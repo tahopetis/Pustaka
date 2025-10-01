@@ -1,0 +1,177 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: pustaka-postgres
+    environment:
+      POSTGRES_DB: pustaka
+      POSTGRES_USER: pustaka
+      POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./cmd/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - pustaka-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pustaka -d pustaka"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: pustaka-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/password
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_memory_heap_initial__size: 2g
+      NEO4J_dbms_memory_heap_max__size: 4g
+      NEO4J_dbms_memory_pagecache_size: 2g
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    networks:
+      - pustaka-network
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "password", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: pustaka-redis
+    command: redis-server --appendonly yes --requirepass redispassword
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - pustaka-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: pustaka-api
+    environment:
+      # Database Configuration
+      PUSTAKA_DATABASE_URL: postgres://pustaka:password@postgres:5432/pustaka?sslmode=disable
+      PUSTAKA_POSTGRES_PASSWORD: password
+      PUSTAKA_POSTGRES_USER: pustaka
+      PUSTAKA_POSTGRES_DB: pustaka
+
+      # Neo4j Configuration
+      PUSTAKA_NEO4J_URI: bolt://neo4j:7687
+      PUSTAKA_NEO4J_USERNAME: neo4j
+      PUSTAKA_NEO4J_PASSWORD: password
+      PUSTAKA_NEO4J_DATABASE: neo4j
+
+      # Redis Configuration
+      PUSTAKA_REDIS_URL: redis://:redispassword@redis:6379
+      PUSTAKA_REDIS_PASSWORD: redispassword
+
+      # JWT Configuration
+      PUSTAKA_JWT_SECRET: super-secret-jwt-key-change-this-in-production
+      PUSTAKA_JWT_ACCESS_TOKEN_TTL: 24h
+      PUSTAKA_JWT_REFRESH_TOKEN_TTL: 168h
+
+      # Server Configuration
+      PUSTAKA_SERVER_HOST: 0.0.0.0
+      PUSTAKA_SERVER_PORT: 8080
+      PUSTAKA_SERVER_READ_TIMEOUT: 30s
+      PUSTAKA_SERVER_WRITE_TIMEOUT: 30s
+      PUSTAKA_SERVER_IDLE_TIMEOUT: 60s
+
+      # CORS Configuration
+      PUSTAKA_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
+      PUSTAKA_CORS_ALLOWED_METHODS: GET,POST,PUT,DELETE,OPTIONS
+      PUSTAKA_CORS_ALLOWED_HEADERS: Origin,Content-Type,Accept,Authorization,X-Request-ID
+
+      # Logging Configuration
+      PUSTAKA_LOGGING_LEVEL: info
+      PUSTAKA_LOGGING_FORMAT: json
+
+      # Admin Configuration
+      PUSTAKA_ADMIN_USERNAME: admin
+      PUSTAKA_ADMIN_EMAIL: admin@pustaka.dev
+      PUSTAKA_ADMIN_PASSWORD: Admin@123
+
+      # Environment
+      PUSTAKA_ENVIRONMENT: development
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pustaka-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: pustaka-frontend
+    environment:
+      VITE_API_URL: http://localhost:8080
+      VITE_API_BASE_URL: /api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - pustaka-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  neo4j_import:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  pustaka-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
