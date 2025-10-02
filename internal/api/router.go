@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -39,6 +40,16 @@ func NewRouter(
 }
 
 func (r *Router) setupRoutes() {
+	// Add debugging middleware to log all requests
+	r.router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Log request path and variables
+			vars := mux.Vars(r)
+			fmt.Printf("DEBUG: Request path: %s, vars: %+v\n", r.URL.Path, vars)
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	// API versioning
 	v1 := r.router.PathPrefix("/api/v1").Subrouter()
 
@@ -46,31 +57,28 @@ func (r *Router) setupRoutes() {
 	v1.HandleFunc("/health", r.healthCheck).Methods("GET")
 
 	// Configuration Items
-	ci := v1.PathPrefix("/ci").Subrouter()
-	ci.HandleFunc("", r.ciHandlers.CreateCI).Methods("POST")
-	ci.HandleFunc("", r.ciHandlers.ListCIs).Methods("GET")
-	ci.HandleFunc("/{id}", r.ciHandlers.GetCI).Methods("GET")
-	ci.HandleFunc("/{id}", r.ciHandlers.UpdateCI).Methods("PUT")
-	ci.HandleFunc("/{id}", r.ciHandlers.DeleteCI).Methods("DELETE")
-	ci.HandleFunc("/{id}/relationships", r.ciHandlers.GetCIRelationships).Methods("GET")
-	ci.HandleFunc("/{id}/network", r.ciHandlers.GetCINetwork).Methods("GET")
-	ci.HandleFunc("/{id}/impact", r.ciHandlers.GetImpactAnalysis).Methods("GET")
+	v1.HandleFunc("/ci", r.ciHandlers.CreateCI).Methods("POST")
+	v1.HandleFunc("/ci", r.ciHandlers.ListCIs).Methods("GET")
+	v1.HandleFunc("/ci/{id}", r.ciHandlers.GetCI).Methods("GET")
+	v1.HandleFunc("/ci/{id}", r.ciHandlers.UpdateCI).Methods("PUT")
+	v1.HandleFunc("/ci/{id}", r.ciHandlers.DeleteCI).Methods("DELETE")
+	v1.HandleFunc("/ci/{id}/relationships", r.ciHandlers.GetCIRelationships).Methods("GET")
+	v1.HandleFunc("/ci/{id}/network", r.ciHandlers.GetCINetwork).Methods("GET")
+	v1.HandleFunc("/ci/{id}/impact", r.ciHandlers.GetImpactAnalysis).Methods("GET")
 
 	// CI Types
-	types := v1.PathPrefix("/ci-types").Subrouter()
-	types.HandleFunc("", r.typeHandlers.CreateCIType).Methods("POST")
-	types.HandleFunc("", r.typeHandlers.ListCITypes).Methods("GET")
-	types.HandleFunc("/{id}", r.typeHandlers.GetCIType).Methods("GET")
-	types.HandleFunc("/{id}", r.typeHandlers.UpdateCIType).Methods("PUT")
-	types.HandleFunc("/{id}", r.typeHandlers.DeleteCIType).Methods("DELETE")
+	v1.HandleFunc("/ci-types", r.typeHandlers.CreateCIType).Methods("POST")
+	v1.HandleFunc("/ci-types", r.typeHandlers.ListCITypes).Methods("GET")
+	v1.HandleFunc("/ci-types/{id}", r.typeHandlers.GetCIType).Methods("GET")
+	v1.HandleFunc("/ci-types/{id}", r.typeHandlers.UpdateCIType).Methods("PUT")
+	v1.HandleFunc("/ci-types/{id}", r.typeHandlers.DeleteCIType).Methods("DELETE")
 
 	// Relationships
-	relationships := v1.PathPrefix("/relationships").Subrouter()
-	relationships.HandleFunc("", r.relHandlers.CreateRelationship).Methods("POST")
-	relationships.HandleFunc("", r.relHandlers.ListRelationships).Methods("GET")
-	relationships.HandleFunc("/{id}", r.relHandlers.GetRelationship).Methods("GET")
-	relationships.HandleFunc("/{id}", r.relHandlers.UpdateRelationship).Methods("PUT")
-	relationships.HandleFunc("/{id}", r.relHandlers.DeleteRelationship).Methods("DELETE")
+	v1.HandleFunc("/relationships", r.relHandlers.CreateRelationship).Methods("POST")
+	v1.HandleFunc("/relationships", r.relHandlers.ListRelationships).Methods("GET")
+	v1.HandleFunc("/relationships/{id}", r.relHandlers.GetRelationship).Methods("GET")
+	v1.HandleFunc("/relationships/{id}", r.relHandlers.UpdateRelationship).Methods("PUT")
+	v1.HandleFunc("/relationships/{id}", r.relHandlers.DeleteRelationship).Methods("DELETE")
 
 	// Graph operations
 	graph := v1.PathPrefix("/graph").Subrouter()

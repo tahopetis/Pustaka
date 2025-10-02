@@ -1,15 +1,14 @@
 <template>
-  <div class="px-4 py-6 sm:px-0">
-    <div class="max-w-4xl mx-auto">
-      <!-- Page header -->
-      <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">
-          {{ isEdit ? 'Edit Configuration Item' : 'Create Configuration Item' }}
-        </h1>
-        <p class="mt-2 text-gray-600">
-          {{ isEdit ? 'Update the configuration item details' : 'Add a new configuration item to your CMDB' }}
-        </p>
-      </div>
+  <div class="page-container page-content" style="max-width: 1024px; margin: 0 auto;">
+    <!-- Page header -->
+    <div class="page-header">
+      <h1 class="page-title">
+        {{ isEdit ? 'Edit Configuration Item' : 'Create Configuration Item' }}
+      </h1>
+      <p class="page-subtitle">
+        {{ isEdit ? 'Update the configuration item details' : 'Add a new configuration item to your CMDB' }}
+      </p>
+    </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Basic Information -->
@@ -182,7 +181,6 @@
           </button>
         </div>
       </form>
-    </div>
   </div>
 </template>
 
@@ -319,7 +317,7 @@ const loadCI = async () => {
     form.name = existingCI.value.name
     form.ci_type = existingCI.value.ci_type
     form.attributes = { ...existingCI.value.attributes }
-    form.tags = [...existingCI.value.tags]
+    form.tags = existingCI.value.tags ? [...existingCI.value.tags] : []
 
     // Wait for CI type to be loaded and set up validation
     await new Promise(resolve => setTimeout(resolve, 100))

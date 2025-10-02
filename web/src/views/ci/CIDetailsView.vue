@@ -1,8 +1,7 @@
 <template>
-  <div class="px-4 py-6 sm:px-0">
-    <div class="max-w-7xl mx-auto">
-      <!-- Page header -->
-      <div class="mb-8 flex justify-between items-center">
+  <div class="page-container page-content">
+    <!-- Page header -->
+    <div class="page-header flex justify-between items-center">
         <div>
           <nav class="flex" aria-label="Breadcrumb">
             <ol class="flex items-center space-x-4">
@@ -91,7 +90,10 @@
               <h3 class="text-lg leading-6 font-medium text-gray-900">Attributes</h3>
             </div>
             <div class="card-body">
-              <div v-if="!ciType || !ci" class="text-center py-8">
+              <div v-if="!ci" class="text-center py-8">
+                <p class="text-gray-500">Loading configuration item...</p>
+              </div>
+              <div v-else-if="!ciType" class="text-center py-8">
                 <p class="text-gray-500">Loading attributes...</p>
               </div>
               <div v-else-if="Object.keys(ci.attributes).length === 0" class="text-center py-8">
@@ -169,7 +171,7 @@
               <h3 class="text-lg leading-6 font-medium text-gray-900">Tags</h3>
             </div>
             <div class="card-body">
-              <div v-if="ci.tags.length === 0" class="text-center py-4">
+              <div v-if="!ci.tags || ci.tags.length === 0" class="text-center py-4">
                 <p class="text-gray-500 text-sm">No tags</p>
               </div>
               <div v-else class="flex flex-wrap gap-2">
@@ -203,7 +205,6 @@
           </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
 
@@ -255,8 +256,10 @@ const loadCIType = async () => {
   if (!ci.value) return
 
   try {
-    const response = await ciTypeAPI.get(ci.value.ci_type)
-    ciType.value = response.data
+    // Get all CI types and find the matching one by name
+    const response = await ciTypeAPI.list()
+    const ciTypes = response.data.ci_types || []
+    ciType.value = ciTypes.find(type => type.name === ci.value.ci_type) || null
   } catch (error) {
     console.error('Failed to load CI type:', error)
   }

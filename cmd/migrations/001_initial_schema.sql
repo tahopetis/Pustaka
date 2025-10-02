@@ -85,7 +85,9 @@ CREATE TABLE relationships (
     relationship_type VARCHAR(50) NOT NULL,
     attributes JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_by UUID REFERENCES users(id),
+    updated_by UUID REFERENCES users(id),
 
     -- Constraints
     CONSTRAINT no_self_relationship CHECK (source_id != target_id),
@@ -154,6 +156,9 @@ CREATE TRIGGER update_ci_type_definitions_updated_at BEFORE UPDATE ON ci_type_de
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_configuration_items_updated_at BEFORE UPDATE ON configuration_items
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_relationships_updated_at BEFORE UPDATE ON relationships
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert default roles and permissions

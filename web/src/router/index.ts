@@ -57,6 +57,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/relationships/new',
+      name: 'CreateRelationship',
+      component: () => import('@/views/relationships/RelationshipFormView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'relationship:create' }
+    },
+    {
       path: '/graph',
       name: 'Graph',
       component: () => import('@/views/graph/GraphView.vue'),

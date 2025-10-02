@@ -1,10 +1,10 @@
 <template>
-  <div class="space-y-6">
+  <div class="page-container page-content">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div class="page-header flex justify-between items-center">
       <div>
-        <h1 class="text-2xl font-semibold text-gray-900">CI Type Management</h1>
-        <p class="mt-1 text-sm text-gray-500">
+        <h1 class="page-title">CI Type Management</h1>
+        <p class="page-subtitle">
           Define and manage configuration item type schemas
         </p>
       </div>
@@ -286,7 +286,12 @@ const loadCITypes = async () => {
       searchQuery.value
     )
     ciTypes.value = response.ci_types
-    pagination.value = response.pagination
+    pagination.value = {
+      page: response.page,
+      limit: response.limit,
+      total: response.total,
+      total_pages: response.total_pages
+    }
   } catch (error) {
     notificationStore.showError('Failed to load CI types')
     console.error('Error loading CI types:', error)

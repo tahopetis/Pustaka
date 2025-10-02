@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/google/uuid"
+	"github.com/pustaka/pustaka/internal/api/middleware"
 	"github.com/pustaka/pustaka/internal/ci"
 )
 
@@ -34,7 +36,16 @@ func NewCIHandlers(handler *Handler, ciService *ci.Service) *CIHandlers {
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/ci [post]
 func (h *CIHandlers) CreateCI(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(uuid.UUID)
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
 
 	var req ci.CreateCIRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -55,6 +66,11 @@ func (h *CIHandlers) CreateCI(w http.ResponseWriter, r *http.Request) {
 	ci, err := h.ciService.CreateCI(r.Context(), &req, userID)
 	if err != nil {
 		if err.Error() == "Attribute validation failed" {
+			h.logger.ErrorService("ci", "CREATE_CI_VALIDATION", err, map[string]interface{}{
+				"request": req,
+				"user_id": userID,
+				"error_type": "validation",
+			})
 			h.writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
@@ -84,6 +100,9 @@ func (h *CIHandlers) CreateCI(w http.ResponseWriter, r *http.Request) {
 func (h *CIHandlers) GetCI(w http.ResponseWriter, r *http.Request) {
 	ciID, err := h.getUUIDParam(r, "id")
 	if err != nil {
+		h.logger.ErrorService("ci", "GET_CI_UUID_PARSE", err, map[string]interface{}{
+			"id_param": mux.Vars(r)["id"],
+		})
 		h.writeError(w, http.StatusBadRequest, "Invalid CI ID")
 		return
 	}
@@ -171,7 +190,16 @@ func (h *CIHandlers) ListCIs(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/ci/{id} [put]
 func (h *CIHandlers) UpdateCI(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(uuid.UUID)
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
 	ciID, err := h.getUUIDParam(r, "id")
 	if err != nil {
 		h.writeError(w, http.StatusBadRequest, "Invalid CI ID")
@@ -220,7 +248,16 @@ func (h *CIHandlers) UpdateCI(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/ci/{id} [delete]
 func (h *CIHandlers) DeleteCI(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(uuid.UUID)
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
 	ciID, err := h.getUUIDParam(r, "id")
 	if err != nil {
 		h.writeError(w, http.StatusBadRequest, "Invalid CI ID")

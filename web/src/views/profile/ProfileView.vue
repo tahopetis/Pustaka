@@ -1,11 +1,10 @@
 <template>
-  <div class="px-4 py-6 sm:px-0">
-    <div class="max-w-3xl mx-auto">
-      <!-- Page header -->
-      <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Profile</h1>
-        <p class="mt-2 text-gray-600">Manage your account settings and preferences</p>
-      </div>
+  <div class="page-container page-content" style="max-width: 768px; margin: 0 auto;">
+    <!-- Page header -->
+    <div class="page-header">
+      <h1 class="page-title">Profile</h1>
+      <p class="page-subtitle">Manage your account settings and preferences</p>
+    </div>
 
       <div class="bg-white shadow rounded-lg">
         <div class="card-body">
@@ -70,7 +69,6 @@
           </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
 

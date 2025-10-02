@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/pustaka/pustaka/internal/api/middleware"
 	"github.com/pustaka/pustaka/internal/ci"
 )
 
@@ -35,7 +36,16 @@ func NewRelationshipHandlers(handler *Handler, ciService *ci.Service) *Relations
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/relationships [post]
 func (h *RelationshipHandlers) CreateRelationship(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(uuid.UUID)
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
 
 	var req ci.CreateRelationshipRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

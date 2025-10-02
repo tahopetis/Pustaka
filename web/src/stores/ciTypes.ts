@@ -30,12 +30,10 @@ export interface CIType {
 
 export interface CITypeListResponse {
   ci_types: CIType[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    total_pages: number
-  }
+  page: number
+  limit: number
+  total: number
+  total_pages: number
 }
 
 export interface CITypeUsage {

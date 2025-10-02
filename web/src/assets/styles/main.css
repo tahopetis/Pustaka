@@ -53,6 +53,27 @@
     @apply px-4 py-5 sm:p-6;
   }
 
+  /* Page layout styles */
+  .page-container {
+    @apply px-6 py-6 lg:px-8;
+  }
+
+  .page-content {
+    @apply max-w-full;
+  }
+
+  .page-header {
+    @apply mb-8;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold text-gray-900;
+  }
+
+  .page-subtitle {
+    @apply mt-2 text-sm text-gray-600;
+  }
+
   /* Table styles */
   .table {
     @apply min-w-full divide-y divide-gray-200;

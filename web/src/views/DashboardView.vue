@@ -1,11 +1,10 @@
 <template>
-  <div class="px-4 py-6 sm:px-0">
-    <div class="max-w-7xl mx-auto">
-      <!-- Page header -->
-      <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p class="mt-2 text-gray-600">Welcome back, {{ user?.username }}!</p>
-      </div>
+  <div class="page-container page-content">
+    <!-- Page header -->
+    <div class="page-header">
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle">Welcome back, {{ user?.username }}!</p>
+    </div>
 
       <!-- Stats cards -->
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -155,7 +154,6 @@
           </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
 

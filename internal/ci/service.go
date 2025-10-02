@@ -43,6 +43,11 @@ func (s *Service) CreateCI(ctx context.Context, req *CreateCIRequest, userID uui
 	// Validate attributes against schema
 	validationErrors := ciType.ValidateAttributes(req.Attributes)
 	if len(validationErrors) > 0 {
+		s.logger.ErrorService("ci", "CREATE_CI_VALIDATION_DETAIL", fmt.Errorf("validation errors"), map[string]interface{}{
+			"ci_type": req.CIType,
+			"attributes": req.Attributes,
+			"validation_errors": validationErrors,
+		})
 		return nil, ServiceValidationError{
 			Message: "Attribute validation failed",
 			Errors:  validationErrors,

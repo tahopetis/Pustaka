@@ -1,12 +1,11 @@
 <template>
-  <div class="px-4 py-6 sm:px-0">
-    <div class="max-w-7xl mx-auto">
-      <!-- Page header -->
-      <div class="mb-8 flex justify-between items-center">
-        <div>
-          <h1 class="text-3xl font-bold text-gray-900">Configuration Items</h1>
-          <p class="mt-2 text-gray-600">Manage your configuration items and their relationships</p>
-        </div>
+  <div class="page-container page-content">
+    <!-- Page header -->
+    <div class="page-header flex justify-between items-center">
+      <div>
+        <h1 class="page-title">Configuration Items</h1>
+        <p class="page-subtitle">Manage your configuration items and their relationships</p>
+      </div>
         <router-link
           v-if="hasPermission('ci:create')"
           to="/ci/new"
@@ -164,7 +163,6 @@
           </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
 
@@ -243,7 +241,8 @@ const loadCIs = async () => {
       params.attributes = cleanedAttributes
     }
 
-    response.value = await ciAPI.list(params)
+    const apiResponse = await ciAPI.list(params)
+    response.value = apiResponse.data
   } catch (error) {
     console.error('Failed to load CIs:', error)
     showErrorToast('Failed to load configuration items')

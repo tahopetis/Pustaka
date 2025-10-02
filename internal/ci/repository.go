@@ -210,13 +210,11 @@ func (r *Repository) ListCIs(ctx context.Context, filters ListCIFilters, page, l
 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 
 	return &CIListResponse{
-		CIs: cis,
-		Pagination: PaginationResponse{
-			Page:       page,
-			Limit:      limit,
-			Total:      total,
-			TotalPages: totalPages,
-		},
+		CIs:        cis,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
 	}, nil
 }
 
@@ -494,13 +492,11 @@ func (r *Repository) ListCITypes(ctx context.Context, page, limit int, search st
 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 
 	return &CITypeListResponse{
-		CITypes: ciTypes,
-		Pagination: PaginationResponse{
-			Page:       page,
-			Limit:      limit,
-			Total:      total,
-			TotalPages: totalPages,
-		},
+		CITypes:    ciTypes,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
 	}, nil
 }
 
@@ -789,12 +785,10 @@ func (r *Repository) ListRelationships(ctx context.Context, filters ListRelation
 
 	return &RelationshipListResponse{
 		Relationships: relationships,
-		Pagination: PaginationResponse{
-			Page:       page,
-			Limit:      limit,
-			Total:      total,
-			TotalPages: totalPages,
-		},
+		Page:          page,
+		Limit:         limit,
+		Total:         total,
+		TotalPages:    totalPages,
 	}, nil
 }
 

@@ -1,11 +1,10 @@
 <template>
-  <div class="px-4 py-6 sm:px-0">
-    <div class="max-w-7xl mx-auto">
-      <!-- Page header -->
-      <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Graph Visualization</h1>
-        <p class="mt-2 text-gray-600">Explore relationships between your configuration items</p>
-      </div>
+  <div class="page-container page-content">
+    <!-- Page header -->
+    <div class="page-header">
+      <h1 class="page-title">Graph Visualization</h1>
+      <p class="page-subtitle">Explore relationships between your configuration items</p>
+    </div>
 
       <!-- Controls -->
       <div class="bg-white shadow rounded-lg mb-6">
@@ -174,7 +173,6 @@
           </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
 

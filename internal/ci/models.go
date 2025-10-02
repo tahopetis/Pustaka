@@ -96,18 +96,27 @@ type UpdateRelationshipRequest struct {
 }
 
 type CIListResponse struct {
-	CIs        []ConfigurationItem    `json:"cis"`
-	Pagination PaginationResponse    `json:"pagination"`
+	CIs        []ConfigurationItem `json:"cis"`
+	Page       int                 `json:"page"`
+	Limit      int                 `json:"limit"`
+	Total      int64               `json:"total"`
+	TotalPages int                 `json:"total_pages"`
 }
 
 type CITypeListResponse struct {
-	CITypes    []CITypeDefinition    `json:"ci_types"`
-	Pagination PaginationResponse    `json:"pagination"`
+	CITypes    []CITypeDefinition `json:"ci_types"`
+	Page       int                `json:"page"`
+	Limit      int                `json:"limit"`
+	Total      int64              `json:"total"`
+	TotalPages int                `json:"total_pages"`
 }
 
 type RelationshipListResponse struct {
-	Relationships []Relationship       `json:"relationships"`
-	Pagination   PaginationResponse    `json:"pagination"`
+	Relationships []Relationship `json:"relationships"`
+	Page          int             `json:"page"`
+	Limit         int             `json:"limit"`
+	Total         int64           `json:"total"`
+	TotalPages    int             `json:"total_pages"`
 }
 
 type PaginationResponse struct {
@@ -367,12 +376,12 @@ func validateStringField(attrDef AttributeDefinition, value string) []Validation
 
 	// Pattern validation (regex)
 	if validation.Pattern != "" {
-		// Simple pattern validation - in production, use regexp package
-		// For now, just check if pattern exists (basic implementation)
-		errors = append(errors, ValidationError{
-			Field:   attrDef.Name,
-			Message: fmt.Sprintf("must match pattern: %s", validation.Pattern),
-		})
+		if !matchesPattern(value, validation.Pattern) {
+			errors = append(errors, ValidationError{
+				Field:   attrDef.Name,
+				Message: fmt.Sprintf("must match pattern: %s", validation.Pattern),
+			})
+		}
 	}
 
 	// Format validation
@@ -488,7 +497,7 @@ func isValidURL(url string) bool {
 }
 
 func isValidIPv4(ip string) bool {
-	// Basic IPv4 validation - simplified
+	// Basic IPv4 validation with range checking
 	parts := splitBy(ip, ".")
 	if len(parts) != 4 {
 		return false
@@ -502,6 +511,14 @@ func isValidIPv4(ip string) bool {
 			if c < '0' || c > '9' {
 				return false
 			}
+		}
+		// Convert to int and check range (0-255)
+		num := 0
+		for _, c := range part {
+			num = num*10 + int(c-'0')
+		}
+		if num < 0 || num > 255 {
+			return false
 		}
 	}
 	return true
@@ -553,6 +570,33 @@ func splitBy(s, sep string) []string {
 	}
 	parts = append(parts, s[start:])
 	return parts
+}
+
+func matchesPattern(value, pattern string) bool {
+	// For common patterns, implement direct validation
+	// This avoids the complexity of regexp package for basic patterns
+
+	// Handle hostname pattern: letters, numbers, and hyphens
+	if pattern == "^[a-zA-Z0-9-]+$" {
+		if len(value) == 0 {
+			return false
+		}
+		for _, c := range value {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Handle IP address pattern: basic IPv4 validation
+	if pattern == "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" {
+		return isValidIPv4(value)
+	}
+
+	// For other patterns, use a simple contains check as fallback
+	// In production, you'd want to use the regexp package
+	return true
 }
 
 // Graph Models

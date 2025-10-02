@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/google/uuid"
 	"github.com/pustaka/pustaka/internal/ci"
 )
@@ -81,6 +82,9 @@ func (h *CITypeHandlers) CreateCIType(w http.ResponseWriter, r *http.Request) {
 func (h *CITypeHandlers) GetCIType(w http.ResponseWriter, r *http.Request) {
 	ciTypeID, err := h.getUUIDParam(r, "id")
 	if err != nil {
+		h.logger.ErrorService("ci_type", "GET_CI_TYPE_UUID_PARSE", err, map[string]interface{}{
+			"id_param": mux.Vars(r)["id"],
+		})
 		h.writeError(w, http.StatusBadRequest, "Invalid CI type ID")
 		return
 	}
