@@ -145,7 +145,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useCITypesStore } from '@/stores/ciTypes'
+import { useCITypesStore, type CIType } from '@/stores/ciTypes'
 import { useNotificationStore } from '@/stores/notification'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
@@ -170,6 +170,7 @@ interface AttributeDefinition {
 }
 
 interface CITypeForm {
+  id?: string
   name: string
   description?: string
   required_attributes: AttributeDefinition[]
@@ -177,7 +178,7 @@ interface CITypeForm {
 }
 
 const props = defineProps<{
-  ciType?: CITypeForm
+  ciType?: CIType
   isEdit?: boolean
 }>()
 
@@ -197,10 +198,21 @@ const form = ref<CITypeForm>({
   optional_attributes: []
 })
 
-// Initialize form with CI type data if editing
+// Helper functions must be defined before they are used in watch
+const resetForm = () => {
+  form.value = {
+    name: '',
+    description: '',
+    required_attributes: [],
+    optional_attributes: []
+  }
+}
+
+// Initialize form with CI type data if editing - moved after resetForm definition
 watch(() => props.ciType, (ciType) => {
   if (ciType) {
     form.value = {
+      id: ciType.id,
       name: ciType.name,
       description: ciType.description || '',
       required_attributes: [...ciType.required_attributes],
@@ -219,15 +231,6 @@ const schemaPreview = computed(() => {
     optional_attributes: form.value.optional_attributes
   }, null, 2)
 })
-
-const resetForm = () => {
-  form.value = {
-    name: '',
-    description: '',
-    required_attributes: [],
-    optional_attributes: []
-  }
-}
 
 const addRequiredAttribute = () => {
   form.value.required_attributes.push({
@@ -299,30 +302,114 @@ const validateForm = (): string[] => {
   return errors
 }
 
-const handleSubmit = async () => {
-  const errors = validateForm()
-  if (errors.length > 0) {
-    notificationStore.showError(errors.join('\n'))
-    return
+const cleanValidationData = (validation: any) => {
+  if (!validation || typeof validation !== 'object') {
+    return {}
   }
 
+  const cleaned: any = {}
+  Object.keys(validation).forEach(key => {
+    const value = validation[key]
+    if (value !== undefined && value !== null && value !== '') {
+      cleaned[key] = value
+    }
+  })
+
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined
+}
+
+const cleanAttributeData = (attributes: AttributeDefinition[]): any[] => {
+  return attributes.map(attr => ({
+    name: attr.name.trim(),
+    type: attr.type,
+    description: attr.description.trim(),
+    validation: cleanValidationData(attr.validation)
+  })).filter(attr => attr.name) // Filter out empty attributes
+}
+
+const handleSubmit = async () => {
   try {
+    // Validate form
+    const errors = validateForm()
+    if (errors.length > 0) {
+      console.error('❌ Validation errors:', errors)
+      notificationStore.showError(errors.join('\n'))
+      return
+    }
+
+    console.log('✅ Form validation passed')
     isSubmitting.value = true
 
-    if (props.isEdit && props.ciType) {
-      await ciTypesStore.updateCIType(props.ciType.id!, form.value)
-    } else {
-      await ciTypesStore.createCIType(form.value)
+    // Clean and prepare the data
+    const cleanedData = {
+      description: form.value.description?.trim() || undefined,
+      required_attributes: cleanAttributeData(form.value.required_attributes),
+      optional_attributes: cleanAttributeData(form.value.optional_attributes)
     }
 
-    emit('saved')
-  } catch (error: any) {
-    console.error('Error saving CI type:', error)
-    if (error.message.includes('already exists')) {
-      notificationStore.showError('A CI type with this name already exists')
+    console.log('📤 Submitting data:', {
+      isEdit: props.isEdit,
+      id: props.ciType?.id,
+      data: cleanedData
+    })
+
+    if (props.isEdit && props.ciType?.id) {
+      console.log('📝 Updating existing CI Type')
+      await ciTypesStore.updateCIType(props.ciType.id, cleanedData)
+      notificationStore.showSuccess('CI Type updated successfully')
     } else {
-      notificationStore.showError('Failed to save CI type')
+      console.log('➕ Creating new CI Type')
+      // For create, include the name
+      await ciTypesStore.createCIType({
+        name: form.value.name.trim(),
+        ...cleanedData
+      })
+      notificationStore.showSuccess('CI Type created successfully')
     }
+
+    console.log('✅ CI Type saved successfully')
+
+    // Emit saved event and close modal
+    emit('saved')
+
+  } catch (error: any) {
+    console.error('❌ Error saving CI type:', error)
+
+    // Enhanced error handling
+    let errorMessage = 'Failed to save CI type. Please try again.'
+
+    if (error.response) {
+      const status = error.response.status
+      const errorData = error.response.data
+
+      console.error('Error response:', { status, data: errorData })
+
+      if (status === 422) {
+        const errorDetails = errorData?.error?.details
+        if (errorDetails) {
+          const errorMessages = Object.values(errorDetails).flat()
+          errorMessage = `Validation errors: ${errorMessages.join('. ')}`
+        } else {
+          errorMessage = 'Validation failed. Please check your input.'
+        }
+      } else if (status === 409) {
+        errorMessage = 'A CI type with this name already exists'
+      } else if (status >= 500) {
+        const serverMessage = errorData?.error?.message || 'Server error occurred'
+        errorMessage = `${serverMessage}. Please try again later.`
+      }
+    } else if (error.message) {
+      if (error.message.includes('already exists')) {
+        errorMessage = 'A CI type with this name already exists'
+      } else if (error.message.includes('network')) {
+        errorMessage = 'Network error. Please check your connection.'
+      } else {
+        errorMessage = error.message
+      }
+    }
+
+    notificationStore.showError(errorMessage)
+
   } finally {
     isSubmitting.value = false
   }

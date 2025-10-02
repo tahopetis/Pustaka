@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/google/uuid"
 	"github.com/pustaka/pustaka/internal/ci"
+	"github.com/pustaka/pustaka/internal/api/middleware"
 )
 
 type CITypeHandlers struct {
@@ -36,7 +37,17 @@ func NewCITypeHandlers(handler *Handler, ciService *ci.Service) *CITypeHandlers 
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/ci-types [post]
 func (h *CITypeHandlers) CreateCIType(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(uuid.UUID)
+	// FIXED: Properly extract and parse user ID from context
+	userIDStr, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID in context")
+		return
+	}
 
 	var req ci.CreateCITypeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -158,7 +169,18 @@ func (h *CITypeHandlers) ListCITypes(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/ci-types/{id} [put]
 func (h *CITypeHandlers) UpdateCIType(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(uuid.UUID)
+	// FIXED: Properly extract and parse user ID from context
+	userIDStr, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID in context")
+		return
+	}
+
 	ciTypeID, err := h.getUUIDParam(r, "id")
 	if err != nil {
 		h.writeError(w, http.StatusBadRequest, "Invalid CI type ID")
@@ -203,7 +225,18 @@ func (h *CITypeHandlers) UpdateCIType(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/ci-types/{id} [delete]
 func (h *CITypeHandlers) DeleteCIType(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(uuid.UUID)
+	// FIXED: Properly extract and parse user ID from context
+	userIDStr, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID in context")
+		return
+	}
+
 	ciTypeID, err := h.getUUIDParam(r, "id")
 	if err != nil {
 		h.writeError(w, http.StatusBadRequest, "Invalid CI type ID")

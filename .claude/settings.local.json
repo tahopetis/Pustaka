@@ -22,7 +22,9 @@
       "Bash(go run:*)",
       "Bash(DATABASE_URL=postgres://test:password@postgres:5432/test go run:*)",
       "Bash(curl:*)",
-      "Bash(docker compose build:*)"
+      "Bash(docker compose build:*)",
+      "Bash(./api:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []

@@ -194,7 +194,18 @@ func (h *RelationshipHandlers) ListRelationships(w http.ResponseWriter, r *http.
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/relationships/{id} [put]
 func (h *RelationshipHandlers) UpdateRelationship(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(uuid.UUID)
+	// FIXED: Properly extract and parse user ID from context
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
 	relationshipID, err := h.getUUIDParam(r, "id")
 	if err != nil {
 		h.writeError(w, http.StatusBadRequest, "Invalid relationship ID")
@@ -238,7 +249,18 @@ func (h *RelationshipHandlers) UpdateRelationship(w http.ResponseWriter, r *http
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/relationships/{id} [delete]
 func (h *RelationshipHandlers) DeleteRelationship(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(uuid.UUID)
+	// FIXED: Properly extract and parse user ID from context
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
 	relationshipID, err := h.getUUIDParam(r, "id")
 	if err != nil {
 		h.writeError(w, http.StatusBadRequest, "Invalid relationship ID")

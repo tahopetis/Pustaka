@@ -16,7 +16,12 @@ api.interceptors.request.use(
   (config) => {
     const authStore = useAuthStore()
 
-    // Add request ID
+    // Add authorization header if token exists
+    if (authStore.accessToken) {
+      config.headers['Authorization'] = `Bearer ${authStore.accessToken}`
+    }
+
+    // Add request ID for tracking
     config.headers['X-Request-ID'] = crypto.randomUUID()
 
     return config
@@ -46,7 +51,8 @@ api.interceptors.response.use(
       const refreshed = await authStore.refreshAccessToken()
 
       if (refreshed && error.config) {
-        // Retry the original request
+        // Retry the original request with new token
+        error.config.headers['Authorization'] = `Bearer ${authStore.accessToken}`
         return api.request(error.config)
       } else {
         // Refresh failed, logout user but don't force redirect
@@ -68,7 +74,16 @@ api.interceptors.response.use(
 
     // Handle 500 Server errors
     if (error.response?.status >= 500) {
-      showToast('Server error occurred. Please try again later.', 'error')
+      const errorMessage = error.response.data?.error?.message || 'Server error occurred. Please try again later.'
+      showToast(errorMessage, 'error')
+      console.error('Server Error Details:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        url: error.config?.url,
+        method: error.config?.method,
+        requestData: error.config?.data
+      })
     }
 
     // Handle network errors
