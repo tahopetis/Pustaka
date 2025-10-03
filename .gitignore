@@ -48,11 +48,15 @@ neo4j_logs/
 redis_data/
 
 # Node.js
+node_modules/
 web/node_modules/
 web/dist/
 web/.nuxt/
 web/.output/
 web/.vite/
+
+# Claude AI agents and configuration
+.claude/
 
 # Test coverage
 coverage.txt
@@ -69,3 +73,7 @@ tmp/
 # Temporary files
 *.tmp
 *.temp
+
+# Debug files
+debug_*.js
+test_*.js
