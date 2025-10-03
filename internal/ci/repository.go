@@ -734,6 +734,12 @@ func (r *Repository) ListRelationships(ctx context.Context, filters ListRelation
 		argIndex++
 	}
 
+	if filters.Search != "" {
+		whereClause += fmt.Sprintf(" AND (id::text ILIKE $%d OR relationship_type ILIKE $%d OR attributes::text ILIKE $%d)", argIndex, argIndex+1, argIndex+2)
+		args = append(args, "%"+filters.Search+"%", "%"+filters.Search+"%", "%"+filters.Search+"%")
+		argIndex += 3
+	}
+
 	// Get total count
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM relationships %s", whereClause)
 	var total int64

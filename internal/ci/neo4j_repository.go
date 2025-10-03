@@ -422,7 +422,7 @@ func (r *Neo4jRepository) GetGraphData(ctx context.Context, filters GraphFilters
 
 		// Get nodes and relationships
 		cypher += `
-			OPTIONAL MATCH (ci)-[r:RELATES_TO]-(related:ConfigurationItem)
+			OPTIONAL MATCH (ci)-[r:RELATES_TO]->(related:ConfigurationItem)
 			RETURN ci, r, related
 			LIMIT $limit
 		`
@@ -442,6 +442,7 @@ func (r *Neo4jRepository) GetGraphData(ctx context.Context, filters GraphFilters
 			Edges: make([]GraphEdge, 0),
 		}
 		nodeMap := make(map[string]bool)
+		edgeMap := make(map[string]bool)
 
 		for cursor.Next(ctx) {
 			record := cursor.Record()
@@ -535,6 +536,11 @@ func (r *Neo4jRepository) GetGraphData(ctx context.Context, filters GraphFilters
 					return nil, fmt.Errorf("failed to parse relationship ID: %w", err)
 				}
 
+				// Create edge key to detect duplicates
+				edgeKey := fmt.Sprintf("%s-%s-%s", sourceID, targetID, relProps["type"].(string))
+
+				// Only add edge if we haven't added it before
+				if !edgeMap[edgeKey] {
 				// Add link
 				link := GraphEdge{
 					ID:               relIDUUID,
@@ -544,6 +550,8 @@ func (r *Neo4jRepository) GetGraphData(ctx context.Context, filters GraphFilters
 					Attributes:       attributes,
 				}
 				graphData.Edges = append(graphData.Edges, link)
+					edgeMap[edgeKey] = true // Mark this edge as added
+				}
 			}
 		}
 

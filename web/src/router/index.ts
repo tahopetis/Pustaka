@@ -63,6 +63,18 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresPermission: 'relationship:create' }
     },
     {
+      path: '/relationships/:id',
+      name: 'RelationshipDetails',
+      component: () => import('@/views/relationships/RelationshipDetailsView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/relationships/:id/edit',
+      name: 'EditRelationship',
+      component: () => import('@/views/relationships/RelationshipFormView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'relationship:update' }
+    },
+    {
       path: '/graph',
       name: 'Graph',
       component: () => import('@/views/graph/GraphView.vue'),

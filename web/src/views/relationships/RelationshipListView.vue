@@ -288,10 +288,13 @@ const loadRelationships = async () => {
       }
     })
 
-    response.value = await relationshipAPI.list(params)
+    const apiResponse = await relationshipAPI.list(params)
+    response.value = apiResponse.data
 
     // Load CI details for display
-    await loadCIDetails(response.value.relationships)
+    if (response.value && response.value.relationships) {
+      await loadCIDetails(response.value.relationships)
+    }
   } catch (error) {
     console.error('Failed to load relationships:', error)
     showErrorToast('Failed to load relationships')
@@ -301,6 +304,11 @@ const loadRelationships = async () => {
 }
 
 const loadCIDetails = async (relationships: Relationship[]) => {
+  if (!relationships || !Array.isArray(relationships)) {
+    console.warn('loadCIDetails called with invalid relationships:', relationships)
+    return
+  }
+
   const ciIds = new Set<string>()
 
   relationships.forEach(rel => {

@@ -141,7 +141,7 @@
                       <div>
                         <p class="text-sm font-medium text-gray-900">{{ rel.relationship_type }}</p>
                         <p class="text-xs text-gray-500">
-                          {{ rel.source_ci?.name }} → {{ rel.target_ci?.name }}
+                          {{ getRelationshipDisplayText(rel) }}
                         </p>
                       </div>
                     </div>
@@ -235,6 +235,20 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString()
 }
 
+const getRelationshipDisplayText = (rel: Relationship) => {
+  const sourceName = rel.source_ci?.name || `Unknown (${rel.source_id?.slice(0, 8)}...)`
+  const targetName = rel.target_ci?.name || `Unknown (${rel.target_id?.slice(0, 8)}...)`
+
+  // Check if current CI is the source or target
+  if (ci.value && rel.source_id === ci.value.id) {
+    // Outgoing relationship: Current CI is the source
+    return `${sourceName} → ${targetName}`
+  } else {
+    // Incoming relationship: Current CI is the target
+    return `${sourceName} ← ${targetName}`
+  }
+}
+
 const loadCI = async () => {
   if (!route.params.id) return
 
@@ -270,11 +284,59 @@ const loadRelationships = async () => {
 
   loadingRelationships.value = true
   try {
-    const response = await relationshipAPI.list({
-      source_id: ci.value.id,
-      limit: 50
-    })
-    relationships.value = response.data.relationships || []
+    // Query for relationships where current CI is either the source OR the target
+    const [sourceResponse, targetResponse] = await Promise.all([
+      relationshipAPI.list({
+        source_id: ci.value.id,
+        limit: 50
+      }),
+      relationshipAPI.list({
+        target_id: ci.value.id,
+        limit: 50
+      })
+    ])
+
+    // Combine both results, avoiding duplicates if any
+    const allRelationships = [
+      ...(sourceResponse.data.relationships || []),
+      ...(targetResponse.data.relationships || [])
+    ]
+
+    // Remove duplicates (in case there are relationships that match both queries - though unlikely)
+    const uniqueRelationships = allRelationships.filter((rel, index, arr) =>
+      arr.findIndex(r => r.id === rel.id) === index
+    )
+
+    // Fetch CI details for relationships where source_ci and target_ci are not populated
+    const relationshipsWithCIs = await Promise.all(
+      uniqueRelationships.map(async (rel: Relationship) => {
+        let updatedRel = { ...rel }
+
+        // Fetch source CI if not populated
+        if (!rel.source_ci && rel.source_id) {
+          try {
+            const sourceCIResponse = await ciAPI.get(rel.source_id)
+            updatedRel.source_ci = sourceCIResponse.data
+          } catch (error) {
+            console.warn(`Failed to load source CI ${rel.source_id}:`, error)
+          }
+        }
+
+        // Fetch target CI if not populated
+        if (!rel.target_ci && rel.target_id) {
+          try {
+            const targetCIResponse = await ciAPI.get(rel.target_id)
+            updatedRel.target_ci = targetCIResponse.data
+          } catch (error) {
+            console.warn(`Failed to load target CI ${rel.target_id}:`, error)
+          }
+        }
+
+        return updatedRel
+      })
+    )
+
+    relationships.value = relationshipsWithCIs
   } catch (error) {
     console.error('Failed to load relationships:', error)
   } finally {

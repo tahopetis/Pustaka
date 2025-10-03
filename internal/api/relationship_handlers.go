@@ -131,6 +131,7 @@ func (h *RelationshipHandlers) GetRelationship(w http.ResponseWriter, r *http.Re
 // @Param source_id query string false "Filter by source CI ID"
 // @Param target_id query string false "Filter by target CI ID"
 // @Param relationship_type query string false "Filter by relationship type"
+// @Param search query string false "Search term for relationships"
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(20)
 // @Success 200 {object} ci.RelationshipListResponse
@@ -153,6 +154,7 @@ func (h *RelationshipHandlers) ListRelationships(w http.ResponseWriter, r *http.
 	}
 
 	filters.RelationshipType = h.getQueryString(r, "relationship_type")
+	filters.Search = h.getQueryString(r, "search")
 
 	page := h.getQueryInt(r, "page", 1)
 	limit := h.getQueryInt(r, "limit", 20)

@@ -21,13 +21,37 @@
             </div>
             <div>
               <label class="form-label">Search</label>
-              <input
-                v-model="filters.search"
-                type="text"
-                placeholder="Search CI names..."
-                class="form-input"
-                @input="debouncedSearch"
-              >
+              <div class="relative">
+                <input
+                  v-model="filters.search"
+                  type="text"
+                  placeholder="Search CI names..."
+                  class="form-input pr-10"
+                  @input="debouncedSearch"
+                  @focus="showAutocomplete = true"
+                  @blur="hideAutocomplete"
+                >
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                  </svg>
+                </div>
+                <!-- Autocomplete dropdown -->
+                <div v-if="showAutocomplete && searchResults.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                  <div
+                    v-for="result in searchResults"
+                    :key="result.id"
+                    class="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between"
+                    @mousedown="selectSearchResult(result)"
+                  >
+                    <div>
+                      <div class="font-medium">{{ result.name }}</div>
+                      <div class="text-sm text-gray-500">{{ result.type }}</div>
+                    </div>
+                    <div class="w-2 h-2 rounded-full" :style="{ backgroundColor: getCITypeColor(result.type) }"></div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div>
               <label class="form-label">Max Nodes</label>
@@ -67,6 +91,12 @@
               </svg>
               Fit
             </button>
+            <button @click="clearGraph" class="btn btn-outline text-sm">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              Clear
+            </button>
           </div>
         </div>
         <div class="relative">
@@ -95,7 +125,37 @@
             ref="graphContainer"
             class="w-full"
             style="height: 600px;"
+            @contextmenu.prevent="handleRightClick"
           ></div>
+
+          <!-- Context Menu -->
+          <div
+            v-if="contextMenu.visible"
+            :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+            class="absolute z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+            @click="hideContextMenu"
+          >
+            <button
+              v-if="contextMenu.node"
+              @click="expandNode(contextMenu.node)"
+              class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+              </svg>
+              Expand Node
+            </button>
+            <button
+              v-if="contextMenu.node"
+              @click="viewNodeDetails(contextMenu.node)"
+              class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              View Details
+            </button>
+          </div>
         </div>
       </div>
 
@@ -179,9 +239,9 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { graphAPI, ciTypeAPI } from '@/services/api'
-import { showErrorToast } from '@/utils/toast'
-import type { GraphData, CIType } from '@/types/ci'
+import { graphAPI, ciAPI, ciTypeAPI } from '@/services/api'
+import { showErrorToast, showSuccessToast } from '@/utils/toast'
+import type { GraphData, CIType, CI } from '@/types/ci'
 
 // Import vis-network
 import { Network, DataSet } from 'vis-network/standalone/umd/vis-network.min'
@@ -189,13 +249,23 @@ import { Network, DataSet } from 'vis-network/standalone/umd/vis-network.min'
 const authStore = useAuthStore()
 
 const loading = ref(false)
-const graphContainer = ref<HTMLElement | null>(null)
-const network = ref<Network | null>(null)
-const graphData = ref<GraphData | null>(null)
-const ciTypes = ref<CIType[]>([])
+const graphContainer = ref(null)
+const network = ref(null)
+const graphData = ref(null)
+const ciTypes = ref([])
+const searchResults = ref([])
+const showAutocomplete = ref(false)
+
+// Context menu state
+const contextMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  node: null
+})
 
 const filters = reactive({
-  ci_types: [] as string[],
+  ci_types: [],
   search: '',
   limit: 100,
 })
@@ -222,11 +292,16 @@ const getCITypeColor = (type: string) => {
 
 const debouncedSearch = debounce(() => {
   loadGraphData()
+  if (filters.search.length >= 2) {
+    searchCIs()
+  } else {
+    searchResults.value = []
+  }
 }, 500)
 
-function debounce(func: Function, wait: number) {
-  let timeout: NodeJS.Timeout
-  return function executedFunction(...args: any[]) {
+function debounce(func, wait) {
+  let timeout
+  return function executedFunction(...args) {
     const later = () => {
       clearTimeout(timeout)
       func(...args)
@@ -260,6 +335,32 @@ const loadGraphData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const searchCIs = async () => {
+  if (!hasPermission('ci:read') || filters.search.length < 2) return
+
+  try {
+    const response = await ciAPI.search({
+      search: filters.search,
+      limit: 10
+    })
+    searchResults.value = response.data.cis || []
+  } catch (error) {
+    console.error('Failed to search CIs:', error)
+  }
+}
+
+const selectSearchResult = (ci) => {
+  filters.search = ci.name
+  showAutocomplete.value = false
+  loadGraphData()
+}
+
+const hideAutocomplete = () => {
+  setTimeout(() => {
+    showAutocomplete.value = false
+  }, 200)
 }
 
 const loadCITypes = async () => {
@@ -376,6 +477,53 @@ const renderGraph = () => {
       }
     }
   })
+
+  // Add right-click event listener
+  network.value.on('oncontext', (params) => {
+    if (params.nodes.length > 0) {
+      const nodeId = params.nodes[0]
+      const node = graphData.value?.nodes.find(n => n.id === nodeId)
+      if (node) {
+        showContextMenu(params.event, node)
+      }
+    }
+  })
+}
+
+const expandNode = async (node: any) => {
+  if (!hasPermission('ci:read')) return
+
+  try {
+    showSuccessToast(`Expanding connections for ${node.name}...`)
+    // TODO: Implement node expansion logic
+    // This could call a new API endpoint to get connected nodes
+    console.log('Expand node:', node)
+  } catch (error) {
+    console.error('Failed to expand node:', error)
+    showErrorToast('Failed to expand node')
+  }
+  hideContextMenu()
+}
+
+const viewNodeDetails = (node: any) => {
+  window.location.href = `/ci/${node.id}`
+  hideContextMenu()
+}
+
+const handleRightClick = (event) => {
+  event.preventDefault()
+}
+
+const showContextMenu = (event, node) => {
+  contextMenu.visible = true
+  contextMenu.x = event.clientX
+  contextMenu.y = event.clientY
+  contextMenu.node = node
+}
+
+const hideContextMenu = () => {
+  contextMenu.visible = false
+  contextMenu.node = null
 }
 
 const centerGraph = () => {
@@ -394,6 +542,24 @@ const fitGraph = () => {
     })
   }
 }
+
+const clearGraph = () => {
+  graphData.value = { nodes: [], edges: [] }
+  if (network.value) {
+    network.value.destroy()
+    network.value = null
+  }
+  filters.search = ''
+  filters.ci_types = []
+  searchResults.value = []
+}
+
+// Close context menu when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target || !(e.target as Element).closest('.absolute.z-20')) {
+    hideContextMenu()
+  }
+})
 
 onMounted(async () => {
   await loadCITypes()

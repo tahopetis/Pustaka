@@ -24,7 +24,15 @@
       "Bash(curl:*)",
       "Bash(docker compose build:*)",
       "Bash(./api:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(python3:*)",
+      "Bash(npm run lint)",
+      "Bash(netstat:*)",
+      "Bash(cat:*)",
+      "Bash(docker compose:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiYTU5ZGZhMDctZjU4Zi00MDUxLWFmNWUtYWMzN2ZjMjRjNjdkIiwidXNlcm5hbWUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AcHVzdGFrYS5kZXYiLCJyb2xlcyI6WyJhZG1pbiJdLCJwZXJtaXNzaW9ucyI6WyJyZWxhdGlvbnNoaXA6cmVhZCIsInJlbGF0aW9uc2hpcDpkZWxldGUiLCJjaV90eXBlOnVwZGF0ZSIsImNpOmNyZWF0ZSIsInN5c3RlbTphZG1pbiIsImNpX3R5cGU6ZGVsZXRlIiwiY2lfdHlwZTpyZWFkIiwicmVsYXRpb25zaGlwOmNyZWF0ZSIsImNpOnJlYWQiLCJ1c2VyOmRlbGV0ZSIsImF1ZGl0OnJlYWQiLCJ1c2VyOmNyZWF0ZSIsImNpOnVwZGF0ZSIsImNpX3R5cGU6Y3JlYXRlIiwidXNlcjp1cGRhdGUiLCJ1c2VyOnJlYWQiLCJyZWxhdGlvbnNoaXA6dXBkYXRlIiwiY2k6ZGVsZXRlIl0sImlzcyI6InB1c3Rha2EiLCJzdWIiOiJhNTlkZmEwNy1mNThmLTQwNTEtYWY1ZS1hYzM3ZmMyNGM2N2QiLCJhdWQiOlsicHVzdGFrYSJdLCJleHAiOjE3NTk1NzExNzYsIm5iZiI6MTc1OTQ4NDc3NiwiaWF0IjoxNzU5NDg0Nzc2LCJqdGkiOiJkYjAzYmMxZi01MjRhLTQ2YWEtYTg2Zi1jNGMxYjUzMDNhNDgifQ.MmAFQwwEY71QMm-rqbjtLY7WyqacFXiK3nAKIgYK7fs\")",
+      "Bash(node:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

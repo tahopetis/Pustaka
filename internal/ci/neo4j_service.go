@@ -362,3 +362,4 @@ func (s *Neo4jService) GetMostConnectedCIs(ctx context.Context, limit int) ([]CI
 
 	return result.([]CIConnectivity), nil
 }
+

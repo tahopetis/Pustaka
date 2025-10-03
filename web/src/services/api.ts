@@ -133,6 +133,12 @@ export const ciAPI = {
   }) => api.put(`/ci/${id}`, data),
 
   delete: (id: string) => api.delete(`/ci/${id}`),
+
+  search: (params?: {
+    search?: string
+    ci_types?: string[]
+    limit?: number
+  }) => api.get('/ci/search', { params }),
 }
 
 export const ciTypeAPI = {
@@ -190,11 +196,18 @@ export const relationshipAPI = {
 export const graphAPI = {
   getNodes: (id: string) => api.get(`/graph/nodes/${id}`),
   explore: (params?: {
+    ci_types?: string[]
+    search?: string
+    limit?: number
     center_id?: string
     depth?: number
-    node_types?: string[]
     relationship_types?: string[]
   }) => api.get('/graph/explore', { params }),
+
+  expandNode: (nodeId: string, params?: {
+    depth?: number
+    relationship_types?: string[]
+  }) => api.get(`/graph/nodes/${nodeId}/expand`, { params }),
 }
 
 export const auditAPI = {

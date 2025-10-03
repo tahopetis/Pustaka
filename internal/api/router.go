@@ -50,11 +50,11 @@ func (r *Router) setupRoutes() {
 		})
 	})
 
+	// Health check endpoint
+	r.router.HandleFunc("/health", r.healthCheck).Methods("GET")
+
 	// API versioning
 	v1 := r.router.PathPrefix("/api/v1").Subrouter()
-
-	// Health check
-	v1.HandleFunc("/health", r.healthCheck).Methods("GET")
 
 	// Configuration Items
 	v1.HandleFunc("/ci", r.ciHandlers.CreateCI).Methods("POST")
@@ -82,13 +82,22 @@ func (r *Router) setupRoutes() {
 
 	// Graph operations
 	graph := v1.PathPrefix("/graph").Subrouter()
+
+	// Graph endpoints
 	graph.HandleFunc("", r.ciHandlers.GetGraphData).Methods("GET")
+	graph.HandleFunc("/explore", r.ciHandlers.ExploreGraph).Methods("GET")
+
+	// CI network endpoint
+	v1.HandleFunc("/ci/{id}/network", r.ciHandlers.GetCINetwork).Methods("GET")
 
 	// Analytics
 	analytics := v1.PathPrefix("/analytics").Subrouter()
 	analytics.HandleFunc("/cycles", r.relHandlers.FindCycles).Methods("GET")
 	analytics.HandleFunc("/most-connected", r.relHandlers.GetMostConnectedCIs).Methods("GET")
 	analytics.HandleFunc("/ci-types/usage", r.typeHandlers.GetCITypesByUsage).Methods("GET")
+
+	// Dashboard
+	v1.HandleFunc("/dashboard/stats", r.ciHandlers.GetDashboardStats).Methods("GET")
 }
 
 func (r *Router) healthCheck(w http.ResponseWriter, req *http.Request) {
