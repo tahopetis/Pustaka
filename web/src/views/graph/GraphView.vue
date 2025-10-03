@@ -125,14 +125,18 @@
             ref="graphContainer"
             class="w-full"
             style="height: 600px;"
-            @contextmenu.prevent="handleRightClick"
           ></div>
 
           <!-- Context Menu -->
           <div
             v-if="contextMenu.visible"
-            :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
-            class="absolute z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+            :style="{
+              left: contextMenu.x + 'px',
+              top: contextMenu.y + 'px',
+              position: 'fixed',
+              zIndex: 9999
+            }"
+            class="bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-48"
             @click="hideContextMenu"
           >
             <button
@@ -397,7 +401,7 @@ const renderGraph = () => {
     graphData.value.edges.map(edge => ({
       from: edge.source,
       to: edge.target,
-      label: edge.type,
+      label: edge.relationship_type,
       color: {
         color: '#6b7280',
         highlight: '#3b82f6',
@@ -413,7 +417,7 @@ const renderGraph = () => {
           scaleFactor: 0.5,
         },
       },
-      title: `${edge.type}\n${JSON.stringify(edge.attributes || {}, null, 2)}`,
+      title: edge.relationship_type,
     }))
   )
 
@@ -484,7 +488,9 @@ const renderGraph = () => {
       const nodeId = params.nodes[0]
       const node = graphData.value?.nodes.find(n => n.id === nodeId)
       if (node) {
-        showContextMenu(params.event, node)
+        // Use the event from params if available, otherwise use the DOM event
+        const event = params.event || window.event
+        showContextMenu(event, node)
       }
     }
   })
@@ -510,11 +516,13 @@ const viewNodeDetails = (node: any) => {
   hideContextMenu()
 }
 
-const handleRightClick = (event) => {
-  event.preventDefault()
-}
 
 const showContextMenu = (event, node) => {
+  // Prevent default browser context menu
+  if (event.preventDefault) {
+    event.preventDefault()
+  }
+
   contextMenu.visible = true
   contextMenu.x = event.clientX
   contextMenu.y = event.clientY
@@ -556,7 +564,7 @@ const clearGraph = () => {
 
 // Close context menu when clicking outside
 document.addEventListener('click', (e) => {
-  if (!e.target || !(e.target as Element).closest('.absolute.z-20')) {
+  if (!e.target || !(e.target as Element).closest('[style*="z-index: 9999"]')) {
     hideContextMenu()
   }
 })
