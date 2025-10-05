@@ -107,8 +107,8 @@
                 </td>
                 <td class="table-cell">
                   <div class="flex flex-wrap gap-1">
-                    <span v-for="role in user.roles" :key="role" class="badge badge-info">
-                      {{ formatRole(role) }}
+                    <span v-for="role in user.roles" :key="role.id || role" class="badge badge-info">
+                      {{ formatRole(role.name || role) }}
                     </span>
                   </div>
                 </td>
@@ -201,9 +201,14 @@ interface User {
   username: string
   email: string
   is_active: boolean
-  roles: string[]
-  created_at: string
-  updated_at: string
+  roles: Array<{
+    id: string
+    name: string
+    description: string
+  }>
+  permissions: string[]
+  created_at?: string
+  updated_at?: string
 }
 
 interface UserListResponse {
@@ -236,8 +241,13 @@ const hasPermission = (permission: string) => {
   return authStore.hasPermission(permission)
 }
 
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString()
+const formatDate = (dateString?: string) => {
+  if (!dateString) return 'N/A'
+  try {
+    return new Date(dateString).toLocaleDateString()
+  } catch (error) {
+    return 'N/A'
+  }
 }
 
 const formatRole = (role: string) => {
@@ -281,7 +291,8 @@ const loadUsers = async () => {
       }
     })
 
-    response.value = await userAPI.list(params)
+    const result = await userAPI.list(params)
+    response.value = result.data
   } catch (error) {
     console.error('Failed to load users:', error)
     showErrorToast('Failed to load users')

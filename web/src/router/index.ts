@@ -93,6 +93,24 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresPermission: 'user:read' }
     },
     {
+      path: '/users/new',
+      name: 'CreateUser',
+      component: () => import('@/views/users/UserCreateView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'user:create' }
+    },
+    {
+      path: '/users/:id',
+      name: 'UserDetails',
+      component: () => import('@/views/users/UserDetailsView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'user:read' }
+    },
+    {
+      path: '/users/:id/edit',
+      name: 'EditUser',
+      component: () => import('@/views/users/UserEditView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'user:update' }
+    },
+    {
       path: '/profile',
       name: 'Profile',
       component: () => import('@/views/profile/ProfileView.vue'),

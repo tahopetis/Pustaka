@@ -402,6 +402,57 @@ func (r *RBACService) GetUserPasswordHash(ctx context.Context, username string) 
 	return passwordHash, nil
 }
 
+// ListUsers retrieves all users with their roles and permissions
+func (r *RBACService) ListUsers(ctx context.Context) ([]User, error) {
+	query := `
+		SELECT u.id, u.username, u.email, u.is_active
+		FROM users u
+		ORDER BY u.username
+	`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var user User
+		err := rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.IsActive,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+
+		// Get user roles
+		roles, err := r.getUserRoles(ctx, user.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user roles: %w", err)
+		}
+		user.Roles = roles
+
+		// Get user permissions
+		permissions, err := r.getUserPermissions(ctx, user.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user permissions: %w", err)
+		}
+		user.Permissions = permissions
+
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating users: %w", err)
+	}
+
+	return users, nil
+}
+
 // VerifyPassword verifies a password against the stored hash
 func (r *RBACService) VerifyPassword(ctx context.Context, username, password string) bool {
 	passwordHash, err := r.GetUserPasswordHash(ctx, username)

@@ -290,7 +290,6 @@ func (h *UserHandler) getQueryInt(r *http.Request, key string, defaultValue int)
 
 // Temporary method until we implement proper search/pagination
 func (h *UserHandler) listAllUsers(ctx context.Context) ([]auth.User, error) {
-	// This is a placeholder - in a real implementation, you'd add a ListUsers method to RBACService
-	// For now, return empty slice to avoid build errors
-	return []auth.User{}, nil
+	// Use the RBAC service to get all users
+	return h.rbacService.ListUsers(ctx)
 }
