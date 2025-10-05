@@ -23,6 +23,14 @@ func NewAuditService(repo AuditLogRepository, logger *pustakaLogger.Logger) *Aud
 
 // CreateAuditLog creates a new audit log entry
 func (s *AuditService) CreateAuditLog(ctx context.Context, entityType string, entityID *uuid.UUID, action string, performedBy uuid.UUID, details map[string]interface{}, ipAddress, userAgent string) error {
+	var ipPtr, userAgentPtr *string
+	if ipAddress != "" {
+		ipPtr = &ipAddress
+	}
+	if userAgent != "" {
+		userAgentPtr = &userAgent
+	}
+
 	auditLog := &AuditLog{
 		EntityType:  entityType,
 		EntityID:    entityID,
@@ -30,8 +38,8 @@ func (s *AuditService) CreateAuditLog(ctx context.Context, entityType string, en
 		PerformedBy: performedBy,
 		Timestamp:   time.Now(),
 		Details:     details,
-		IPAddress:   ipAddress,
-		UserAgent:   userAgent,
+		IPAddress:   ipPtr,
+		UserAgent:   userAgentPtr,
 	}
 
 	if err := s.repo.Create(ctx, auditLog); err != nil {

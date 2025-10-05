@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +16,9 @@ type User struct {
 	Username    string      `json:"username"`
 	Email       string      `json:"email"`
 	IsActive    bool        `json:"is_active"`
+	CreatedAt   *time.Time  `json:"created_at,omitempty"`
+	UpdatedAt   *time.Time  `json:"updated_at,omitempty"`
+	LastActive  *time.Time  `json:"last_active,omitempty"`
 	Roles       []Role      `json:"roles"`
 	Permissions []string    `json:"permissions"`
 }
@@ -43,7 +47,7 @@ func NewRBACService(db *pgxpool.Pool) *RBACService {
 // GetUserByID retrieves a user by ID with their roles and permissions
 func (r *RBACService) GetUserByID(ctx context.Context, userID uuid.UUID) (*User, error) {
 	query := `
-		SELECT u.id, u.username, u.email, u.is_active
+		SELECT u.id, u.username, u.email, u.is_active, u.created_at, u.updated_at, u.last_active
 		FROM users u
 		WHERE u.id = $1
 	`
@@ -54,6 +58,9 @@ func (r *RBACService) GetUserByID(ctx context.Context, userID uuid.UUID) (*User,
 		&user.Username,
 		&user.Email,
 		&user.IsActive,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.LastActive,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -82,7 +89,7 @@ func (r *RBACService) GetUserByID(ctx context.Context, userID uuid.UUID) (*User,
 // GetUserByUsername retrieves a user by username with their roles and permissions
 func (r *RBACService) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	query := `
-		SELECT u.id, u.username, u.email, u.is_active
+		SELECT u.id, u.username, u.email, u.is_active, u.created_at, u.updated_at, u.last_active
 		FROM users u
 		WHERE u.username = $1
 	`
@@ -93,6 +100,9 @@ func (r *RBACService) GetUserByUsername(ctx context.Context, username string) (*
 		&user.Username,
 		&user.Email,
 		&user.IsActive,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.LastActive,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -330,9 +340,9 @@ func (r *RBACService) CreateUser(ctx context.Context, username, email, passwordH
 	// Insert user
 	userID := uuid.New()
 	query := `
-		INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, true, NOW(), NOW())
-		RETURNING id, username, email, is_active, created_at, updated_at
+		INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at, last_active)
+		VALUES ($1, $2, $3, $4, true, NOW(), NOW(), NOW())
+		RETURNING id, username, email, is_active, created_at, updated_at, last_active
 	`
 
 	var user User
@@ -341,8 +351,9 @@ func (r *RBACService) CreateUser(ctx context.Context, username, email, passwordH
 		&user.Username,
 		&user.Email,
 		&user.IsActive,
-		new(any), // created_at - not used in User struct
-		new(any), // updated_at - not used in User struct
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.LastActive,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
@@ -405,9 +416,9 @@ func (r *RBACService) GetUserPasswordHash(ctx context.Context, username string) 
 // ListUsers retrieves all users with their roles and permissions
 func (r *RBACService) ListUsers(ctx context.Context) ([]User, error) {
 	query := `
-		SELECT u.id, u.username, u.email, u.is_active
+		SELECT u.id, u.username, u.email, u.is_active, u.created_at, u.updated_at, u.last_active
 		FROM users u
-		ORDER BY u.username
+		ORDER BY u.created_at DESC
 	`
 
 	rows, err := r.db.Query(ctx, query)
@@ -424,6 +435,9 @@ func (r *RBACService) ListUsers(ctx context.Context) ([]User, error) {
 			&user.Username,
 			&user.Email,
 			&user.IsActive,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+			&user.LastActive,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan user: %w", err)
@@ -463,4 +477,16 @@ func (r *RBACService) VerifyPassword(ctx context.Context, username, password str
 	// This is a simple verification - in practice, you'd use bcrypt
 	// For now, we'll do a basic comparison (this should be improved)
 	return passwordHash == password
+}
+
+// UpdateLastActive updates the user's last active timestamp
+func (r *RBACService) UpdateLastActive(ctx context.Context, userID uuid.UUID) error {
+	query := `UPDATE users SET last_active = NOW() WHERE id = $1`
+
+	_, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update last active: %w", err)
+	}
+
+	return nil
 }

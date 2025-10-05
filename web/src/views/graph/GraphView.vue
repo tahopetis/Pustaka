@@ -1004,24 +1004,43 @@ const showCollapseOptions = async (node: any) => {
   try {
     // Get current graph data to determine what relationship types are currently visible
     if (graphData.value && graphData.value.edges) {
-      // Group relationships by type and count them
-      const relationshipTypes = graphData.value.edges.reduce((acc, edge) => {
-        const type = edge.relationship_type
-        if (!acc[type]) {
-          acc[type] = { type, count: 0 }
-        }
-        acc[type].count++
-        return acc
-      }, {})
+      // Group relationships by direction and type (matching expand mode structure)
+      const groupedRelationships = {
+        outgoing: {}, // Node is source: "Using"
+        incoming: {}  // Node is target: "Used by"
+      }
 
-      relationshipModal.relationshipTypes = Object.values(relationshipTypes)
+      graphData.value.edges.forEach(edge => {
+        const type = edge.relationship_type
+        const direction = edge.source === node.id ? 'outgoing' : 'incoming'
+
+        if (!groupedRelationships[direction][type]) {
+          groupedRelationships[direction][type] = {
+            type,
+            count: 0,
+            direction,
+            edges: []
+          }
+        }
+        groupedRelationships[direction][type].count++
+        groupedRelationships[direction][type].edges.push(edge)
+      })
+
+      // Convert to arrays and sort (matching expand mode structure)
+      const outgoing = Object.values(groupedRelationships.outgoing)
+      const incoming = Object.values(groupedRelationships.incoming)
+
+      relationshipModal.relationshipTypes = {
+        outgoing,
+        incoming
+      }
       console.log('Available relationship types for collapse:', relationshipModal.relationshipTypes) // Debug log
     } else {
-      relationshipModal.relationshipTypes = []
+      relationshipModal.relationshipTypes = { outgoing: [], incoming: [] }
     }
   } catch (error) {
     console.error('Failed to load relationship types for collapse:', error)
-    relationshipModal.relationshipTypes = []
+    relationshipModal.relationshipTypes = { outgoing: [], incoming: [] }
   } finally {
     relationshipModal.loading = false
   }
@@ -1037,10 +1056,21 @@ const collapseSelectedRelationships = async () => {
       const allNodes = graphData.value.nodes
       const allEdges = graphData.value.edges
 
-      // Filter out edges that match the selected relationship types
-      const remainingEdges = allEdges.filter(edge =>
-        !relationshipModal.selectedType.includes(edge.relationship_type)
-      )
+      // Filter out edges that match the selected relationship types AND directions
+      // Only remove edges connected to the selected node that match the selected type-direction combinations
+      const remainingEdges = allEdges.filter(edge => {
+        // Check if this edge is connected to the selected node
+        if (edge.source !== node.id && edge.target !== node.id) {
+          return true // Keep edges not connected to the selected node
+        }
+
+        // Check if this edge type and direction is selected for removal
+        const edgeDirection = edge.source === node.id ? 'outgoing' : 'incoming'
+        const selectionKey = `${edgeDirection}-${edge.relationship_type}`
+
+        // Keep this edge if it's NOT selected for removal
+        return !relationshipModal.selectedType.includes(selectionKey)
+      })
 
       // Get nodes that should remain (either original node or connected to remaining edges)
       const nodeIdsToKeep = new Set([node.id])
@@ -1057,7 +1087,13 @@ const collapseSelectedRelationships = async () => {
 
       await nextTick()
       renderGraph()
-      showSuccessToast(`Collapsed ${relationshipModal.selectedType.join(', ')} relationships`)
+
+      // Fix the success message to show actual relationship types (without direction prefixes)
+      const collapsedTypes = relationshipModal.selectedType.map(selection => {
+        const [, type] = selection.split('-')
+        return type
+      })
+      showSuccessToast(`Collapsed ${collapsedTypes.join(', ')} relationships`)
     }
   } catch (error) {
     console.error('Failed to collapse relationships:', error)

@@ -169,11 +169,12 @@ func main() {
 	// Create CI services
 	ciRepo := ci.NewRepository(postgresDB.Pool, logger)
 	neo4jService := ci.NewNeo4jService(neo4jDB.Driver, logger)
-	ciService := ci.NewService(ciRepo, neo4jService, redisDB.Client, logger)
 
 	// Create audit service
 	auditRepo := ci.NewAuditLogRepository(postgresDB.Pool, logger)
 	auditService := ci.NewAuditService(auditRepo, logger)
+
+	ciService := ci.NewService(ciRepo, neo4jService, redisDB.Client, auditService, logger)
 
 	// Initialize admin user
 	if err := initializeAdminUser(postgresDB.Pool, rbacService, passwordService, cfg.Admin, logger); err != nil {
@@ -286,6 +287,9 @@ func setupRouter(
 			// JWT authentication middleware
 			r.Use(middleware.JWTAuth(jwtService))
 
+			// Activity tracking middleware
+			r.Use(middleware.ActivityTracker(rbacService))
+
 			// Audit logging middleware
 			r.Use(middleware.AuditLogging(rbacService, logger))
 
@@ -393,6 +397,7 @@ func setupRouter(
 			// Audit routes
 			r.Route("/audit", func(r chi.Router) {
 				r.Use(middleware.RBAC("audit:read"))
+				r.Get("/", auditHandlers.ListAuditLogsFrontend) // For frontend compatibility
 				r.Get("/logs", auditHandlers.ListAuditLogs)
 				r.Get("/logs/{id}", auditHandlers.GetAuditLog)
 				r.Get("/stats", auditHandlers.GetAuditStats)

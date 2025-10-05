@@ -47,6 +47,17 @@ func (r *auditLogRepository) Create(ctx context.Context, auditLog *AuditLog) err
 		entityID = auditLog.EntityID
 	}
 
+	// Handle nullable fields
+	var ipAddress interface{}
+	if auditLog.IPAddress != nil {
+		ipAddress = *auditLog.IPAddress
+	}
+
+	var userAgent interface{}
+	if auditLog.UserAgent != nil {
+		userAgent = *auditLog.UserAgent
+	}
+
 	err = r.pool.QueryRow(ctx, query,
 		auditLog.EntityType,
 		entityID,
@@ -54,8 +65,8 @@ func (r *auditLogRepository) Create(ctx context.Context, auditLog *AuditLog) err
 		auditLog.PerformedBy,
 		auditLog.Timestamp,
 		detailsJSON,
-		auditLog.IPAddress,
-		auditLog.UserAgent,
+		ipAddress,
+		userAgent,
 	).Scan(&auditLog.ID)
 
 	if err != nil {

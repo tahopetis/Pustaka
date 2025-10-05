@@ -57,6 +57,8 @@ web/.vite/
 
 # Claude AI agents and configuration
 .claude/
+.claude-settings.local.json
+# Note: CLAUDE.md is intentionally not ignored as it contains project documentation
 
 # Test coverage
 coverage.txt
@@ -77,6 +79,11 @@ tmp/
 # Debug files
 debug_*.js
 test_*.js
+debug-investigation-report.md
+README-DEBUG.md
+*-debug.md
+comprehensive-debug-guide.md
+run-debug-test.*
 
 # Lock files (keep package-lock.json but ignore others)
 # package-lock.json is kept for dependency consistency
@@ -153,4 +160,23 @@ development/
 *.lnk
 *.url
 
-.claude/
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+/playwright/test-results/
+/test-results/
+/playwright-results/
+/html-report/
+trace/
+traces/
+*.trace
+
+# Test result images and artifacts
+*-test.png
+audit-*.png
+screenshot-*.png
+test-*.png
+page-*.png
+modal-*.png

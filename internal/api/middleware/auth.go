@@ -229,3 +229,43 @@ func GetUserFromContext(r *http.Request) (*auth.JWTClaims, bool) {
 	user, ok := r.Context().Value(UserContextKey).(*auth.JWTClaims)
 	return user, ok
 }
+
+// ActivityTracker creates middleware to update user's last active timestamp
+func ActivityTracker(rbacService *auth.RBACService) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip activity tracking for health check and static assets
+			if r.URL.Path == "/health" || strings.HasPrefix(r.URL.Path, "/assets/") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Get user from context
+			user, ok := r.Context().Value(UserContextKey).(*auth.JWTClaims)
+			if !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Create response writer wrapper to capture status code
+			wrapper := &responseWriter{ResponseWriter: w, statusCode: 200}
+
+			// Process request
+			next.ServeHTTP(wrapper, r)
+
+			// Only update last active for successful requests (2xx status codes)
+			// and skip OPTIONS requests
+			if wrapper.statusCode >= 200 && wrapper.statusCode < 300 && r.Method != "OPTIONS" {
+				// Update last active timestamp in background
+				go func() {
+					ctx := context.Background()
+					err := rbacService.UpdateLastActive(ctx, user.UserID)
+					if err != nil {
+						// Log error but don't affect the response
+						// In production, you might want more sophisticated error handling
+					}
+				}()
+			}
+		})
+	}
+}

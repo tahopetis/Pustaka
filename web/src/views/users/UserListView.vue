@@ -82,6 +82,7 @@
                 <th class="table-header-cell">Roles</th>
                 <th class="table-header-cell">Status</th>
                 <th class="table-header-cell">Created</th>
+                <th class="table-header-cell">Last Active</th>
                 <th class="table-header-cell">Actions</th>
               </tr>
             </thead>
@@ -119,6 +120,9 @@
                 </td>
                 <td class="table-cell">
                   {{ formatDate(user.created_at) }}
+                </td>
+                <td class="table-cell">
+                  {{ formatLastActive(user.last_active) }}
                 </td>
                 <td class="table-cell">
                   <div class="flex space-x-2">
@@ -209,6 +213,7 @@ interface User {
   permissions: string[]
   created_at?: string
   updated_at?: string
+  last_active?: string
 }
 
 interface UserListResponse {
@@ -244,7 +249,12 @@ const hasPermission = (permission: string) => {
 const formatDate = (dateString?: string) => {
   if (!dateString) return 'N/A'
   try {
-    return new Date(dateString).toLocaleDateString()
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
   } catch (error) {
     return 'N/A'
   }
@@ -255,6 +265,39 @@ const formatRole = (role: string) => {
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
+}
+
+const formatLastActive = (dateString?: string) => {
+  if (!dateString) return 'Never'
+  try {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffTime = Math.abs(now.getTime() - date.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) {
+      // Show time for today's activity
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } else if (diffDays === 1) {
+      return 'Yesterday'
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`
+    } else if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7)
+      return `${weeks} week${weeks > 1 ? 's' : ''} ago`
+    } else {
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    }
+  } catch (error) {
+    return 'Never'
+  }
 }
 
 const debouncedSearch = debounce(() => {

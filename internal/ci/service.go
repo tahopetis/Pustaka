@@ -12,18 +12,20 @@ import (
 )
 
 type Service struct {
-	repo   *Repository
-	neo4j  *Neo4jService
-	redis  *redis.Client
-	logger *pustakaLogger.Logger
+	repo         *Repository
+	neo4j        *Neo4jService
+	redis        *redis.Client
+	auditService *AuditService
+	logger       *pustakaLogger.Logger
 }
 
-func NewService(db *Repository, neo4j *Neo4jService, redis *redis.Client, logger *pustakaLogger.Logger) *Service {
+func NewService(db *Repository, neo4j *Neo4jService, redis *redis.Client, auditService *AuditService, logger *pustakaLogger.Logger) *Service {
 	return &Service{
-		repo:   db,
-		neo4j:  neo4j,
-		redis:  redis,
-		logger: logger,
+		repo:         db,
+		neo4j:        neo4j,
+		redis:        redis,
+		auditService: auditService,
+		logger:       logger,
 	}
 }
 
@@ -525,7 +527,26 @@ func (s *Service) invalidateCICache(ctx context.Context, id uuid.UUID) {
 }
 
 func (s *Service) logAuditEvent(ctx context.Context, entityType, entityID, action, performedBy string, details map[string]interface{}) {
-	// This would integrate with the audit service
+	// Parse UUIDs
+	var entityUUID *uuid.UUID
+	if entityID != "" {
+		if parsedID, err := uuid.Parse(entityID); err == nil {
+			entityUUID = &parsedID
+		}
+	}
+
+	performedByUUID, err := uuid.Parse(performedBy)
+	if err != nil {
+		s.logger.Error().Err(err).Str("performed_by", performedBy).Msg("Invalid user ID for audit logging")
+		return
+	}
+
+	// Save to database via audit service
+	if err := s.auditService.CreateAuditLog(ctx, entityType, entityUUID, action, performedByUUID, details, "", ""); err != nil {
+		s.logger.Error().Err(err).Str("entity_type", entityType).Str("action", action).Msg("Failed to create audit log")
+	}
+
+	// Also log to structured logs for debugging
 	s.logger.InfoAudit(entityType, entityID, action, performedBy, details)
 }
 

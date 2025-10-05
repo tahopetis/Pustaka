@@ -16,8 +16,8 @@ type AuditLog struct {
 	PerformedBy uuid.UUID            `json:"performed_by" db:"performed_by"`
 	Timestamp   time.Time            `json:"timestamp" db:"timestamp"`
 	Details     map[string]interface{} `json:"details" db:"details"`
-	IPAddress   string               `json:"ip_address" db:"ip_address"`
-	UserAgent   string               `json:"user_agent" db:"user_agent"`
+	IPAddress   *string              `json:"ip_address" db:"ip_address"`
+	UserAgent   *string              `json:"user_agent" db:"user_agent"`
 }
 
 // AuditLogFilters represents filters for querying audit logs

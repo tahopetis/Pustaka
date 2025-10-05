@@ -6,13 +6,13 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   /* Run tests in files in parallel */
-  fullyParallel: true,
+  fullyParallel: false, // Disable parallel for debugging
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 1, // Use single worker for debugging
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['html', { outputFolder: 'test-results/html-report' }],
@@ -23,13 +23,13 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:3001',
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'retain-on-failure',
+    trace: 'on', // Enable full trace for debugging
     /* Take screenshot on failure */
     screenshot: 'only-on-failure',
     /* Record video on failure */
-    video: 'retain-on-failure',
+    video: 'on', // Enable video for debugging
     /* Global timeout for each action */
     actionTimeout: 30000,
     /* Global timeout for navigation */
@@ -45,40 +45,25 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
       },
     },
-
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox'],
-        viewport: { width: 1280, height: 720 },
-      },
-    },
-
-    {
-      name: 'webkit',
-      use: {
-        ...devices['Desktop Safari'],
-        viewport: { width: 1280, height: 720 },
-      },
-    },
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  // NOTE: Commented out since frontend is already running on port 3001
+  // webServer: {
+  //   command: 'npm run dev',
+  //   url: 'http://localhost:3000',
+  //   reuseExistingServer: !process.env.CI,
+  //   timeout: 120 * 1000,
+  // },
 
   /* Global setup and teardown */
-  // globalSetup: './tests/setup.ts',
+  globalSetup: './tests/setup.ts',
 
   /* Output directory for test artifacts */
   outputDir: 'test-results/',
 
   /* Test timeout */
-  timeout: 60000,
+  timeout: 120000, // Increased timeout for debugging
 
   /* Expect timeout */
   expect: {

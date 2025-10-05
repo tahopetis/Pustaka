@@ -34,6 +34,28 @@ func (h *AuditHandlers) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, auditLogs)
 }
 
+// ListAuditLogsFrontend handles GET /audit - for frontend compatibility
+func (h *AuditHandlers) ListAuditLogsFrontend(w http.ResponseWriter, r *http.Request) {
+	filters := h.buildAuditLogFiltersFrontend(r)
+
+	auditLogs, err := h.auditService.ListAuditLogs(r.Context(), filters)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "Failed to list audit logs")
+		return
+	}
+
+	// Transform response to match frontend expectation
+	response := map[string]interface{}{
+		"audit_logs":  auditLogs.AuditLogs,
+		"total":       auditLogs.Pagination.Total,
+		"page":        auditLogs.Pagination.Page,
+		"limit":       auditLogs.Pagination.Limit,
+		"total_pages": auditLogs.Pagination.TotalPages,
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
 // GetAuditLog handles GET /audit/logs/{id}
 func (h *AuditHandlers) GetAuditLog(w http.ResponseWriter, r *http.Request) {
 	id, err := h.getUUIDParam(r, "id")
@@ -118,6 +140,50 @@ func (h *AuditHandlers) CleanupOldAuditLogs(w http.ResponseWriter, r *http.Reque
 	h.writeJSON(w, http.StatusOK, response)
 }
 
+// buildAuditLogFiltersFrontend builds filters from query parameters for frontend
+func (h *AuditHandlers) buildAuditLogFiltersFrontend(r *http.Request) ci.AuditLogFilters {
+	filters := ci.AuditLogFilters{
+		EntityType: h.getQueryString(r, "entity"),  // Frontend sends 'entity' instead of 'entity_type'
+		Action:     h.getQueryString(r, "action"),
+		Search:     h.getQueryString(r, "search"),
+		Sort:       h.getQueryString(r, "sort"),
+		Order:      h.getQueryString(r, "order"),
+		Page:       h.getQueryInt(r, "page", 1),
+		Limit:      h.getQueryInt(r, "limit", 50),
+	}
+
+	// Parse entity_id if provided
+	if entityIDStr := h.getQueryString(r, "entity_id"); entityIDStr != "" {
+		if entityID, err := uuid.Parse(entityIDStr); err == nil {
+			filters.EntityID = &entityID
+		}
+	}
+
+	// Parse performed_by if provided
+	if performedByStr := h.getQueryString(r, "performed_by"); performedByStr != "" {
+		if performedBy, err := uuid.Parse(performedByStr); err == nil {
+			filters.PerformedBy = &performedBy
+		}
+	}
+
+	// Parse date ranges - frontend uses from_date and to_date
+	if startDateStr := h.getQueryString(r, "from_date"); startDateStr != "" {
+		if startDate, err := time.Parse("2006-01-02", startDateStr); err == nil {
+			filters.StartDate = &startDate
+		}
+	}
+
+	if endDateStr := h.getQueryString(r, "to_date"); endDateStr != "" {
+		if endDate, err := time.Parse("2006-01-02", endDateStr); err == nil {
+			// Set to end of day
+			endDate = endDate.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+			filters.EndDate = &endDate
+		}
+	}
+
+	return filters
+}
+
 // ExportAuditLogs handles GET /audit/export
 func (h *AuditHandlers) ExportAuditLogs(w http.ResponseWriter, r *http.Request) {
 	filters := h.buildAuditLogFilters(r)
@@ -152,8 +218,18 @@ func (h *AuditHandlers) ExportAuditLogs(w http.ResponseWriter, r *http.Request) 
 			log.Action,
 			log.PerformedBy.String(),
 			log.Timestamp.Format(time.RFC3339),
-			log.IPAddress,
-			log.UserAgent,
+			func() string {
+				if log.IPAddress != nil {
+					return *log.IPAddress
+				}
+				return ""
+			}(),
+			func() string {
+				if log.UserAgent != nil {
+					return *log.UserAgent
+				}
+				return ""
+			}(),
 		}
 
 		// Write row as CSV (simple implementation)

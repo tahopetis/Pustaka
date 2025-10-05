@@ -1,0 +1,26 @@
+{
+  "name": "pustaka",
+  "version": "1.0.0",
+  "description": "> A modern, open-source **Configuration Management Database (CMDB)** designed for managing IT assets, their relationships, and governance in enterprise environments.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tahopetis/Pustaka.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tahopetis/Pustaka/issues"
+  },
+  "homepage": "https://github.com/tahopetis/Pustaka#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "@types/node": "^24.6.2"
+  }
+}
