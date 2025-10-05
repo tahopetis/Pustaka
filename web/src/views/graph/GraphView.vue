@@ -27,8 +27,8 @@
                   type="text"
                   placeholder="Search CI names..."
                   class="form-input pr-10"
-                  @input="debouncedSearch"
-                  @focus="showAutocomplete = true"
+                  @input="onSearchInputChange"
+                  @focus="handleSearchFocus"
                   @blur="hideAutocomplete"
                 >
                 <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -37,18 +37,36 @@
                   </svg>
                 </div>
                 <!-- Autocomplete dropdown -->
-                <div v-if="showAutocomplete && searchResults.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                <div
+                  v-if="showAutocomplete && (searchResults.length > 0 || isSearching)"
+                  class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+                >
+                  <div v-if="isSearching" class="p-3 text-gray-500 text-sm">
+                    Searching...
+                  </div>
                   <div
                     v-for="result in searchResults"
                     :key="result.id"
                     class="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between"
                     @mousedown="selectSearchResult(result)"
                   >
-                    <div>
-                      <div class="font-medium">{{ result.name }}</div>
-                      <div class="text-sm text-gray-500">{{ result.type }}</div>
+                    <div class="flex items-center flex-1">
+                      <div v-if="result.isShowAll" class="mr-3">
+                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                      </div>
+                      <div v-else-if="result.isCIOption" class="mr-3">
+                        <div class="w-4 h-4 rounded-full border border-gray-300" :style="{ backgroundColor: getCITypeColor(result.ci_type) }"></div>
+                      </div>
+                      <div v-else class="mr-3">
+                        <div class="w-4 h-4 rounded-full border border-gray-300" :style="{ backgroundColor: getCITypeColor(result.ci_type) }"></div>
+                      </div>
+                      <div>
+                        <div class="font-medium">{{ result.name }}</div>
+                        <div class="text-sm text-gray-500">{{ result.ci_type }}</div>
+                      </div>
                     </div>
-                    <div class="w-2 h-2 rounded-full" :style="{ backgroundColor: getCITypeColor(result.type) }"></div>
                   </div>
                 </div>
               </div>
@@ -108,15 +126,34 @@
             </div>
           </div>
 
-          <!-- Empty State -->
-          <div v-if="!loading && (!graphData || graphData.nodes.length === 0)" class="text-center py-16">
+          <!-- Empty State - No results for selected CI -->
+          <div v-if="!loading && filters.search && (!graphData || graphData.nodes.length === 0)" class="text-center py-16">
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">No graph data available</h3>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No results found for "{{ filters.search }}"</h3>
             <p class="mt-1 text-sm text-gray-500">
-              Try adjusting your filters or create some configuration items with relationships.
+              Try searching for a different configuration item or adjust your filters.
             </p>
+          </div>
+
+          <!-- Empty State - Initial state -->
+        <div v-else-if="!loading && !filters.search && (!graphData || graphData.nodes.length === 0)" class="text-center py-16">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Search for Configuration Items</h3>
+            <p class="mt-1 text-sm text-gray-500">
+              Start typing in the search box above to explore configuration items and their relationships.
+            </p>
+            <div class="mt-6">
+              <div class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white">
+                <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                Search and select a CI to begin
+              </div>
+            </div>
           </div>
 
           <!-- Graph Canvas -->
@@ -141,13 +178,23 @@
           >
             <button
               v-if="contextMenu.node"
-              @click="expandNode(contextMenu.node)"
+              @click="showRelationshipOptions(contextMenu.node)"
               class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
             >
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
               </svg>
-              Expand Node
+              Expand Relationships
+            </button>
+            <button
+              v-if="contextMenu.node"
+              @click="showCollapseOptions(contextMenu.node)"
+              class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+              Collapse Relationships
             </button>
             <button
               v-if="contextMenu.node"
@@ -160,6 +207,17 @@
               View Details
             </button>
           </div>
+
+          <!-- Custom Tooltip Component -->
+          <GraphTooltip
+            v-if="tooltipState.visible"
+            :node="tooltipState.node"
+            :visible="tooltipState.visible"
+            :x="tooltipState.x"
+            :y="tooltipState.y"
+            @hide="hideTooltip"
+            ref="tooltipRef"
+          />
         </div>
       </div>
 
@@ -237,6 +295,130 @@
           </div>
         </div>
       </div>
+
+      <!-- Relationship Options Modal -->
+      <div
+        v-if="relationshipModal.visible"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        @click="hideRelationshipModal"
+      >
+        <div
+          class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4"
+          @click.stop
+        >
+          <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-medium text-gray-900">
+                {{ relationshipModal.mode === 'expand' ? 'Expand' : 'Collapse' }} Relationships for {{ relationshipModal.node?.name }}
+              </h3>
+              <button
+                @click="hideRelationshipModal"
+                class="text-gray-400 hover:text-gray-500"
+              >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div v-if="relationshipModal.loading" class="text-center py-8">
+              <div class="spinner w-8 h-8 mx-auto mb-4"></div>
+              <p class="text-gray-500">Loading relationship types...</p>
+            </div>
+
+            <div v-else-if="hasGroupedRelationships">
+              <p class="text-sm text-gray-600 mb-4">
+                Select relationship types to {{ relationshipModal.mode === 'expand' ? 'expand' : 'collapse' }}:
+              </p>
+              <div class="space-y-4 max-h-60 overflow-y-auto">
+                <!-- Using section (outgoing relationships) -->
+                <div v-if="relationshipModal.relationshipTypes.outgoing.length > 0">
+                  <div class="flex items-center mb-2">
+                    <svg class="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    </svg>
+                    <h4 class="text-sm font-semibold text-gray-700">Using (outgoing)</h4>
+                    <span class="ml-2 text-xs text-gray-500">{{ getTotalCount('outgoing') }} relationships</span>
+                  </div>
+                  <div class="space-y-1 ml-6">
+                    <label
+                      v-for="type in relationshipModal.relationshipTypes.outgoing"
+                      :key="`outgoing-${type.type}`"
+                      class="flex items-center p-2 border rounded hover:bg-blue-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        :value="`outgoing-${type.type}`"
+                        v-model="relationshipModal.selectedType"
+                        class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      >
+                      <div class="flex-1">
+                        <div class="font-medium text-gray-900">{{ type.type }}</div>
+                        <div class="text-xs text-gray-500">{{ type.count }} relationships</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Used by section (incoming relationships) -->
+                <div v-if="relationshipModal.relationshipTypes.incoming.length > 0">
+                  <div class="flex items-center mb-2">
+                    <svg class="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17l-5-5m0 0l5-5m-5 5h12"></path>
+                    </svg>
+                    <h4 class="text-sm font-semibold text-gray-700">Used by (incoming)</h4>
+                    <span class="ml-2 text-xs text-gray-500">{{ getTotalCount('incoming') }} relationships</span>
+                  </div>
+                  <div class="space-y-1 ml-6">
+                    <label
+                      v-for="type in relationshipModal.relationshipTypes.incoming"
+                      :key="`incoming-${type.type}`"
+                      class="flex items-center p-2 border rounded hover:bg-green-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        :value="`incoming-${type.type}`"
+                        v-model="relationshipModal.selectedType"
+                        class="mr-3 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                      >
+                      <div class="flex-1">
+                        <div class="font-medium text-gray-900">{{ type.type }}</div>
+                        <div class="text-xs text-gray-500">{{ type.count }} relationships</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 flex justify-end space-x-3">
+                <button
+                  @click="hideRelationshipModal"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="relationshipModal.mode === 'expand' ? expandSelectedRelationships() : collapseSelectedRelationships()"
+                  :disabled="!relationshipModal.selectedType || relationshipModal.selectedType.length === 0"
+                  class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 rounded-md"
+                >
+                  {{ relationshipModal.mode === 'expand' ? 'Expand' : 'Collapse' }} Selected ({{ relationshipModal.selectedType?.length || 0 }})
+                </button>
+              </div>
+            </div>
+
+            <div v-else class="text-center py-8">
+              <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+              <h3 class="text-sm font-medium text-gray-900 mb-2">No relationships found</h3>
+              <p class="text-sm text-gray-500">
+                This CI doesn't have any relationships to expand.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
   </div>
 </template>
 
@@ -246,6 +428,7 @@ import { useAuthStore } from '@/stores/auth'
 import { graphAPI, ciAPI, ciTypeAPI } from '@/services/api'
 import { showErrorToast, showSuccessToast } from '@/utils/toast'
 import type { GraphData, CIType, CI } from '@/types/ci'
+import GraphTooltip from '@/components/graph/GraphTooltip.vue'
 
 // Import vis-network
 import { Network, DataSet } from 'vis-network/standalone/umd/vis-network.min'
@@ -259,6 +442,17 @@ const graphData = ref(null)
 const ciTypes = ref([])
 const searchResults = ref([])
 const showAutocomplete = ref(false)
+const isSearching = ref(false)
+const searchTimeout = ref<NodeJS.Timeout | null>(null)
+const tooltipRef = ref(null)
+
+// Custom tooltip state
+const tooltipState = reactive({
+  visible: false,
+  node: null,
+  x: 0,
+  y: 0
+})
 
 // Context menu state
 const contextMenu = reactive({
@@ -266,6 +460,16 @@ const contextMenu = reactive({
   x: 0,
   y: 0,
   node: null
+})
+
+// Relationship options modal state
+const relationshipModal = reactive({
+  visible: false,
+  node: null,
+  loading: false,
+  relationshipTypes: [],
+  selectedType: [],
+  mode: 'expand' // 'expand' or 'collapse'
 })
 
 const filters = reactive({
@@ -277,6 +481,14 @@ const filters = reactive({
 const uniqueCITypes = computed(() => {
   if (!graphData.value) return []
   return [...new Set(graphData.value.nodes.map(node => node.type))]
+})
+
+const hasGroupedRelationships = computed(() => {
+  if (!relationshipModal.relationshipTypes || typeof relationshipModal.relationshipTypes !== 'object') {
+    return false
+  }
+  return relationshipModal.relationshipTypes.outgoing.length > 0 ||
+         relationshipModal.relationshipTypes.incoming.length > 0
 })
 
 const hasPermission = (permission: string) => {
@@ -294,25 +506,108 @@ const getCITypeColor = (type: string) => {
   return ciTypeColors[type as keyof typeof ciTypeColors] || ciTypeColors.default
 }
 
-const debouncedSearch = debounce(() => {
-  loadGraphData()
-  if (filters.search.length >= 2) {
-    searchCIs()
-  } else {
-    searchResults.value = []
+const handleSearchFocus = () => {
+  showAutocomplete.value = true
+  // Load initial suggestions if search is empty
+  if (!filters.search.trim()) {
+    fetchSearchSuggestions()
   }
-}, 500)
+}
 
-function debounce(func, wait) {
-  let timeout
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout)
-      func(...args)
-    }
-    clearTimeout(timeout)
-    timeout = setTimeout(later, wait)
+const onSearchInputChange = () => {
+  // Clear existing timeout
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value)
   }
+
+  // Always show autocomplete when typing
+  showAutocomplete.value = true
+
+  // Debounce search suggestions
+  searchTimeout.value = setTimeout(() => {
+    fetchSearchSuggestions()
+  }, 300)
+}
+
+const fetchSearchSuggestions = async () => {
+  if (!filters.search.trim()) {
+    // When search is empty, show top 5 CIs + "Show All" option
+    isSearching.value = true
+    try {
+      const response = await ciAPI.list({ limit: 5 })
+      let ciResults = []
+      if (response.data && response.data.cis) {
+        ciResults = response.data.cis.map(ci => ({
+          id: ci.id,
+          name: ci.name,
+          ci_type: ci.ci_type,
+          isCIOption: true,
+          ci: ci
+        }))
+      }
+
+      // Add "Show All" option at the top
+      ciResults.unshift({
+        id: 'show-all',
+        name: 'Show All CIs',
+        ci_type: 'All',
+        isShowAll: true
+      })
+
+      searchResults.value = ciResults
+    } catch (error) {
+      console.error('Failed to fetch CI suggestions:', error)
+      searchResults.value = []
+    } finally {
+      isSearching.value = false
+    }
+    return
+  }
+
+  isSearching.value = true
+  try {
+    // Search for specific CIs when user types using the list endpoint with search parameter
+    const response = await ciAPI.list({
+      search: filters.search,
+      limit: 5
+    })
+
+    // Handle different response structures
+    let ciResults = []
+    if (response.data && response.data.cis) {
+      ciResults = response.data.cis.map(ci => ({
+        id: ci.id,
+        name: ci.name,
+        ci_type: ci.ci_type,
+        isCIOption: true,
+        ci: ci
+      }))
+    } else if (response.data) {
+      // Handle case where response is directly the data
+      ciResults = Array.isArray(response.data) ? response.data.map(ci => ({
+        id: ci.id,
+        name: ci.name,
+        ci_type: ci.ci_type,
+        isCIOption: true,
+        ci: ci
+      })) : []
+    }
+
+    searchResults.value = ciResults
+    console.log('Search results:', searchResults.value) // Debug log
+  } catch (error) {
+    console.error('Failed to fetch search suggestions:', error)
+    searchResults.value = []
+  } finally {
+    isSearching.value = false
+  }
+}
+
+const hideAutocomplete = () => {
+  // Delay hiding to allow click events to register
+  setTimeout(() => {
+    showAutocomplete.value = false
+  }, 200)
 }
 
 const loadGraphData = async () => {
@@ -341,30 +636,75 @@ const loadGraphData = async () => {
   }
 }
 
-const searchCIs = async () => {
-  if (!hasPermission('ci:read') || filters.search.length < 2) return
+const selectSearchResult = async (result: any) => {
+  if (!hasPermission('ci:read')) return
 
-  try {
-    const response = await ciAPI.search({
-      search: filters.search,
-      limit: 10
-    })
-    searchResults.value = response.data.cis || []
-  } catch (error) {
-    console.error('Failed to search CIs:', error)
+  let searchQuery = ''
+  let searchParams = {}
+
+  if (result.isShowAll) {
+    // Show all CIs - clear filters
+    filters.search = ''
+    filters.ci_types = []
+    searchQuery = 'All CIs'
+    searchParams = {
+      limit: 100
+    }
+  } else if (result.isCIOption) {
+    // Specific CI selected - show only the single CI node initially
+    searchQuery = result.name
+    filters.search = result.name
+
+    // Create a single node graph for the selected CI
+    graphData.value = {
+      nodes: [{
+        id: result.id,
+        name: result.name,
+        type: result.ci_type,
+        attributes: result.ci.attributes || {},
+        x: 0,
+        y: 0
+      }],
+      edges: []
+    }
+
+    await nextTick()
+    renderGraph()
+    showSuccessToast(`Loaded ${searchQuery}`)
+
+    // Don't set loading to false here since we're not making an API call
+    loading.value = false
+    return
+  } else {
+    // Fallback for any other type
+    searchQuery = result.name
+    filters.search = result.name
+    searchParams = {
+      search: result.name,
+      limit: 50
+    }
   }
-}
 
-const selectSearchResult = (ci) => {
-  filters.search = ci.name
   showAutocomplete.value = false
-  loadGraphData()
-}
+  searchResults.value = []
 
-const hideAutocomplete = () => {
-  setTimeout(() => {
-    showAutocomplete.value = false
-  }, 200)
+  loading.value = true
+  try {
+    // Use the explore API with the appropriate search parameters
+    const response = await graphAPI.explore(searchParams)
+
+    if (response.data) {
+      graphData.value = response.data
+      await nextTick()
+      renderGraph()
+      showSuccessToast(`Loaded ${searchQuery}`)
+    }
+  } catch (error) {
+    console.error('Failed to load graph data:', error)
+    showErrorToast('Failed to load graph data')
+  } finally {
+    loading.value = false
+  }
 }
 
 const loadCITypes = async () => {
@@ -393,7 +733,8 @@ const renderGraph = () => {
       },
       shape: 'dot',
       size: 20,
-      title: `${node.name} (${node.type})\n${JSON.stringify(node.attributes, null, 2)}`,
+      // Remove the default tooltip by setting title to undefined
+      title: undefined,
     }))
   )
 
@@ -401,23 +742,37 @@ const renderGraph = () => {
     graphData.value.edges.map(edge => ({
       from: edge.source,
       to: edge.target,
-      label: edge.relationship_type,
+      label: edge.relationship_type, // Show relationship type on arrow
       color: {
         color: '#6b7280',
         highlight: '#3b82f6',
       },
       font: {
-        size: 12,
+        size: 14,
+        color: '#1f2937',
+        strokeWidth: 3,
+        strokeColor: '#ffffff',
         align: 'middle',
         background: '#ffffff',
       },
       arrows: {
         to: {
           enabled: true,
-          scaleFactor: 0.5,
+          scaleFactor: 0.8,
+          type: 'arrow',
+        },
+        middle: {
+          enabled: false,
+        },
+        from: {
+          enabled: false,
         },
       },
-      title: edge.relationship_type,
+      smooth: {
+        type: 'curvedCW',
+        roundness: 0.2,
+      },
+      title: `${edge.relationship_type}: ${graphData.value.nodes.find(n => n.id === edge.source)?.name} → ${graphData.value.nodes.find(n => n.id === edge.target)?.name}`,
     }))
   )
 
@@ -448,6 +803,8 @@ const renderGraph = () => {
       tooltipDelay: 200,
       zoomView: true,
       dragView: true,
+      // Disable default tooltips
+      hideEdgesOnDrag: true,
     },
     nodes: {
       borderWidth: 2,
@@ -457,7 +814,23 @@ const renderGraph = () => {
       width: 2,
       shadow: true,
       smooth: {
-        type: 'continuous',
+        enabled: true,
+        type: 'curvedCW',
+        roundness: 0.1,
+      },
+      font: {
+        size: 14,
+        color: '#1f2937',
+        strokeWidth: 3,
+        strokeColor: '#ffffff',
+        align: 'middle',
+        background: '#ffffff',
+      },
+      arrows: {
+        to: {
+          enabled: true,
+          scaleFactor: 0.8,
+        },
       },
     },
   }
@@ -476,39 +849,330 @@ const renderGraph = () => {
       const nodeId = params.nodes[0]
       const node = graphData.value?.nodes.find(n => n.id === nodeId)
       if (node) {
-        // Navigate to CI details
-        window.location.href = `/ci/${nodeId}`
+        // Just select the node, don't navigate automatically
+        // Users can right-click for details or use other interactions
       }
     }
   })
 
-  // Add right-click event listener
+  // Add hover event listener for custom tooltips
+  network.value.on('hoverNode', (params) => {
+    const nodeId = params.node
+    const node = graphData.value?.nodes.find(n => n.id === nodeId)
+    if (node) {
+      showTooltip(params.event, node)
+    }
+  })
+
+  // Add blur event listener to hide tooltip
+  network.value.on('blurNode', () => {
+    hideTooltip()
+  })
+
+  // Hide tooltip when dragging starts
+  network.value.on('dragStart', () => {
+    hideTooltip()
+  })
+
+  // Hide tooltip when zooming
+  network.value.on('zoom', () => {
+    hideTooltip()
+  })
+
+  // Add right-click event listener with better event handling
   network.value.on('oncontext', (params) => {
     if (params.nodes.length > 0) {
       const nodeId = params.nodes[0]
       const node = graphData.value?.nodes.find(n => n.id === nodeId)
       if (node) {
-        // Use the event from params if available, otherwise use the DOM event
-        const event = params.event || window.event
-        showContextMenu(event, node)
+        // Prevent default context menu
+        const event = params.event
+        if (event) {
+          event.preventDefault()
+          event.stopPropagation()
+          showContextMenu(event, node)
+        }
       }
     }
   })
 }
 
-const expandNode = async (node: any) => {
+// Custom tooltip methods
+const showTooltip = (event, node) => {
+  hideTooltip() // Clear any existing tooltip
+
+  if (!network.value) {
+    return
+  }
+
+  // Use the mouse event position directly and offset it slightly above the cursor
+  const x = event.clientX
+  const y = event.clientY - 10 // Position slightly above cursor
+
+  tooltipState.node = node
+  tooltipState.x = x
+  tooltipState.y = y
+  tooltipState.visible = true
+}
+
+const hideTooltip = () => {
+  tooltipState.visible = false
+  tooltipState.node = null
+
+  // Clean up tooltip component if needed
+  if (tooltipRef.value?.cleanup) {
+    tooltipRef.value.cleanup()
+  }
+}
+
+const showRelationshipOptions = async (node: any) => {
   if (!hasPermission('ci:read')) return
 
-  try {
-    showSuccessToast(`Expanding connections for ${node.name}...`)
-    // TODO: Implement node expansion logic
-    // This could call a new API endpoint to get connected nodes
-    console.log('Expand node:', node)
-  } catch (error) {
-    console.error('Failed to expand node:', error)
-    showErrorToast('Failed to expand node')
-  }
+  relationshipModal.node = node
+  relationshipModal.visible = true
+  relationshipModal.loading = true
+  relationshipModal.selectedType = []
+  relationshipModal.mode = 'expand'
   hideContextMenu()
+
+  try {
+    // Get relationships for this node to determine available relationship types
+    const response = await graphAPI.explore({
+      center_id: node.id,
+      limit: 200,
+      depth: 1
+    })
+
+    if (response.data && response.data.edges) {
+      // Filter edges to only include those directly connected to the selected node
+      const connectedEdges = response.data.edges.filter(edge =>
+        edge.source === node.id || edge.target === node.id
+      )
+
+      // Group relationships by direction and type
+      const groupedRelationships = {
+        outgoing: {}, // Node is source: "Using"
+        incoming: {}  // Node is target: "Used by"
+      }
+
+      connectedEdges.forEach(edge => {
+        const type = edge.relationship_type
+        const direction = edge.source === node.id ? 'outgoing' : 'incoming'
+
+        if (!groupedRelationships[direction][type]) {
+          groupedRelationships[direction][type] = {
+            type,
+            count: 0,
+            direction,
+            edges: []
+          }
+        }
+        groupedRelationships[direction][type].count++
+        groupedRelationships[direction][type].edges.push(edge)
+      })
+
+      // Convert to arrays and sort
+      const outgoing = Object.values(groupedRelationships.outgoing)
+      const incoming = Object.values(groupedRelationships.incoming)
+
+      relationshipModal.relationshipTypes = {
+        outgoing,
+        incoming
+      }
+      console.log('Grouped relationships for node:', node.name, relationshipModal.relationshipTypes) // Debug log
+    } else {
+      relationshipModal.relationshipTypes = { outgoing: [], incoming: [] }
+    }
+  } catch (error) {
+    console.error('Failed to load relationship types:', error)
+    relationshipModal.relationshipTypes = { outgoing: [], incoming: [] }
+  } finally {
+    relationshipModal.loading = false
+  }
+}
+
+const showCollapseOptions = async (node: any) => {
+  if (!hasPermission('ci:read')) return
+
+  relationshipModal.node = node
+  relationshipModal.visible = true
+  relationshipModal.loading = true
+  relationshipModal.selectedType = []
+  relationshipModal.mode = 'collapse'
+  hideContextMenu()
+
+  try {
+    // Get current graph data to determine what relationship types are currently visible
+    if (graphData.value && graphData.value.edges) {
+      // Group relationships by type and count them
+      const relationshipTypes = graphData.value.edges.reduce((acc, edge) => {
+        const type = edge.relationship_type
+        if (!acc[type]) {
+          acc[type] = { type, count: 0 }
+        }
+        acc[type].count++
+        return acc
+      }, {})
+
+      relationshipModal.relationshipTypes = Object.values(relationshipTypes)
+      console.log('Available relationship types for collapse:', relationshipModal.relationshipTypes) // Debug log
+    } else {
+      relationshipModal.relationshipTypes = []
+    }
+  } catch (error) {
+    console.error('Failed to load relationship types for collapse:', error)
+    relationshipModal.relationshipTypes = []
+  } finally {
+    relationshipModal.loading = false
+  }
+}
+
+const collapseSelectedRelationships = async () => {
+  if (!relationshipModal.selectedType || relationshipModal.selectedType.length === 0) return
+
+  try {
+    const node = relationshipModal.node
+
+    if (graphData.value && graphData.value.edges) {
+      const allNodes = graphData.value.nodes
+      const allEdges = graphData.value.edges
+
+      // Filter out edges that match the selected relationship types
+      const remainingEdges = allEdges.filter(edge =>
+        !relationshipModal.selectedType.includes(edge.relationship_type)
+      )
+
+      // Get nodes that should remain (either original node or connected to remaining edges)
+      const nodeIdsToKeep = new Set([node.id])
+      remainingEdges.forEach(edge => {
+        nodeIdsToKeep.add(edge.source)
+        nodeIdsToKeep.add(edge.target)
+      })
+
+      const remainingNodes = allNodes.filter(n => nodeIdsToKeep.has(n.id))
+
+      // Update graph data with filtered results
+      graphData.value.nodes = remainingNodes
+      graphData.value.edges = remainingEdges
+
+      await nextTick()
+      renderGraph()
+      showSuccessToast(`Collapsed ${relationshipModal.selectedType.join(', ')} relationships`)
+    }
+  } catch (error) {
+    console.error('Failed to collapse relationships:', error)
+    showErrorToast('Failed to collapse relationships')
+  } finally {
+    hideRelationshipModal()
+  }
+}
+
+const getTotalCount = (direction: 'outgoing' | 'incoming') => {
+  if (!relationshipModal.relationshipTypes || !relationshipModal.relationshipTypes[direction]) {
+    return 0
+  }
+  return relationshipModal.relationshipTypes[direction].reduce((total, type) => total + type.count, 0)
+}
+
+const parseSelectedTypes = () => {
+  const result = {
+    types: [],
+    directions: {}
+  }
+
+  if (!relationshipModal.selectedType) return result
+
+  relationshipModal.selectedType.forEach(selection => {
+    const [direction, type] = selection.split('-')
+    if (!result.types.includes(type)) {
+      result.types.push(type)
+    }
+    result.directions[type] = direction
+  })
+
+  return result
+}
+
+const hideRelationshipModal = () => {
+  relationshipModal.visible = false
+  relationshipModal.node = null
+  relationshipModal.selectedType = []
+  relationshipModal.relationshipTypes = []
+}
+
+const expandSelectedRelationships = async () => {
+  if (!relationshipModal.selectedType || relationshipModal.selectedType.length === 0) return
+
+  try {
+    relationshipModal.loading = true
+    const node = relationshipModal.node
+    const parsedSelections = parseSelectedTypes()
+
+    // Get relationships for the node
+    const response = await graphAPI.explore({
+      center_id: node.id,
+      limit: 200,
+      depth: 1
+    })
+
+    if (response.data) {
+      const allNodes = response.data.nodes || []
+      const allEdges = response.data.edges || []
+
+      // Filter edges based on selected types and directions
+      const filteredEdges = allEdges.filter(edge => {
+        // Only include edges connected to the selected node
+        if (edge.source !== node.id && edge.target !== node.id) {
+          return false
+        }
+
+        // Check if this edge type is selected and matches the direction
+        const edgeDirection = edge.source === node.id ? 'outgoing' : 'incoming'
+        const selectionKey = `${edgeDirection}-${edge.relationship_type}`
+
+        return relationshipModal.selectedType.includes(selectionKey)
+      })
+
+      // Get only nodes that are connected by the filtered edges
+      const connectedNodeIds = new Set([node.id])
+      filteredEdges.forEach(edge => {
+        connectedNodeIds.add(edge.source)
+        connectedNodeIds.add(edge.target)
+      })
+
+      const filteredNodes = allNodes.filter(n => connectedNodeIds.has(n.id))
+
+      if (graphData.value) {
+        // Create sets to avoid duplicates
+        const existingNodeIds = new Set(graphData.value.nodes.map(n => n.id))
+        const existingEdgeIds = new Set(graphData.value.edges.map(e => `${e.source}-${e.target}`))
+
+        // Add only new nodes and filtered edges
+        const uniqueNewNodes = filteredNodes.filter(n => !existingNodeIds.has(n.id))
+        const uniqueNewEdges = filteredEdges.filter(e => !existingEdgeIds.has(`${e.source}-${e.target}`))
+
+        graphData.value.nodes.push(...uniqueNewNodes)
+        graphData.value.edges.push(...uniqueNewEdges)
+      } else {
+        graphData.value = {
+          nodes: filteredNodes,
+          edges: filteredEdges
+        }
+      }
+
+      await nextTick()
+      renderGraph()
+
+      const relationshipCount = relationshipModal.selectedType.length
+      showSuccessToast(`Expanded ${relationshipCount} relationship group(s) for ${node.name}`)
+    }
+  } catch (error) {
+    console.error('Failed to expand relationships:', error)
+    showErrorToast('Failed to expand relationships')
+  } finally {
+    relationshipModal.loading = false
+    hideRelationshipModal()
+  }
 }
 
 const viewNodeDetails = (node: any) => {
@@ -516,11 +1180,13 @@ const viewNodeDetails = (node: any) => {
   hideContextMenu()
 }
 
-
 const showContextMenu = (event, node) => {
   // Prevent default browser context menu
   if (event.preventDefault) {
     event.preventDefault()
+  }
+  if (event.stopPropagation) {
+    event.stopPropagation()
   }
 
   contextMenu.visible = true
@@ -560,6 +1226,8 @@ const clearGraph = () => {
   filters.search = ''
   filters.ci_types = []
   searchResults.value = []
+  showAutocomplete.value = false
+  hideTooltip()
 }
 
 // Close context menu when clicking outside
@@ -571,13 +1239,18 @@ document.addEventListener('click', (e) => {
 
 onMounted(async () => {
   await loadCITypes()
-  await loadGraphData()
+  // Don't load graph data initially - wait for user to search
+  // This ensures the graph starts empty
 })
 
 onUnmounted(() => {
   if (network.value) {
     network.value.destroy()
   }
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value)
+  }
+  hideTooltip()
 })
 </script>
 

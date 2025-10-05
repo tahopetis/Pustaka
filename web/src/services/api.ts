@@ -139,6 +139,12 @@ export const ciAPI = {
     ci_types?: string[]
     limit?: number
   }) => api.get('/ci/search', { params }),
+
+  bulkSearch: (params?: {
+    ci_types?: string[]
+    limit?: number
+    search?: string
+  }) => api.get('/ci/bulk-search', { params }),
 }
 
 export const ciTypeAPI = {
@@ -194,7 +200,6 @@ export const relationshipAPI = {
 }
 
 export const graphAPI = {
-  getNodes: (id: string) => api.get(`/graph/nodes/${id}`),
   explore: (params?: {
     ci_types?: string[]
     search?: string
@@ -204,10 +209,12 @@ export const graphAPI = {
     relationship_types?: string[]
   }) => api.get('/graph/explore', { params }),
 
-  expandNode: (nodeId: string, params?: {
-    depth?: number
-    relationship_types?: string[]
-  }) => api.get(`/graph/nodes/${nodeId}/expand`, { params }),
+  // Alternative method for graph data using the same endpoint as explore
+  get: (params?: {
+    ci_types?: string[]
+    search?: string
+    limit?: number
+  }) => api.get('/graph', { params }),
 }
 
 export const auditAPI = {

@@ -23,15 +23,44 @@
     <div class="card-body">
       <!-- Basic Search -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <div>
+        <div class="relative">
           <label class="form-label">Quick Search</label>
           <input
             v-model="filters.search"
             type="text"
             placeholder="Search by name, tags..."
             class="form-input"
-            @input="onSearchChange"
+            @input="onSearchInputChange"
+            @focus="showSuggestions = true"
+            @blur="hideSuggestions"
           >
+
+          <!-- Search Suggestions Dropdown -->
+          <div
+            v-if="showSuggestions && (searchSuggestions.length > 0 || isSearching)"
+            class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+          >
+            <div v-if="isSearching" class="p-3 text-gray-500 text-sm">
+              Searching...
+            </div>
+            <div
+              v-for="suggestion in searchSuggestions"
+              :key="suggestion.id"
+              @mousedown="selectSuggestion(suggestion)"
+              class="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+            >
+              <div class="font-medium text-gray-900">{{ suggestion.name }}</div>
+              <div class="text-sm text-gray-500">{{ suggestion.ci_type }}</div>
+              <div v-if="suggestion.tags && suggestion.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
+                <span v-for="tag in suggestion.tags.slice(0, 3)" :key="tag" class="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                  {{ tag }}
+                </span>
+                <span v-if="suggestion.tags.length > 3" class="inline-block px-2 py-1 text-xs text-gray-500">
+                  +{{ suggestion.tags.length - 3 }} more
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
         <div>
           <label class="form-label">CI Type</label>
@@ -262,6 +291,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import type { CIType } from '@/types/ci'
+import { ciAPI } from '@/services/api'
 
 interface AttributeDefinition {
   name: string
@@ -297,6 +327,12 @@ const emit = defineEmits<{
 const showAdvanced = ref(false)
 const selectedCIType = ref('')
 const tagInput = ref('')
+
+// Search suggestions state
+const searchSuggestions = ref<any[]>([])
+const showSuggestions = ref(false)
+const isSearching = ref(false)
+const searchTimeout = ref<NodeJS.Timeout | null>(null)
 
 const filters = reactive({
   search: '',
@@ -352,6 +388,62 @@ const toggleAdvanced = () => {
 
 const onSearchChange = () => {
   emit('search', { ...filters })
+}
+
+const onSearchInputChange = () => {
+  // Clear existing timeout
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value)
+  }
+
+  // Always emit search for immediate filtering
+  onSearchChange()
+
+  // If search term is empty, clear suggestions
+  if (!filters.search.trim()) {
+    searchSuggestions.value = []
+    showSuggestions.value = false
+    return
+  }
+
+  // Debounce search suggestions
+  searchTimeout.value = setTimeout(() => {
+    fetchSearchSuggestions()
+  }, 300)
+}
+
+const fetchSearchSuggestions = async () => {
+  if (!filters.search.trim()) {
+    searchSuggestions.value = []
+    return
+  }
+
+  isSearching.value = true
+  try {
+    const response = await ciAPI.search({
+      search: filters.search,
+      limit: 8
+    })
+    searchSuggestions.value = response.data.cis || []
+  } catch (error) {
+    console.error('Failed to fetch search suggestions:', error)
+    searchSuggestions.value = []
+  } finally {
+    isSearching.value = false
+  }
+}
+
+const selectSuggestion = (suggestion: any) => {
+  filters.search = suggestion.name
+  showSuggestions.value = false
+  onSearchChange()
+}
+
+const hideSuggestions = () => {
+  // Delay hiding to allow click events to register
+  setTimeout(() => {
+    showSuggestions.value = false
+  }, 200)
 }
 
 const onCITypeChange = () => {

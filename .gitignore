@@ -77,3 +77,80 @@ tmp/
 # Debug files
 debug_*.js
 test_*.js
+
+# Lock files (keep package-lock.json but ignore others)
+# package-lock.json is kept for dependency consistency
+yarn.lock
+pnpm-lock.yaml
+
+# Backup files
+*.backup
+*.bak
+*.old
+*.orig
+*.rej
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
+
+# Test coverage and reports
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+playwright-report/
+test-results.xml
+
+# Temporary build files
+*.tgz
+*.tar.gz
+*.rar
+*.7z
+
+# IDE specific files
+*.sublime-project
+*.sublime-workspace
+.spyderproject
+.spyproject
+*.komodoproject
+*.komodotools
+
+# Package manager cache
+.npm
+.yarn
+.pnpm-store
+.npmrc.local
+
+# Database dumps
+*.sql
+*.dump
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Configuration templates
+*.template
+*.example
+*.sample
+
+# Local development
+.local/
+dev/
+development/
+
+# Monitoring and profiling
+*.prof
+*.pprof
+*.cpu
+*.mem
+
+# Platform specific
+*.lnk
+*.url
+
+.claude/

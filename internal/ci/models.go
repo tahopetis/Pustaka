@@ -2,6 +2,7 @@ package ci
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -142,6 +143,25 @@ type ListRelationshipFilters struct {
 	Search           string     `json:"search,omitempty"`
 	Sort             string     `json:"sort,omitempty"`
 	Order            string     `json:"order,omitempty"`
+}
+
+// Search models for autocomplete
+type CISearchRequest struct {
+	Query   string   `json:"q"`   // Search query
+	CIType  string   `json:"ci_type"` // Filter by CI type
+	Limit   int      `json:"limit"`   // Maximum results (default 10)
+}
+
+type CISearchResponse struct {
+	Suggestions []CISuggestion `json:"suggestions"`
+}
+
+type CISuggestion struct {
+	ID        uuid.UUID            `json:"id"`
+	Name      string               `json:"name"`
+	CIType    string               `json:"ci_type"`
+	Tags      []string             `json:"tags"`
+	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
 
 // ValidateAttributes validates CI attributes against a CI type definition
@@ -293,12 +313,31 @@ func validateField(attrDef AttributeDefinition, value interface{}) []ValidationE
 			return errors
 		}
 	case "integer":
-		if _, ok := value.(float64); !ok {
+		var intValue int
+		switch v := value.(type) {
+		case float64:
+			intValue = int(v)
+		case string:
+			// Try to convert string to int
+			if parsedInt, err := strconv.Atoi(v); err == nil {
+				intValue = parsedInt
+			} else {
+				errors = append(errors, ValidationError{
+					Field:   attrDef.Name,
+					Message: "must be an integer",
+				})
+				return errors
+			}
+		default:
 			errors = append(errors, ValidationError{
 				Field:   attrDef.Name,
 				Message: "must be an integer",
 			})
 			return errors
+		}
+		// Apply integer-specific validation rules
+		if fieldErrors := validateIntegerField(attrDef, intValue); len(fieldErrors) > 0 {
+			errors = append(errors, fieldErrors...)
 		}
 	case "boolean":
 		if _, ok := value.(bool); !ok {

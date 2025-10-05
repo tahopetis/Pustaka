@@ -20,15 +20,27 @@
     <!-- Search and Filters -->
     <div class="bg-white shadow rounded-lg p-6 mb-6">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="md:col-span-2">
+        <div class="md:col-span-2 relative">
           <label class="form-label">Search</label>
-          <input
-            v-model="filters.search"
-            type="text"
-            placeholder="Search by CI name or type..."
-            class="form-input"
-            @input="debouncedSearch"
-          />
+          <div class="relative">
+            <input
+              v-model="filters.search"
+              type="text"
+              placeholder="Search by CI name or type..."
+              class="form-input pr-10"
+              @input="debouncedSearch"
+            />
+            <button
+              v-if="filters.search"
+              @click="clearSearch"
+              class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              title="Clear search"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
         </div>
         <div>
           <label class="form-label">Relationship Type</label>
@@ -259,6 +271,12 @@ const debouncedSearch = debounce(() => {
   loadRelationships()
 }, 500)
 
+const clearSearch = () => {
+  filters.search = ''
+  pagination.page = 1
+  loadRelationships()
+}
+
 function debounce(func: Function, wait: number) {
   let timeout: NodeJS.Timeout
   return function executedFunction(...args: any[]) {
@@ -288,8 +306,10 @@ const loadRelationships = async () => {
       }
     })
 
+    console.log('Loading relationships with params:', params)
     const apiResponse = await relationshipAPI.list(params)
     response.value = apiResponse.data
+    console.log('Relationships response:', apiResponse.data)
 
     // Load CI details for display
     if (response.value && response.value.relationships) {
