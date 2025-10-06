@@ -75,6 +75,30 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresPermission: 'relationship:update' }
     },
     {
+      path: '/relationship-types',
+      name: 'RelationshipTypes',
+      component: () => import('@/views/relationship-types/RelationshipTypeListView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'relationship_type:read' }
+    },
+    {
+      path: '/relationship-types/new',
+      name: 'CreateRelationshipType',
+      component: () => import('@/views/relationship-types/RelationshipTypeFormView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'relationship_type:create' }
+    },
+    {
+      path: '/relationship-types/:id',
+      name: 'RelationshipTypeDetails',
+      component: () => import('@/views/relationship-types/RelationshipTypeDetailsView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'relationship_type:read' }
+    },
+    {
+      path: '/relationship-types/:id/edit',
+      name: 'EditRelationshipType',
+      component: () => import('@/views/relationship-types/RelationshipTypeFormView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'relationship_type:update' }
+    },
+    {
       path: '/graph',
       name: 'Graph',
       component: () => import('@/views/graph/GraphView.vue'),
@@ -117,9 +141,16 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/audit/debug',
+      name: 'AuditDebug',
+      component: () => import('@/views/audit/AuditViewDebug.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'audit:read' }
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
-      component: () => import('@/views/error/NotFoundView.vue')
+      component: () => import('@/views/error/NotFoundView.vue'),
+      meta: { requiresAuth: false }
     }
   ]
 })
@@ -128,69 +159,49 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  console.log('Router guard:', {
-    to: to.path,
-    isLoading: authStore.isLoading,
-    isInitialized: authStore.isInitialized,
-    isAuthenticated: authStore.isAuthenticated,
-    hasAccessToken: !!authStore.accessToken,
-    hasUser: !!authStore.user
-  })
-
-  // If authentication is not initialized, ensure checkAuth is called
+  // Initialize auth store if not already done
   if (!authStore.isInitialized) {
-    console.log('Auth not initialized, calling checkAuth...')
-    await authStore.checkAuth()
-    console.log('checkAuth completed, auth state updated')
+    try {
+      await authStore.checkAuth()
+    } catch (error) {
+      console.error('Auth initialization failed:', error)
+    }
   }
 
-  // If authentication is still loading after checkAuth, wait for it
-  if (authStore.isLoading) {
-    console.log('Auth is still loading, waiting for completion...')
-
-    // Create a promise that resolves when auth is initialized
-    await new Promise<void>((resolve) => {
-      const checkAuth = () => {
-        if (!authStore.isLoading) {
-          console.log('Auth loading completed')
-          resolve()
-        } else {
-          setTimeout(checkAuth, 50) // Check every 50ms
-        }
-      }
-      checkAuth()
-    })
+  // Wait a bit for user data to be loaded if we have a token but no user yet
+  if (authStore.accessToken && !authStore.user && authStore.isLoading) {
+    // Wait for auth check to complete
+    let attempts = 0
+    while (authStore.isLoading && attempts < 50) { // Max 5 seconds
+      await new Promise(resolve => setTimeout(resolve, 100))
+      attempts++
+    }
   }
-
-  console.log('Final auth state:', {
-    isLoading: authStore.isLoading,
-    isInitialized: authStore.isInitialized,
-    isAuthenticated: authStore.isAuthenticated,
-    hasUser: !!authStore.user
-  })
 
   // Check if route requires authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    console.log('Route requires auth but user not authenticated, redirecting to login')
     next('/login')
     return
   }
 
   // Check if route requires specific permission
-  if (to.meta.requiresPermission && !authStore.hasPermission(to.meta.requiresPermission)) {
-    console.log('Route requires specific permission but user lacks it, redirecting to dashboard')
+  if (to.meta.requiresPermission && typeof to.meta.requiresPermission === 'string') {
+    if (!authStore.hasPermission(to.meta.requiresPermission)) {
+      console.log(`Router guard: Missing permission ${to.meta.requiresPermission}, redirecting to dashboard`)
+      console.log('User permissions:', authStore.user?.permissions || [])
+      // For unauthorized access, you could redirect to a dedicated "unauthorized" page
+      // For now, we'll redirect to dashboard
+      next('/dashboard')
+      return
+    }
+  }
+
+  // If user is authenticated and tries to access login, redirect to dashboard
+  if (to.path === '/login' && authStore.isAuthenticated) {
     next('/dashboard')
     return
   }
 
-  // Redirect authenticated users away from login page
-  if (to.name === 'Login' && authStore.isAuthenticated) {
-    console.log('Authenticated user accessing login, redirecting to dashboard')
-    next('/dashboard')
-    return
-  }
-
-  console.log('Router guard allowing navigation to:', to.path)
   next()
 })
 

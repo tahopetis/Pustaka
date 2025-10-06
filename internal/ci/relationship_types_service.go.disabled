@@ -1,0 +1,525 @@
+package ci
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
+	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+)
+
+// RelationshipTypeService handles business logic for relationship types
+type RelationshipTypeService struct {
+	repo         *RelationshipTypeRepository
+	ciRepo       *Repository
+	redis        *redis.Client
+	auditService *AuditService
+	logger       *pustakaLogger.Logger
+	db           *pgxpool.Pool
+}
+
+func NewRelationshipTypeService(
+	repo *RelationshipTypeRepository,
+	ciRepo *Repository,
+	redis *redis.Client,
+	auditService *AuditService,
+	logger *pustakaLogger.Logger,
+	db *pgxpool.Pool,
+) *RelationshipTypeService {
+	return &RelationshipTypeService{
+		repo:         repo,
+		ciRepo:       ciRepo,
+		redis:        redis,
+		auditService: auditService,
+		logger:       logger,
+		db:           db,
+	}
+}
+
+// CreateRelationshipType creates a new relationship type
+func (s *RelationshipTypeService) CreateRelationshipType(ctx context.Context, req *CreateRelationshipTypeRequest, userID string) (*RelationshipType, error) {
+	// Validate request
+	if err := s.validateCreateRequest(req); err != nil {
+		return nil, err
+	}
+
+	// Check for duplicate name
+	existing, err := s.repo.GetByName(ctx, req.Name)
+	if err == nil && existing != nil {
+		return nil, fmt.Errorf("relationship type '%s' already exists", req.Name)
+	}
+
+	// Create relationship type
+	relationshipType := &RelationshipType{
+		ID:                 uuid.New().String(),
+		Name:               strings.ToLower(strings.TrimSpace(req.Name)),
+		DisplayName:        strings.TrimSpace(req.DisplayName),
+		Description:        req.Description,
+		Category:           strings.TrimSpace(req.Category),
+		Color:              req.Color,
+		Icon:               req.Icon,
+		IsSystemType:       false,
+		IsActive:           true,
+		AllowedSourceTypes: req.AllowedSourceTypes,
+		AllowedTargetTypes: req.AllowedTargetTypes,
+		CardinalitySource:  req.CardinalitySource,
+		CardinalityTarget:  req.CardinalityTarget,
+		Bidirectional:      req.Bidirectional,
+		ReverseLabel:       req.ReverseLabel,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+		CreatedBy:          &userID,
+		UpdatedBy:          &userID,
+	}
+
+	result, err := s.repo.Create(ctx, relationshipType)
+	if err != nil {
+		return nil, err
+	}
+
+	// Invalidate cache
+	s.invalidateRelationshipTypeCache(ctx)
+
+	// Log audit event
+	s.logAuditEvent(ctx, "relationship_type", result.ID, "create", userID, map[string]interface{}{
+		"name":         result.Name,
+		"display_name": result.DisplayName,
+		"category":     result.Category,
+	})
+
+	s.logger.InfoService("relationship_type", "create_relationship_type", map[string]interface{}{
+		"relationship_type_id": result.ID,
+		"name":                 result.Name,
+		"user_id":              userID,
+	})
+
+	return result, nil
+}
+
+// GetRelationshipType retrieves a relationship type by ID
+func (s *RelationshipTypeService) GetRelationshipType(ctx context.Context, id uuid.UUID) (*RelationshipType, error) {
+	// Try cache first
+	if rt, err := s.getRelationshipTypeFromCache(ctx, id); err == nil {
+		return rt, nil
+	}
+
+	// Get from database
+	rt, err := s.repo.GetRelationshipType(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the result
+	s.cacheRelationshipType(ctx, rt)
+
+	return rt, nil
+}
+
+// GetRelationshipTypeByName retrieves a relationship type by name
+func (s *RelationshipTypeService) GetRelationshipTypeByName(ctx context.Context, name string) (*RelationshipType, error) {
+	return s.repo.GetRelationshipTypeByName(ctx, name)
+}
+
+// ListRelationshipTypes retrieves paginated relationship types with filters
+func (s *RelationshipTypeService) ListRelationshipTypes(ctx context.Context, filter RelationshipTypeFilter, page, limit int) (*RelationshipTypeListResponse, error) {
+	// Validate pagination parameters
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	return s.repo.ListRelationshipTypes(ctx, filter, page, limit)
+}
+
+// GetActiveRelationshipTypes returns all active relationship types
+func (s *RelationshipTypeService) GetActiveRelationshipTypes(ctx context.Context) ([]RelationshipType, error) {
+	// Try cache first
+	if rts, err := s.getActiveRelationshipTypesFromCache(ctx); err == nil {
+		return rts, nil
+	}
+
+	// Get from database
+	rts, err := s.repo.GetActiveRelationshipTypes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the result
+	s.cacheActiveRelationshipTypes(ctx, rts)
+
+	return rts, nil
+}
+
+// UpdateRelationshipType updates an existing relationship type
+func (s *RelationshipTypeService) UpdateRelationshipType(ctx context.Context, id uuid.UUID, req *UpdateRelationshipTypeRequest, userID uuid.UUID) (*RelationshipType, error) {
+	// Get current relationship type
+	current, err := s.repo.GetRelationshipType(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if it's a system type
+	if current.IsSystem {
+		return nil, fmt.Errorf("system relationship types cannot be modified")
+	}
+
+	// Validate update request
+	if err := s.validateUpdateRequest(req); err != nil {
+		return nil, err
+	}
+
+	// Validate cardinality if being updated
+	if req.Cardinality != nil {
+		validCardinalities := map[string]bool{
+			"one-to-one": true, "one-to-many": true, "many-to-one": true, "many-to-many": true,
+		}
+		if !validCardinalities[*req.Cardinality] {
+			return nil, fmt.Errorf("invalid cardinality: %s", *req.Cardinality)
+		}
+	}
+
+	// Validate CI types if being updated
+	if req.AllowedSourceTypes != nil || req.AllowedTargetTypes != nil {
+		sourceTypes := current.AllowedSourceTypes
+		targetTypes := current.AllowedTargetTypes
+
+		if req.AllowedSourceTypes != nil {
+			sourceTypes = req.AllowedSourceTypes
+		}
+		if req.AllowedTargetTypes != nil {
+			targetTypes = req.AllowedTargetTypes
+		}
+
+		if err := s.validateCITypes(ctx, sourceTypes, targetTypes); err != nil {
+			return nil, err
+		}
+	}
+
+	// Update relationship type
+	result, err := s.repo.UpdateRelationshipType(ctx, id, req, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Invalidate cache
+	s.invalidateRelationshipTypeCache(ctx)
+
+	// Log audit event
+	s.logAuditEvent(ctx, "relationship_type", id.String(), "update", userID.String(), map[string]interface{}{
+		"name":     result.Name,
+		"changes":  req,
+	})
+
+	s.logger.InfoService("relationship_type", "update_relationship_type", map[string]interface{}{
+		"relationship_type_id": id,
+		"name":                 result.Name,
+		"user_id":              userID,
+	})
+
+	return result, nil
+}
+
+// DeleteRelationshipType deletes a relationship type
+func (s *RelationshipTypeService) DeleteRelationshipType(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+	// Get relationship type for audit
+	rt, err := s.repo.GetRelationshipType(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Check if it's a system type
+	if rt.IsSystem {
+		return fmt.Errorf("system relationship types cannot be deleted")
+	}
+
+	// Delete from database
+	if err := s.repo.DeleteRelationshipType(ctx, id); err != nil {
+		return err
+	}
+
+	// Invalidate cache
+	s.invalidateRelationshipTypeCache(ctx)
+
+	// Log audit event
+	s.logAuditEvent(ctx, "relationship_type", id.String(), "delete", userID.String(), map[string]interface{}{
+		"name": rt.Name,
+	})
+
+	s.logger.InfoService("relationship_type", "delete_relationship_type", map[string]interface{}{
+		"relationship_type_id": id,
+		"name":                 rt.Name,
+		"user_id":              userID,
+	})
+
+	return nil
+}
+
+// ValidateRelationship validates if a relationship can be created between two CIs
+func (s *RelationshipTypeService) ValidateRelationship(ctx context.Context, relationshipTypeName string, sourceID, targetID uuid.UUID) (*RelationshipTypeValidation, error) {
+	// Get relationship type
+	rt, err := s.repo.GetRelationshipTypeByName(ctx, relationshipTypeName)
+	if err != nil {
+		return nil, fmt.Errorf("relationship type '%s' not found", relationshipTypeName)
+	}
+
+	// Get CIs
+	sourceCI, err := s.ciRepo.GetCI(ctx, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("source CI not found: %w", err)
+	}
+
+	targetCI, err := s.ciRepo.GetCI(ctx, targetID)
+	if err != nil {
+		return nil, fmt.Errorf("target CI not found: %w", err)
+	}
+
+	// Validate relationship
+	validation := rt.ValidateRelationship(sourceCI, targetCI)
+
+	// Additional validation checks
+	if rt.Name == "depends_on" || rt.Name == "part_of" {
+		// Check for potential circular dependencies
+		if err := s.checkCircularDependency(ctx, sourceID, targetID, relationshipTypeName); err != nil {
+			validation.Warnings = append(validation.Warnings, "Potential circular dependency detected")
+		}
+	}
+
+	return &validation, nil
+}
+
+// GetRelationshipTypeUsage returns usage statistics for relationship types
+func (s *RelationshipTypeService) GetRelationshipTypeUsage(ctx context.Context) ([]RelationshipTypeUsage, error) {
+	return s.repo.GetRelationshipTypeUsage(ctx)
+}
+
+// GetRelationshipTypeStatistics returns comprehensive statistics
+func (s *RelationshipTypeService) GetRelationshipTypeStatistics(ctx context.Context) (*RelationshipTypeStatistics, error) {
+	return s.repo.GetRelationshipTypeStatistics(ctx)
+}
+
+// Helper methods
+
+func (s *RelationshipTypeService) validateCreateRequest(req *CreateRelationshipTypeRequest) error {
+	// Name validation
+	if strings.TrimSpace(req.Name) == "" {
+		return fmt.Errorf("name is required")
+	}
+	if len(req.Name) < 2 || len(req.Name) > 50 {
+		return fmt.Errorf("name must be between 2 and 50 characters")
+	}
+	if !isValidRelationshipTypeName(req.Name) {
+		return fmt.Errorf("name must contain only lowercase letters, numbers, and underscores")
+	}
+
+	// Display name validation
+	if strings.TrimSpace(req.DisplayName) == "" {
+		return fmt.Errorf("display name is required")
+	}
+	if len(req.DisplayName) < 3 || len(req.DisplayName) > 100 {
+		return fmt.Errorf("display name must be between 3 and 100 characters")
+	}
+
+	// Labels validation
+	if strings.TrimSpace(req.ForwardLabel) == "" {
+		return fmt.Errorf("forward label is required")
+	}
+	if strings.TrimSpace(req.BackwardLabel) == "" {
+		return fmt.Errorf("backward label is required")
+	}
+	if req.ForwardLabel == req.BackwardLabel {
+		return fmt.Errorf("forward and backward labels must be different")
+	}
+
+	// Category validation
+	if strings.TrimSpace(req.Category) == "" {
+		return fmt.Errorf("category is required")
+	}
+
+	return nil
+}
+
+func (s *RelationshipTypeService) validateUpdateRequest(req *UpdateRelationshipTypeRequest) error {
+	// Display name validation
+	if req.DisplayName != nil {
+		if strings.TrimSpace(*req.DisplayName) == "" {
+			return fmt.Errorf("display name cannot be empty")
+		}
+		if len(*req.DisplayName) < 3 || len(*req.DisplayName) > 100 {
+			return fmt.Errorf("display name must be between 3 and 100 characters")
+		}
+	}
+
+	// Labels validation
+	if req.ForwardLabel != nil && req.BackwardLabel != nil {
+		if strings.TrimSpace(*req.ForwardLabel) == "" {
+			return fmt.Errorf("forward label cannot be empty")
+		}
+		if strings.TrimSpace(*req.BackwardLabel) == "" {
+			return fmt.Errorf("backward label cannot be empty")
+		}
+		if *req.ForwardLabel == *req.BackwardLabel {
+			return fmt.Errorf("forward and backward labels must be different")
+		}
+	}
+
+	// Category validation
+	if req.Category != nil {
+		if strings.TrimSpace(*req.Category) == "" {
+			return fmt.Errorf("category cannot be empty")
+		}
+	}
+
+	return nil
+}
+
+func (s *RelationshipTypeService) validateCITypes(ctx context.Context, sourceTypes, targetTypes []string) error {
+	// Validate source types
+	for _, ciType := range sourceTypes {
+		_, err := s.ciRepo.GetCITypeByName(ctx, ciType)
+		if err != nil {
+			return fmt.Errorf("invalid source CI type: %s", ciType)
+		}
+	}
+
+	// Validate target types
+	for _, ciType := range targetTypes {
+		_, err := s.ciRepo.GetCITypeByName(ctx, ciType)
+		if err != nil {
+			return fmt.Errorf("invalid target CI type: %s", ciType)
+		}
+	}
+
+	return nil
+}
+
+func (s *RelationshipTypeService) checkCircularDependency(ctx context.Context, sourceID, targetID uuid.UUID, relationshipType string) error {
+	// This is a simplified circular dependency check
+	// In a full implementation, you would traverse the relationship graph
+	// to detect cycles
+
+	// For now, just check if there's already a reverse relationship
+	reverseQuery := `
+		SELECT COUNT(*) FROM relationships
+		WHERE source_id = $1 AND target_id = $2 AND relationship_type = $3
+	`
+	var count int64
+	err := s.db.QueryRow(ctx, reverseQuery, targetID, sourceID, relationshipType).Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return fmt.Errorf("circular dependency detected")
+	}
+
+	return nil
+}
+
+// Cache methods
+
+func (s *RelationshipTypeService) getRelationshipTypeFromCache(ctx context.Context, id uuid.UUID) (*RelationshipType, error) {
+	key := fmt.Sprintf("relationship_type:%s", id)
+	data, err := s.redis.Get(ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var rt RelationshipType
+	if err := json.Unmarshal([]byte(data), &rt); err != nil {
+		return nil, err
+	}
+
+	return &rt, nil
+}
+
+func (s *RelationshipTypeService) cacheRelationshipType(ctx context.Context, rt *RelationshipType) error {
+	key := fmt.Sprintf("relationship_type:%s", rt.ID)
+	data, err := json.Marshal(rt)
+	if err != nil {
+		return err
+	}
+
+	return s.redis.Set(ctx, key, data, 10*time.Minute).Err()
+}
+
+func (s *RelationshipTypeService) getActiveRelationshipTypesFromCache(ctx context.Context) ([]RelationshipType, error) {
+	key := "relationship_types:active"
+	data, err := s.redis.Get(ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var rts []RelationshipType
+	if err := json.Unmarshal([]byte(data), &rts); err != nil {
+		return nil, err
+	}
+
+	return rts, nil
+}
+
+func (s *RelationshipTypeService) cacheActiveRelationshipTypes(ctx context.Context, rts []RelationshipType) error {
+	key := "relationship_types:active"
+	data, err := json.Marshal(rts)
+	if err != nil {
+		return err
+	}
+
+	return s.redis.Set(ctx, key, data, 5*time.Minute).Err()
+}
+
+func (s *RelationshipTypeService) invalidateRelationshipTypeCache(ctx context.Context) {
+	// Invalidate specific relationship type cache
+	keys := []string{
+		"relationship_types:active",
+	}
+
+	for _, key := range keys {
+		s.redis.Del(ctx, key)
+	}
+}
+
+func (s *RelationshipTypeService) logAuditEvent(ctx context.Context, entityType, entityID, action, performedBy string, details map[string]interface{}) {
+	// Parse UUIDs
+	var entityUUID *uuid.UUID
+	if entityID != "" {
+		if parsedID, err := uuid.Parse(entityID); err == nil {
+			entityUUID = &parsedID
+		}
+	}
+
+	performedByUUID, err := uuid.Parse(performedBy)
+	if err != nil {
+		s.logger.Error().Err(err).Str("performed_by", performedBy).Msg("Invalid user ID for audit logging")
+		return
+	}
+
+	// Save to database via audit service
+	if err := s.auditService.CreateAuditLog(ctx, entityType, entityUUID, action, performedByUUID, details, "", ""); err != nil {
+		s.logger.Error().Err(err).Str("entity_type", entityType).Str("action", action).Msg("Failed to create audit log")
+	}
+
+	// Also log to structured logs for debugging
+	s.logger.InfoAudit(entityType, entityID, action, performedBy, details)
+}
+
+// Validation helper function
+func isValidRelationshipTypeName(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+
+	for _, c := range name {
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+
+	return true
+}

@@ -199,6 +199,62 @@ export const relationshipAPI = {
   delete: (id: string) => api.delete(`/relationships/${id}`),
 }
 
+export const relationshipTypeAPI = {
+  list: (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    is_active?: boolean
+    category?: string
+  }) => api.get('/relationship-types', { params }),
+
+  get: (id: string) => api.get(`/relationship-types/${id}`),
+
+  create: (data: {
+    name: string
+    description?: string
+    forward_label: string
+    reverse_label: string
+    color?: string
+    icon?: string
+    category?: string
+    allowed_source_types?: string[]
+    allowed_target_types?: string[]
+    cardinality_source?: string
+    cardinality_target?: string
+    bidirectional?: boolean
+  }) => api.post('/relationship-types', data),
+
+  update: (id: string, data: {
+    description?: string
+    forward_label?: string
+    reverse_label?: string
+    color?: string
+    icon?: string
+    is_active?: boolean
+    category?: string
+    allowed_source_types?: string[]
+    allowed_target_types?: string[]
+    cardinality_source?: string
+    cardinality_target?: string
+    bidirectional?: boolean
+  }) => api.put(`/relationship-types/${id}`, data),
+
+  delete: (id: string) => api.delete(`/relationship-types/${id}`),
+
+  getCategories: () => api.get('/relationship-types/categories'),
+
+  validateCompatibility: (data: {
+    relationship_type: string
+    source_type: string
+    target_type: string
+  }) => api.post('/relationship-types/validate', data),
+
+  getStats: () => api.get('/relationship-types/stats'),
+
+  getUsage: () => api.get('/analytics/relationship-types/usage'),
+}
+
 export const graphAPI = {
   explore: (params?: {
     ci_types?: string[]

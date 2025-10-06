@@ -1,0 +1,476 @@
+package api
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/pustaka/pustaka/internal/ci"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
+
+// MockRelationshipTypeService is a mock for the RelationshipTypeService
+type MockRelationshipTypeService struct {
+	mock.Mock
+}
+
+func (m *MockRelationshipTypeService) CreateRelationshipType(ctx context.Context, req *ci.CreateRelationshipTypeRequest, userID uuid.UUID) (*ci.RelationshipType, error) {
+	args := m.Called(ctx, req, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*ci.RelationshipType), args.Error(1)
+}
+
+func (m *MockRelationshipTypeService) GetRelationshipType(ctx context.Context, id uuid.UUID) (*ci.RelationshipType, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*ci.RelationshipType), args.Error(1)
+}
+
+func (m *MockRelationshipTypeService) GetRelationshipTypeByName(ctx context.Context, name string) (*ci.RelationshipType, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*ci.RelationshipType), args.Error(1)
+}
+
+func (m *MockRelationshipTypeService) ListRelationshipTypes(ctx context.Context, filter ci.RelationshipTypeFilter, page, limit int) (*ci.RelationshipTypeListResponse, error) {
+	args := m.Called(ctx, filter, page, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*ci.RelationshipTypeListResponse), args.Error(1)
+}
+
+func (m *MockRelationshipTypeService) GetActiveRelationshipTypes(ctx context.Context) ([]ci.RelationshipType, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]ci.RelationshipType), args.Error(1)
+}
+
+func (m *MockRelationshipTypeService) UpdateRelationshipType(ctx context.Context, id uuid.UUID, req *ci.UpdateRelationshipTypeRequest, userID uuid.UUID) (*ci.RelationshipType, error) {
+	args := m.Called(ctx, id, req, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*ci.RelationshipType), args.Error(1)
+}
+
+func (m *MockRelationshipTypeService) DeleteRelationshipType(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+	args := m.Called(ctx, id, userID)
+	return args.Error(0)
+}
+
+func (m *MockRelationshipTypeService) ValidateRelationship(ctx context.Context, relationshipTypeName string, sourceID, targetID uuid.UUID) (*ci.RelationshipTypeValidation, error) {
+	args := m.Called(ctx, relationshipTypeName, sourceID, targetID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*ci.RelationshipTypeValidation), args.Error(1)
+}
+
+func (m *MockRelationshipTypeService) GetRelationshipTypeUsage(ctx context.Context) ([]ci.RelationshipTypeUsage, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]ci.RelationshipTypeUsage), args.Error(1)
+}
+
+func (m *MockRelationshipTypeService) GetRelationshipTypeStatistics(ctx context.Context) (*ci.RelationshipTypeStatistics, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*ci.RelationshipTypeStatistics), args.Error(1)
+}
+
+// Test helpers
+
+func setupRelationshipTypeTest() (*RelationshipTypeHandlers, *MockRelationshipTypeService) {
+	mockService := &MockRelationshipTypeService{}
+	mockLogger := &MockLogger{}
+	handler := &Handler{
+		logger: mockLogger,
+	}
+
+	handlers := NewRelationshipTypeHandlers(handler, mockService)
+	return handlers, mockService
+}
+
+func createMockRelationshipType(id uuid.UUID) *ci.RelationshipType {
+	return &ci.RelationshipType{
+		ID:               id,
+		Name:             "test_type",
+		DisplayName:      "Test Type",
+		Description:      stringPtr("A test relationship type"),
+		Category:         "test",
+		ForwardLabel:     "tests",
+		BackwardLabel:    "tested by",
+		IsActive:         true,
+		IsSystem:         false,
+		Cardinality:      "many-to-many",
+		AllowedSourceTypes: []string{"Server"},
+		AllowedTargetTypes: []string{"Application"},
+		CreatedBy:        uuid.New(),
+	}
+}
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+// Test cases
+
+func TestCreateRelationshipType(t *testing.T) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	userID := uuid.New()
+	testID := uuid.New()
+
+	req := ci.CreateRelationshipTypeRequest{
+		Name:             "test_type",
+		DisplayName:      "Test Type",
+		Description:      stringPtr("A test relationship type"),
+		Category:         "test",
+		ForwardLabel:     "tests",
+		BackwardLabel:    "tested by",
+		Cardinality:      "many-to-many",
+		AllowedSourceTypes: []string{"Server"},
+		AllowedTargetTypes: []string{"Application"},
+	}
+
+	mockRT := createMockRelationshipType(testID)
+	mockService.On("CreateRelationshipType", mock.Anything, &req, userID).Return(mockRT, nil)
+
+	// Create request body
+	reqBody, _ := json.Marshal(req)
+	req := httptest.NewRequest("POST", "/api/v1/relationship-types", bytes.NewReader(reqBody))
+
+	// Set up mock context with user ID
+	ctx := context.WithValue(req.Context(), "user_id", userID.String())
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handlers.CreateRelationshipType(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	var response ci.RelationshipType
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, testID, response.ID)
+	assert.Equal(t, "test_type", response.Name)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestGetRelationshipType(t *testing.T) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	testID := uuid.New()
+	mockRT := createMockRelationshipType(testID)
+
+	mockService.On("GetRelationshipType", mock.Anything, testID).Return(mockRT, nil)
+
+	req := httptest.NewRequest("GET", "/api/v1/relationship-types/"+testID.String(), nil)
+	w := httptest.NewRecorder()
+	handlers.GetRelationshipType(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response ci.RelationshipType
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, testID, response.ID)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestListRelationshipTypes(t *testing.T) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	testID := uuid.New()
+	mockRT := createMockRelationshipType(testID)
+
+	response := &ci.RelationshipTypeListResponse{
+		RelationshipTypes: []ci.RelationshipType{*mockRT},
+		Page:              1,
+		Limit:             20,
+		Total:             1,
+		TotalPages:        1,
+	}
+
+	filter := ci.RelationshipTypeFilter{}
+	mockService.On("ListRelationshipTypes", mock.Anything, filter, 1, 20).Return(response, nil)
+
+	req := httptest.NewRequest("GET", "/api/v1/relationship-types", nil)
+	w := httptest.NewRecorder()
+	handlers.ListRelationshipTypes(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var listResponse ci.RelationshipTypeListResponse
+	err := json.Unmarshal(w.Body.Bytes(), &listResponse)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(listResponse.RelationshipTypes))
+	assert.Equal(t, testID, listResponse.RelationshipTypes[0].ID)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestUpdateRelationshipType(t *testing.T) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	userID := uuid.New()
+	testID := uuid.New()
+
+	req := ci.UpdateRelationshipTypeRequest{
+		DisplayName: stringPtr("Updated Test Type"),
+		Description: stringPtr("Updated description"),
+	}
+
+	mockRT := createMockRelationshipType(testID)
+	mockRT.DisplayName = "Updated Test Type"
+	mockRT.Description = stringPtr("Updated description")
+
+	mockService.On("UpdateRelationshipType", mock.Anything, testID, &req, userID).Return(mockRT, nil)
+
+	// Create request body
+	reqBody, _ := json.Marshal(req)
+	req := httptest.NewRequest("PUT", "/api/v1/relationship-types/"+testID.String(), bytes.NewReader(reqBody))
+
+	// Set up mock context with user ID
+	ctx := context.WithValue(req.Context(), "user_id", userID.String())
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handlers.UpdateRelationshipType(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response ci.RelationshipType
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "Updated Test Type", response.DisplayName)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestDeleteRelationshipType(t *testing.T) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	userID := uuid.New()
+	testID := uuid.New()
+
+	mockService.On("DeleteRelationshipType", mock.Anything, testID, userID).Return(nil)
+
+	req := httptest.NewRequest("DELETE", "/api/v1/relationship-types/"+testID.String(), nil)
+
+	// Set up mock context with user ID
+	ctx := context.WithValue(req.Context(), "user_id", userID.String())
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handlers.DeleteRelationshipType(w, req)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.Equal(t, 0, w.Body.Len())
+
+	mockService.AssertExpectations(t)
+}
+
+func TestValidateRelationship(t *testing.T) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	sourceID := uuid.New()
+	targetID := uuid.New()
+
+	validation := &ci.RelationshipTypeValidation{
+		IsValid:  true,
+		Errors:   []string{},
+		Warnings: []string{},
+	}
+
+	mockService.On("ValidateRelationship", mock.Anything, "depends_on", sourceID, targetID).Return(validation, nil)
+
+	req := httptest.NewRequest("GET", "/api/v1/relationship-types/validate?relationship_type=depends_on&source_id="+sourceID.String()+"&target_id="+targetID.String(), nil)
+	w := httptest.NewRecorder()
+	handlers.ValidateRelationship(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response ci.RelationshipTypeValidation
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.True(t, response.IsValid)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestGetRelationshipTypeUsage(t *testing.T) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	usage := []ci.RelationshipTypeUsage{
+		{
+			Name:             "depends_on",
+			DisplayName:      "Depends On",
+			RelationshipCount: 10,
+		},
+		{
+			Name:             "hosts",
+			DisplayName:      "Hosts",
+			RelationshipCount: 5,
+		},
+	}
+
+	mockService.On("GetRelationshipTypeUsage", mock.Anything).Return(usage, nil)
+
+	req := httptest.NewRequest("GET", "/api/v1/relationship-types/usage", nil)
+	w := httptest.NewRecorder()
+	handlers.GetRelationshipTypeUsage(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response []ci.RelationshipTypeUsage
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(response))
+	assert.Equal(t, "depends_on", response[0].Name)
+	assert.Equal(t, int64(10), response[0].RelationshipCount)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestGetRelationshipTypeStatistics(t *testing.T) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	stats := &ci.RelationshipTypeStatistics{
+		TotalTypes:  25,
+		ActiveTypes: 20,
+		SystemTypes:  5,
+		CustomTypes:  20,
+		Categories: map[string]int64{
+			"infrastructure": 10,
+			"application":    8,
+			"operational":    7,
+		},
+		CardinalityDistribution: map[string]int64{
+			"many-to-many": 15,
+			"one-to-many":   8,
+			"many-to-one":   2,
+		},
+	}
+
+	mockService.On("GetRelationshipTypeStatistics", mock.Anything).Return(stats, nil)
+
+	req := httptest.NewRequest("GET", "/api/v1/relationship-types/statistics", nil)
+	w := httptest.NewRecorder()
+	handlers.GetRelationshipTypeStatistics(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response ci.RelationshipTypeStatistics
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(25), response.TotalTypes)
+	assert.Equal(t, int64(20), response.ActiveTypes)
+	assert.Equal(t, int64(3), len(response.Categories))
+
+	mockService.AssertExpectations(t)
+}
+
+func TestCreateRelationshipType_InvalidRequest(t *testing.T) {
+	handlers, _ := setupRelationshipTypeTest()
+
+	// Invalid JSON
+	req := httptest.NewRequest("POST", "/api/v1/relationship-types", bytes.NewReader([]byte("invalid json")))
+	w := httptest.NewRecorder()
+	handlers.CreateRelationshipType(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestGetRelationshipType_InvalidID(t *testing.T) {
+	handlers, _ := setupRelationshipTypeTest()
+
+	req := httptest.NewRequest("GET", "/api/v1/relationship-types/invalid-uuid", nil)
+	w := httptest.NewRecorder()
+	handlers.GetRelationshipType(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestValidateRelationship_MissingParameters(t *testing.T) {
+	handlers, _ := setupRelationshipTypeTest()
+
+	// Missing relationship_type parameter
+	req := httptest.NewRequest("GET", "/api/v1/relationship-types/validate?source_id=123&target_id=456", nil)
+	w := httptest.NewRecorder()
+	handlers.ValidateRelationship(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestGetActiveRelationshipTypes(t *testing.T) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	testID := uuid.New()
+	mockRT := createMockRelationshipType(testID)
+
+	activeTypes := []ci.RelationshipType{*mockRT}
+	mockService.On("GetActiveRelationshipTypes", mock.Anything).Return(activeTypes, nil)
+
+	req := httptest.NewRequest("GET", "/api/v1/relationship-types/active", nil)
+	w := httptest.NewRecorder()
+	handlers.GetActiveRelationshipTypes(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response []ci.RelationshipType
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(response))
+	assert.Equal(t, testID, response[0].ID)
+
+	mockService.AssertExpectations(t)
+}
+
+// Benchmark tests
+
+func BenchmarkListRelationshipTypes(b *testing.B) {
+	handlers, mockService := setupRelationshipTypeTest()
+
+	testID := uuid.New()
+	mockRT := createMockRelationshipType(testID)
+
+	response := &ci.RelationshipTypeListResponse{
+		RelationshipTypes: []ci.RelationshipType{*mockRT},
+		Page:              1,
+		Limit:             20,
+		Total:             1,
+		TotalPages:        1,
+	}
+
+	filter := ci.RelationshipTypeFilter{}
+	mockService.On("ListRelationshipTypes", mock.Anything, filter, 1, 20).Return(response, nil).Maybe()
+
+	req := httptest.NewRequest("GET", "/api/v1/relationship-types", nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		handlers.ListRelationshipTypes(w, req)
+	}
+}

@@ -102,10 +102,20 @@
           <div class="mt-6">
             <label class="form-label">Relationship Type</label>
             <div class="flex items-center">
-              <span class="badge badge-info text-lg px-4 py-2">
+              <span
+                v-if="relationshipTypeDetails?.color"
+                class="badge text-lg px-4 py-2"
+                :style="{ backgroundColor: relationshipTypeDetails.color + '20', color: relationshipTypeDetails.color, borderColor: relationshipTypeDetails.color }"
+              >
+                {{ relationshipTypeDetails.forward_label }}
+              </span>
+              <span v-else class="badge badge-info text-lg px-4 py-2">
                 {{ formatRelationshipType(existingRelationship.relationship_type) }}
               </span>
             </div>
+            <p v-if="relationshipTypeDetails?.description" class="text-sm text-gray-500 mt-2">
+              {{ relationshipTypeDetails.description }}
+            </p>
             <p class="text-sm text-gray-500 mt-2">Note: Relationship type and CIs cannot be modified after creation. Only attributes can be updated.</p>
           </div>
         </div>
@@ -162,21 +172,14 @@
               </div>
 
               <!-- Relationship Type -->
-              <div>
-                <label class="form-label">Relationship Type</label>
-                <select v-model="form.relationship_type" class="form-input" required>
-                  <option value="">Select relationship type</option>
-                  <option value="depends_on">Depends On</option>
-                  <option value="connected_to">Connected To</option>
-                  <option value="runs_on">Runs On</option>
-                  <option value="contains">Contains</option>
-                  <option value="managed_by">Managed By</option>
-                  <option value="monitors">Monitors</option>
-                  <option value="backed_up_by">Backed Up By</option>
-                  <option value="secured_by">Secured By</option>
-                </select>
-                <p class="form-help">The type of relationship between these configuration items</p>
-              </div>
+              <RelationshipTypeSelect
+                v-model="form.relationship_type"
+                label="Relationship Type"
+                placeholder="Select relationship type"
+                help-text="The type of relationship between these configuration items"
+                :required="true"
+                @change="handleRelationshipTypeChange"
+              />
             </div>
 
             <!-- Attributes (Always shown) -->
@@ -243,8 +246,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useRelationshipTypeStore } from '@/stores/relationshipTypes'
 import { useNotificationStore } from '@/stores/notification'
 import { ciAPI, relationshipAPI } from '@/services/api'
+import RelationshipTypeSelect from '@/components/relationship/RelationshipTypeSelect.vue'
 
 interface Relationship {
   id: string
@@ -265,6 +270,7 @@ interface CI {
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const relationshipTypeStore = useRelationshipTypeStore()
 const notificationStore = useNotificationStore()
 
 const loading = ref(false)
@@ -293,10 +299,21 @@ const hasPermission = (permission: string) => {
   return authStore.hasPermission(permission)
 }
 
+// Get relationship type details for display
+const relationshipTypeDetails = computed(() => {
+  if (!existingRelationship.value) return null
+  return relationshipTypeStore.getRelationshipTypeByName(existingRelationship.value.relationship_type)
+})
+
 const formatRelationshipType = (type: string) => {
   return type.split('_').map(word =>
     word.charAt(0).toUpperCase() + word.slice(1)
   ).join(' ')
+}
+
+const handleRelationshipTypeChange = (type: any) => {
+  // Optional: Handle relationship type change if needed
+  console.log('Relationship type changed:', type)
 }
 
 const loadConfigurationItems = async () => {
@@ -434,6 +451,15 @@ const handleSubmit = async () => {
 }
 
 onMounted(async () => {
+  // Load relationship types
+  if (relationshipTypeStore.relationshipTypes.length === 0) {
+    try {
+      await relationshipTypeStore.loadRelationshipTypes()
+    } catch (error) {
+      console.error('Failed to load relationship types:', error)
+    }
+  }
+
   const permissionRequired = isEditing.value ? 'relationship:update' : 'relationship:create'
   if (!hasPermission(permissionRequired)) {
     notificationStore.showError(`You do not have permission to ${isEditing.value ? 'update' : 'create'} relationships`)

@@ -46,10 +46,13 @@
           <label class="form-label">Relationship Type</label>
           <select v-model="filters.relationship_type" class="form-input" @change="loadRelationships">
             <option value="">All Types</option>
-            <option value="depends_on">Depends On</option>
-            <option value="connected_to">Connected To</option>
-            <option value="runs_on">Runs On</option>
-            <option value="contains">Contains</option>
+            <option
+              v-for="type in relationshipTypeStore.activeRelationshipTypes"
+              :key="type.name"
+              :value="type.name"
+            >
+              {{ type.forward_label }}
+            </option>
           </select>
         </div>
         <div class="flex items-end">
@@ -121,7 +124,16 @@
                   </div>
                 </td>
                 <td class="table-cell">
-                  <span class="badge badge-info">{{ relationship.relationship_type }}</span>
+                  <span
+                    v-if="getRelationshipTypeDetails(relationship)?.color"
+                    class="badge"
+                    :style="{ backgroundColor: getRelationshipTypeDetails(relationship).color + '20', color: getRelationshipTypeDetails(relationship).color, borderColor: getRelationshipTypeDetails(relationship).color }"
+                  >
+                    {{ getRelationshipTypeLabel(relationship) }}
+                  </span>
+                  <span v-else class="badge badge-info">
+                    {{ getRelationshipTypeLabel(relationship) }}
+                  </span>
                 </td>
                 <td class="table-cell">
                   <div>
@@ -211,8 +223,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useRelationshipTypeStore } from '@/stores/relationshipTypes'
 import { relationshipAPI, ciAPI } from '@/services/api'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 
@@ -241,6 +254,7 @@ interface CI {
 }
 
 const authStore = useAuthStore()
+const relationshipTypeStore = useRelationshipTypeStore()
 
 const loading = ref(false)
 const response = ref<RelationshipListResponse | null>(null)
@@ -264,6 +278,23 @@ const hasPermission = (permission: string) => {
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString()
+}
+
+// Get relationship type details
+const getRelationshipTypeDetails = (relationship: Relationship) => {
+  return relationshipTypeStore.getRelationshipTypeByName(relationship.relationship_type)
+}
+
+// Get formatted relationship type label
+const getRelationshipTypeLabel = (relationship: Relationship) => {
+  const type = getRelationshipTypeDetails(relationship)
+  return type ? type.forward_label : formatRelationshipType(relationship.relationship_type)
+}
+
+const formatRelationshipType = (type: string) => {
+  return type.split('_').map(word =>
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ')
 }
 
 const debouncedSearch = debounce(() => {
@@ -384,7 +415,16 @@ const confirmDelete = async (relationship: Relationship) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // Load relationship types for filter dropdown and display
+  if (relationshipTypeStore.relationshipTypes.length === 0) {
+    try {
+      await relationshipTypeStore.loadRelationshipTypes()
+    } catch (error) {
+      console.error('Failed to load relationship types:', error)
+    }
+  }
+
   loadRelationships()
 })
 </script>

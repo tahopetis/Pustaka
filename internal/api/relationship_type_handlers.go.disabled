@@ -1,0 +1,406 @@
+package api
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	"github.com/google/uuid"
+	"github.com/pustaka/pustaka/internal/api/middleware"
+	"github.com/pustaka/pustaka/internal/ci"
+)
+
+type RelationshipTypeHandlers struct {
+	*Handler
+	relationshipTypeService *ci.RelationshipTypeService
+}
+
+func NewRelationshipTypeHandlers(handler *Handler, relationshipTypeService *ci.RelationshipTypeService) *RelationshipTypeHandlers {
+	return &RelationshipTypeHandlers{
+		Handler:                  handler,
+		relationshipTypeService:  relationshipTypeService,
+	}
+}
+
+// CreateRelationshipType godoc
+// @Summary Create a relationship type
+// @Description Create a new relationship type
+// @Tags relationship-types
+// @Accept json
+// @Produce json
+// @Param request body ci.CreateRelationshipTypeRequest true "Relationship type to create"
+// @Success 201 {object} ci.RelationshipType
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationship-types [post]
+func (h *RelationshipTypeHandlers) CreateRelationshipType(w http.ResponseWriter, r *http.Request) {
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
+	var req ci.CreateRelationshipTypeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	relationshipType, err := h.relationshipTypeService.CreateRelationshipType(r.Context(), &req, userID)
+	if err != nil {
+		if err.Error() == "relationship type already exists" {
+			h.writeError(w, http.StatusConflict, "Relationship type already exists")
+			return
+		}
+		h.logger.ErrorService("relationship_type", "CREATE_RELATIONSHIP_TYPE", err, map[string]interface{}{
+			"request": req,
+			"user_id": userID,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to create relationship type")
+		return
+	}
+
+	h.writeJSON(w, http.StatusCreated, relationshipType)
+}
+
+// GetRelationshipType godoc
+// @Summary Get a relationship type
+// @Description Get a relationship type by ID
+// @Tags relationship-types
+// @Produce json
+// @Param id path string true "Relationship Type ID"
+// @Success 200 {object} ci.RelationshipType
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationship-types/{id} [get]
+func (h *RelationshipTypeHandlers) GetRelationshipType(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid relationship type ID")
+		return
+	}
+
+	relationshipType, err := h.relationshipTypeService.GetRelationshipType(r.Context(), id)
+	if err != nil {
+		if err.Error() == "relationship type not found" {
+			h.writeError(w, http.StatusNotFound, "Relationship type not found")
+			return
+		}
+		h.logger.ErrorService("relationship_type", "GET_RELATIONSHIP_TYPE", err, map[string]interface{}{
+			"relationship_type_id": id,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to get relationship type")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, relationshipType)
+}
+
+// ListRelationshipTypes godoc
+// @Summary List relationship types
+// @Description List relationship types with pagination and filtering
+// @Tags relationship-types
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(20)
+// @Param category query string false "Filter by category"
+// @Param is_active query bool false "Filter by active status"
+// @Param is_system query bool false "Filter by system status"
+// @Param search query string false "Search in name, display name, or description"
+// @Param sort query string false "Sort field" default(name)
+// @Param order query string false "Sort order" default(asc)
+// @Success 200 {object} ci.RelationshipTypeListResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationship-types [get]
+func (h *RelationshipTypeHandlers) ListRelationshipTypes(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	query := r.URL.Query()
+
+	page, err := strconv.Atoi(query.Get("page"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	limit, err := strconv.Atoi(query.Get("limit"))
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	// Build filter
+	filter := ci.RelationshipTypeFilter{
+		Category: query.Get("category"),
+		Search:   query.Get("search"),
+		Sort:     query.Get("sort"),
+		Order:    query.Get("order"),
+	}
+
+	if isActiveStr := query.Get("is_active"); isActiveStr != "" {
+		isActive, err := strconv.ParseBool(isActiveStr)
+		if err == nil {
+			filter.IsActive = &isActive
+		}
+	}
+
+	if isSystemStr := query.Get("is_system"); isSystemStr != "" {
+		isSystem, err := strconv.ParseBool(isSystemStr)
+		if err == nil {
+			filter.IsSystem = &isSystem
+		}
+	}
+
+	response, err := h.relationshipTypeService.ListRelationshipTypes(r.Context(), filter, page, limit)
+	if err != nil {
+		h.logger.ErrorService("relationship_type", "LIST_RELATIONSHIP_TYPES", err, map[string]interface{}{
+			"filter": filter,
+			"page":   page,
+			"limit":  limit,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to list relationship types")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// GetActiveRelationshipTypes godoc
+// @Summary Get active relationship types
+// @Description Get all active relationship types
+// @Tags relationship-types
+// @Produce json
+// @Success 200 {array} ci.RelationshipType
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationship-types/active [get]
+func (h *RelationshipTypeHandlers) GetActiveRelationshipTypes(w http.ResponseWriter, r *http.Request) {
+	relationshipTypes, err := h.relationshipTypeService.GetActiveRelationshipTypes(r.Context())
+	if err != nil {
+		h.logger.ErrorService("relationship_type", "GET_ACTIVE_RELATIONSHIP_TYPES", err, nil)
+		h.writeError(w, http.StatusInternalServerError, "Failed to get active relationship types")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, relationshipTypes)
+}
+
+// UpdateRelationshipType godoc
+// @Summary Update a relationship type
+// @Description Update an existing relationship type
+// @Tags relationship-types
+// @Accept json
+// @Produce json
+// @Param id path string true "Relationship Type ID"
+// @Param request body ci.UpdateRelationshipTypeRequest true "Relationship type updates"
+// @Success 200 {object} ci.RelationshipType
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationship-types/{id} [put]
+func (h *RelationshipTypeHandlers) UpdateRelationshipType(w http.ResponseWriter, r *http.Request) {
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
+	idStr := r.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid relationship type ID")
+		return
+	}
+
+	var req ci.UpdateRelationshipTypeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	relationshipType, err := h.relationshipTypeService.UpdateRelationshipType(r.Context(), id, &req, userID)
+	if err != nil {
+		if err.Error() == "relationship type not found" {
+			h.writeError(w, http.StatusNotFound, "Relationship type not found")
+			return
+		}
+		if err.Error() == "system relationship types cannot be modified" {
+			h.writeError(w, http.StatusForbidden, "System relationship types cannot be modified")
+			return
+		}
+		h.logger.ErrorService("relationship_type", "UPDATE_RELATIONSHIP_TYPE", err, map[string]interface{}{
+			"relationship_type_id": id,
+			"request":              req,
+			"user_id":              userID,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to update relationship type")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, relationshipType)
+}
+
+// DeleteRelationshipType godoc
+// @Summary Delete a relationship type
+// @Description Delete a relationship type
+// @Tags relationship-types
+// @Param id path string true "Relationship Type ID"
+// @Success 204
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationship-types/{id} [delete]
+func (h *RelationshipTypeHandlers) DeleteRelationshipType(w http.ResponseWriter, r *http.Request) {
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
+	idStr := r.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid relationship type ID")
+		return
+	}
+
+	err = h.relationshipTypeService.DeleteRelationshipType(r.Context(), id, userID)
+	if err != nil {
+		if err.Error() == "relationship type not found" {
+			h.writeError(w, http.StatusNotFound, "Relationship type not found")
+			return
+		}
+		if err.Error() == "system relationship types cannot be deleted" {
+			h.writeError(w, http.StatusForbidden, "System relationship types cannot be deleted")
+			return
+		}
+		if err.Error() == "cannot delete relationship type with existing relationships" {
+			h.writeError(w, http.StatusConflict, "Cannot delete relationship type with existing relationships")
+			return
+		}
+		h.logger.ErrorService("relationship_type", "DELETE_RELATIONSHIP_TYPE", err, map[string]interface{}{
+			"relationship_type_id": id,
+			"user_id":              userID,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to delete relationship type")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ValidateRelationship godoc
+// @Summary Validate relationship
+// @Description Validate if a relationship can be created between two CIs
+// @Tags relationship-types
+// @Produce json
+// @Param relationship_type query string true "Relationship type name"
+// @Param source_id query string true "Source CI ID"
+// @Param target_id query string true "Target CI ID"
+// @Success 200 {object} ci.RelationshipTypeValidation
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationship-types/validate [get]
+func (h *RelationshipTypeHandlers) ValidateRelationship(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	relationshipType := query.Get("relationship_type")
+	if relationshipType == "" {
+		h.writeError(w, http.StatusBadRequest, "Relationship type is required")
+		return
+	}
+
+	sourceIDStr := query.Get("source_id")
+	sourceID, err := uuid.Parse(sourceIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid source CI ID")
+		return
+	}
+
+	targetIDStr := query.Get("target_id")
+	targetID, err := uuid.Parse(targetIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid target CI ID")
+		return
+	}
+
+	validation, err := h.relationshipTypeService.ValidateRelationship(r.Context(), relationshipType, sourceID, targetID)
+	if err != nil {
+		h.logger.ErrorService("relationship_type", "VALIDATE_RELATIONSHIP", err, map[string]interface{}{
+			"relationship_type": relationshipType,
+			"source_id":         sourceID,
+			"target_id":         targetID,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to validate relationship")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, validation)
+}
+
+// GetRelationshipTypeUsage godoc
+// @Summary Get relationship type usage
+// @Description Get usage statistics for relationship types
+// @Tags relationship-types
+// @Produce json
+// @Success 200 {array} ci.RelationshipTypeUsage
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationship-types/usage [get]
+func (h *RelationshipTypeHandlers) GetRelationshipTypeUsage(w http.ResponseWriter, r *http.Request) {
+	usage, err := h.relationshipTypeService.GetRelationshipTypeUsage(r.Context())
+	if err != nil {
+		h.logger.ErrorService("relationship_type", "GET_RELATIONSHIP_TYPE_USAGE", err, nil)
+		h.writeError(w, http.StatusInternalServerError, "Failed to get relationship type usage")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, usage)
+}
+
+// GetRelationshipTypeStatistics godoc
+// @Summary Get relationship type statistics
+// @Description Get comprehensive statistics for relationship types
+// @Tags relationship-types
+// @Produce json
+// @Success 200 {object} ci.RelationshipTypeStatistics
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationship-types/statistics [get]
+func (h *RelationshipTypeHandlers) GetRelationshipTypeStatistics(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.relationshipTypeService.GetRelationshipTypeStatistics(r.Context())
+	if err != nil {
+		h.logger.ErrorService("relationship_type", "GET_RELATIONSHIP_TYPE_STATISTICS", err, nil)
+		h.writeError(w, http.StatusInternalServerError, "Failed to get relationship type statistics")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, stats)
+}

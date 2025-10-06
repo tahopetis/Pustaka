@@ -176,6 +176,10 @@ func main() {
 
 	ciService := ci.NewService(ciRepo, neo4jService, redisDB.Client, auditService, logger)
 
+	// Create relationship type services
+	relationshipTypeRepo := ci.NewRelationshipTypeRepository(postgresDB.Pool)
+	relationshipTypeService := ci.NewRelationshipTypeService(relationshipTypeRepo, ciRepo, neo4jService, redisDB.Client, auditService, logger, postgresDB.Pool)
+
 	// Initialize admin user
 	if err := initializeAdminUser(postgresDB.Pool, rbacService, passwordService, cfg.Admin, logger); err != nil {
 		logger.Error().Err(err).Msg("Failed to initialize admin user")
@@ -188,10 +192,11 @@ func main() {
 	ciHandlers := api.NewCIHandlers(baseHandler, ciService)
 	ciTypeHandlers := api.NewCITypeHandlers(baseHandler, ciService)
 	relationshipHandlers := api.NewRelationshipHandlers(baseHandler, ciService)
+	relationshipTypeHandlers := handlers.NewRelationshipTypeHandler(relationshipTypeService, rbacService, logger)
 	auditHandlers := api.NewAuditHandlers(baseHandler, auditService)
 
 	// Setup router
-	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, auditHandlers, jwtService, rbacService)
+	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, auditHandlers, jwtService, rbacService)
 
 	// Create HTTP server
 	server := &http.Server{
@@ -239,6 +244,7 @@ func setupRouter(
 	ciHandlers *api.CIHandlers,
 	ciTypeHandlers *api.CITypeHandlers,
 	relationshipHandlers *api.RelationshipHandlers,
+	relationshipTypeHandlers *handlers.RelationshipTypeHandler,
 	auditHandlers *api.AuditHandlers,
 	jwtService *auth.JWTService,
 	rbacService *auth.RBACService,
@@ -378,6 +384,31 @@ func setupRouter(
 				r.Group(func(r chi.Router) {
 					r.Use(middleware.RBAC("relationship:delete"))
 					r.Delete("/{id}", relationshipHandlers.DeleteRelationship)
+				})
+			})
+
+		
+			// Relationship Type routes
+			r.Route("/relationship-types", func(r chi.Router) {
+				r.Use(middleware.RBAC("relationship_type:read"))
+				r.Get("/", relationshipTypeHandlers.ListRelationshipTypes)
+				r.Get("/active", relationshipTypeHandlers.GetActiveRelationshipTypes)
+				r.Get("/usage", relationshipTypeHandlers.GetRelationshipTypeUsage)
+				r.Get("/statistics", relationshipTypeHandlers.GetRelationshipTypeStatistics)
+				r.Get("/categories", relationshipTypeHandlers.GetRelationshipTypeCategories)
+				r.Post("/validate", relationshipTypeHandlers.ValidateRelationship)
+				r.Get("/{id}", relationshipTypeHandlers.GetRelationshipType)
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("relationship_type:create"))
+					r.Post("/", relationshipTypeHandlers.CreateRelationshipType)
+				})
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("relationship_type:update"))
+					r.Put("/{id}", relationshipTypeHandlers.UpdateRelationshipType)
+				})
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("relationship_type:delete"))
+					r.Delete("/{id}", relationshipTypeHandlers.DeleteRelationshipType)
 				})
 			})
 

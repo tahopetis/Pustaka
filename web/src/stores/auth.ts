@@ -76,11 +76,12 @@ export const useAuthStore = defineStore('auth', () => {
       refreshToken.value = refresh_token || null
       user.value = userData
 
-      // Store tokens in localStorage
+      // Store tokens and user data in localStorage
       localStorage.setItem('access_token', access_token)
       if (refresh_token) {
         localStorage.setItem('refresh_token', refresh_token)
       }
+      localStorage.setItem('user', JSON.stringify(userData))
 
       // Set default Authorization header
       api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
@@ -100,6 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Remove from localStorage
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
 
       // Clear Authorization header
       delete api.defaults.headers.common['Authorization']
@@ -142,6 +144,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Remove from localStorage
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
 
       // Clear Authorization header
       delete api.defaults.headers.common['Authorization']
@@ -200,6 +203,7 @@ export const useAuthStore = defineStore('auth', () => {
           user.value = null
           localStorage.removeItem('access_token')
           localStorage.removeItem('refresh_token')
+          localStorage.removeItem('user')
           delete api.defaults.headers.common['Authorization']
           isInitialized.value = true
           isLoading.value = false
@@ -227,10 +231,19 @@ export const useAuthStore = defineStore('auth', () => {
   const loadSessionFromLocalStorage = (): boolean => {
     const storedToken = localStorage.getItem('access_token')
     const storedRefreshToken = localStorage.getItem('refresh_token')
+    const storedUser = localStorage.getItem('user')
 
     if (storedToken) {
       accessToken.value = storedToken
       refreshToken.value = storedRefreshToken
+      if (storedUser) {
+        try {
+          user.value = JSON.parse(storedUser)
+        } catch (error) {
+          console.error('Failed to parse stored user data:', error)
+          localStorage.removeItem('user')
+        }
+      }
       api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
       return true
     }

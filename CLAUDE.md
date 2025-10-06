@@ -24,6 +24,7 @@ go run cmd/api/main.go       # Alternative way to run API
 make test                     # Run all Go tests
 go test ./...                 # Run tests directly
 go test ./internal/ci/        # Run specific package tests
+go test -v ./internal/ci/     # Run tests with verbose output
 
 # Development
 make dev                      # Start full dev environment (Docker + migrations)
@@ -36,8 +37,11 @@ make lint                     # Run golangci-lint
 make security                 # Run gosec security scan
 
 # Database
-make migrate                  # Run database migrations
+make migrate                  # Run database migrations (requires golang-migrate)
 make create-admin             # Create initial admin user (curl command)
+
+# Note on migrations: Install golang-migrate from https://github.com/golang-migrate/migrate
+# Migration files are located in cmd/migrations/
 
 # Dependencies
 make deps                     # Install/update Go modules
@@ -83,17 +87,20 @@ cmd/api/main.go               # Main entrypoint with server initialization
 internal/
 ├── api/                      # HTTP handlers and routing
 │   ├── handlers/             # Specific request handlers (auth, users, CI)
-│   └── middleware/           # Custom middleware (JWT, RBAC, CORS, logging)
+│   ├── middleware/           # Custom middleware (JWT, RBAC, CORS, logging)
+│   └── *_test.go             # Integration tests for API endpoints
 ├── auth/                     # Authentication & authorization
 │   ├── jwt.go               # JWT token service
 │   ├── rbac.go              # Role-based access control
-│   └── password.go          # Password hashing (Argon2ID)
+│   ├── password.go          # Password hashing (Argon2ID)
+│   └── *_test.go            # Tests for auth and RBAC logic
 ├── ci/                       # Core CMDB business logic
 │   ├── models.go            # CI types and relationships
 │   ├── service.go           # Business logic layer
 │   ├── repository.go        # PostgreSQL data access
 │   ├── neo4j_service.go     # Neo4j relationship management
 │   └── audit_*.go           # Audit logging system
+│   └── *_test.go            # Unit tests for CI services
 ├── database/                 # Database connection management
 └── config/                   # Configuration loading
 ```
@@ -111,6 +118,9 @@ web/src/
 │   └── notification.ts      # Global notifications
 ├── services/                 # API communication layer
 │   └── api.ts               # Axios HTTP client setup
+├── tests/                    # Frontend unit tests (Vitest)
+│   ├── ci.test.ts           # CI component tests
+│   └── auth.test.ts         # Auth component tests
 └── router/                   # Vue Router configuration
 ```
 
@@ -151,9 +161,11 @@ web/src/
 - Graceful degradation for external service dependencies
 
 ### Testing Strategy
-- Unit tests for service layer business logic
-- Integration tests for database operations
-- E2E tests for critical user workflows
+- Unit tests for service layer business logic (internal/ci/, internal/auth/)
+- Integration tests for database operations (internal/api/)
+- E2E tests for critical user workflows (web/tests/)
+- Test files follow Go convention: *_test.go
+- Frontend tests in web/tests/ using Vitest
 
 ## Configuration
 
@@ -175,6 +187,7 @@ web/src/
 - Enable production logging levels
 - Set up database connection pooling
 - Configure Redis persistence
+- Migration files: cmd/migrations/001_initial_schema.sql
 
 ## Troubleshooting
 
@@ -198,4 +211,7 @@ curl http://localhost:8080/health
 # Verify database connections
 docker exec -it pustaka-postgres psql -U pustaka -d pustaka -c "SELECT 1;"
 docker exec -it pustaka-neo4j cypher-shell -u neo4j -p password "RETURN 1;"
+
+# Run specific tests with coverage
+go test -cover ./internal/ci/
 ```

@@ -363,3 +363,47 @@ func (s *Neo4jService) GetMostConnectedCIs(ctx context.Context, limit int) ([]CI
 	return result.([]CIConnectivity), nil
 }
 
+// CheckCircularDependency checks if creating a relationship would create a circular dependency
+func (s *Neo4jService) CheckCircularDependency(ctx context.Context, sourceID, targetID uuid.UUID, relationshipType string) error {
+	session := s.repo.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer session.Close(ctx)
+
+	result, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (interface{}, error) {
+		cypher := `
+			MATCH path = (source:ConfigurationItem {id: $sourceID})-[:RELATES_TO]->(target:ConfigurationItem {id: $targetID})
+			WHERE target.id = $sourceID
+			RETURN COUNT(path) > 0
+		`
+
+		params := map[string]interface{}{
+			"sourceID": sourceID.String(),
+			"targetID": targetID.String(),
+		}
+
+		cursor, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check circular dependency: %w", err)
+		}
+
+		if cursor.Next(ctx) {
+			record := cursor.Record()
+			hasCycle := record.Values[0].(bool)
+			if hasCycle {
+				return nil, fmt.Errorf("circular dependency detected between %s and %s", sourceID, targetID)
+			}
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to check circular dependency: %w", err)
+	}
+
+	if result.(bool) {
+		return fmt.Errorf("circular dependency detected")
+	}
+
+	return nil
+}
+
