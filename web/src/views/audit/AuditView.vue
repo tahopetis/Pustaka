@@ -93,6 +93,19 @@
           <span class="text-sm text-gray-500">
             Page {{ pagination.page }} of {{ response?.total_pages || 1 }}
           </span>
+          <div class="flex items-center space-x-2">
+            <label class="text-sm text-gray-500">Rows per page:</label>
+            <select
+              v-model="pagination.limit"
+              @change="changePageSize"
+              class="form-select text-sm py-1 px-2"
+            >
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="card-body p-0">
@@ -271,7 +284,7 @@
           </div>
         </div>
 
-        <!-- Pagination -->
+        <!-- Enhanced Pagination -->
         <div v-if="response && response.total_pages > 1" class="px-6 py-4 bg-gray-50 border-t border-gray-200">
           <div class="flex items-center justify-between">
             <div class="text-sm text-gray-700">
@@ -279,26 +292,92 @@
               {{ Math.min(pagination.page * pagination.limit, response.total) }} of
               {{ response.total }} results
             </div>
+
             <div class="flex items-center space-x-2">
+              <!-- First Page Button -->
+              <button
+                @click="changePage(1)"
+                :disabled="pagination.page <= 1"
+                class="btn btn-secondary text-sm px-2 py-1"
+                :class="{ 'opacity-50 cursor-not-allowed': pagination.page <= 1 }"
+                title="First page"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <!-- Previous Button -->
               <button
                 @click="changePage(pagination.page - 1)"
                 :disabled="pagination.page <= 1"
-                class="btn btn-secondary"
+                class="btn btn-secondary text-sm px-3 py-1"
                 :class="{ 'opacity-50 cursor-not-allowed': pagination.page <= 1 }"
               >
                 Previous
               </button>
-              <span class="px-3 py-1 text-sm text-gray-700">
-                Page {{ pagination.page }} of {{ response.total_pages }}
-              </span>
+
+              <!-- Page Numbers -->
+              <div class="flex items-center space-x-1">
+                <!-- Show first few pages, current page, and last few pages -->
+                <template v-for="pageNum in getPageNumbers()" :key="pageNum">
+                  <span v-if="pageNum === '...'" class="px-2 text-gray-500">...</span>
+                  <button
+                    v-else
+                    @click="changePage(pageNum)"
+                    :class="{
+                      'btn btn-primary': pageNum === pagination.page,
+                      'btn btn-secondary': pageNum !== pagination.page
+                    }"
+                    class="text-sm px-3 py-1"
+                  >
+                    {{ pageNum }}
+                  </button>
+                </template>
+              </div>
+
+              <!-- Next Button -->
               <button
                 @click="changePage(pagination.page + 1)"
                 :disabled="pagination.page >= response.total_pages"
-                class="btn btn-secondary"
+                class="btn btn-secondary text-sm px-3 py-1"
                 :class="{ 'opacity-50 cursor-not-allowed': pagination.page >= response.total_pages }"
               >
                 Next
               </button>
+
+              <!-- Last Page Button -->
+              <button
+                @click="changePage(response.total_pages)"
+                :disabled="pagination.page >= response.total_pages"
+                class="btn btn-secondary text-sm px-2 py-1"
+                :class="{ 'opacity-50 cursor-not-allowed': pagination.page >= response.total_pages }"
+                title="Last page"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              <!-- Jump to Page Input -->
+              <div class="flex items-center space-x-2 ml-4">
+                <label class="text-sm text-gray-500">Go to:</label>
+                <input
+                  v-model.number="jumpToPage"
+                  @keyup.enter="goToJumpPage"
+                  type="number"
+                  :min="1"
+                  :max="response.total_pages"
+                  class="form-input text-sm w-16 py-1 px-2"
+                  placeholder="Page"
+                />
+                <button
+                  @click="goToJumpPage"
+                  class="btn btn-secondary text-sm px-2 py-1"
+                >
+                  Go
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -338,6 +417,7 @@ const authStore = useAuthStore()
 const loading = ref(false)
 const response = ref<AuditListResponse | null>(null)
 const selectedLog = ref<AuditLog | null>(null)
+const jumpToPage = ref<number | null>(null)
 
 const filters = reactive({
   search: '',
@@ -507,8 +587,54 @@ const sortBy = (column: string) => {
 const changePage = (page: number) => {
   if (page >= 1 && response.value && page <= response.value.total_pages) {
     pagination.page = page
+    jumpToPage.value = null // Reset jump input
     loadAuditLogs()
   }
+}
+
+const changePageSize = () => {
+  pagination.page = 1 // Reset to first page when changing page size
+  loadAuditLogs()
+}
+
+const goToJumpPage = () => {
+  if (jumpToPage.value && response.value && jumpToPage.value >= 1 && jumpToPage.value <= response.value.total_pages) {
+    changePage(jumpToPage.value)
+  } else if (jumpToPage.value) {
+    // Invalid page number, reset input
+    jumpToPage.value = null
+  }
+}
+
+const getPageNumbers = () => {
+  if (!response.value) return []
+
+  const currentPage = pagination.page
+  const totalPages = response.value.total_pages
+  const delta = 2 // Number of pages to show on each side of current page
+
+  let pages: (number | string)[] = []
+
+  // Always show page 1
+  if (currentPage > delta + 3) {
+    pages.push(1, '...')
+  } else if (currentPage > delta + 2) {
+    pages.push(1)
+  }
+
+  // Show pages around current page
+  for (let i = Math.max(1, currentPage - delta); i <= Math.min(totalPages, currentPage + delta); i++) {
+    pages.push(i)
+  }
+
+  // Always show last page
+  if (currentPage < totalPages - delta - 2) {
+    pages.push('...', totalPages)
+  } else if (currentPage < totalPages - delta - 1) {
+    pages.push(totalPages)
+  }
+
+  return pages
 }
 
 const loadAuditLogs = async () => {

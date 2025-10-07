@@ -142,6 +142,11 @@ func (h *AuditHandlers) CleanupOldAuditLogs(w http.ResponseWriter, r *http.Reque
 
 // buildAuditLogFiltersFrontend builds filters from query parameters for frontend
 func (h *AuditHandlers) buildAuditLogFiltersFrontend(r *http.Request) ci.AuditLogFilters {
+	limit := h.getQueryInt(r, "limit", 50)
+	if limit > 200 {
+		limit = 200 // Cap at 200 for performance
+	}
+
 	filters := ci.AuditLogFilters{
 		EntityType: h.getQueryString(r, "entity"),  // Frontend sends 'entity' instead of 'entity_type'
 		Action:     h.getQueryString(r, "action"),
@@ -149,7 +154,7 @@ func (h *AuditHandlers) buildAuditLogFiltersFrontend(r *http.Request) ci.AuditLo
 		Sort:       h.getQueryString(r, "sort"),
 		Order:      h.getQueryString(r, "order"),
 		Page:       h.getQueryInt(r, "page", 1),
-		Limit:      h.getQueryInt(r, "limit", 50),
+		Limit:      limit,
 	}
 
 	// Parse entity_id if provided
@@ -239,6 +244,11 @@ func (h *AuditHandlers) ExportAuditLogs(w http.ResponseWriter, r *http.Request) 
 
 // buildAuditLogFilters builds filters from query parameters
 func (h *AuditHandlers) buildAuditLogFilters(r *http.Request) ci.AuditLogFilters {
+	limit := h.getQueryInt(r, "limit", 50)
+	if limit > 200 {
+		limit = 200 // Cap at 200 for performance
+	}
+
 	filters := ci.AuditLogFilters{
 		EntityType: h.getQueryString(r, "entity_type"),
 		Action:     h.getQueryString(r, "action"),
@@ -246,7 +256,7 @@ func (h *AuditHandlers) buildAuditLogFilters(r *http.Request) ci.AuditLogFilters
 		Sort:       h.getQueryString(r, "sort"),
 		Order:      h.getQueryString(r, "order"),
 		Page:       h.getQueryInt(r, "page", 1),
-		Limit:      h.getQueryInt(r, "limit", 50),
+		Limit:      limit,
 	}
 
 	// Parse entity_id if provided
