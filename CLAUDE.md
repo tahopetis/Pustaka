@@ -25,6 +25,7 @@ make test                     # Run all Go tests
 go test ./...                 # Run tests directly
 go test ./internal/ci/        # Run specific package tests
 go test -v ./internal/ci/     # Run tests with verbose output
+go test -cover ./internal/ci/ # Run tests with coverage report
 
 # Development
 make dev                      # Start full dev environment (Docker + migrations)
@@ -77,7 +78,7 @@ npm run format                # Format code with Prettier
 Default credentials (from `.env.example`):
 - PostgreSQL: pustaka/password
 - Neo4j: neo4j/password
-- Admin user: admin/Admin@123 (create with `make create-admin`)
+- Admin user: admin/Admin@123 (created automatically on startup)
 
 ## Key Architecture Components
 
@@ -98,10 +99,13 @@ internal/
 │   ├── models.go            # CI types and relationships
 │   ├── service.go           # Business logic layer
 │   ├── repository.go        # PostgreSQL data access
-│   ├── neo4j_service.go     # Neo4j relationship management
-│   └── audit_*.go           # Audit logging system
+│   ├── neo4j_repository.go  # Neo4j relationship management
+│   ├── audit_*.go           # Audit logging system
 │   └── *_test.go            # Unit tests for CI services
 ├── database/                 # Database connection management
+│   ├── postgres.go          # PostgreSQL connection pool
+│   ├── neo4j.go             # Neo4j driver setup
+│   └── redis.go             # Redis client setup
 └── config/                   # Configuration loading
 ```
 
@@ -111,54 +115,64 @@ web/src/
 ├── views/                    # Page components
 │   ├── auth/                # Authentication pages
 │   ├── ci/                  # CI management pages
-│   └── dashboard/           # Dashboard views
+│   ├── dashboard/           # Dashboard views
+│   ├── users/               # User management
+│   ├── audit/               # Audit log viewer
+│   ├── graph/               # Graph visualization
+│   ├── relationships/       # Relationship management
+│   └── relationship-types/  # Relationship type configuration
 ├── stores/                   # Pinia state management
 │   ├── auth.ts              # Authentication state
 │   ├── ciTypes.ts           # CI types data
+│   ├── relationshipTypes.ts # Relationship types data
 │   └── notification.ts      # Global notifications
 ├── services/                 # API communication layer
 │   └── api.ts               # Axios HTTP client setup
-├── tests/                    # Frontend unit tests (Vitest)
-│   ├── ci.test.ts           # CI component tests
-│   └── auth.test.ts         # Auth component tests
-└── router/                   # Vue Router configuration
+├── components/               # Reusable Vue components
+├── router/                   # Vue Router configuration
+└── types/                    # TypeScript type definitions
 ```
 
 ### Database Schema
-- **PostgreSQL**: Users, roles, CI types, CIs, audit logs
-- **Neo4j**: CI relationships with bidirectional graph connections
+- **PostgreSQL**: Users, roles, permissions, CI types, CIs, relationships, audit logs
+- **Neo4j**: CI relationships with bidirectional graph connections and traversal
 - **Redis**: Session storage, caching, rate limiting
 
 ### API Architecture
 - **Base path**: `/api/v1`
-- **Authentication**: JWT tokens with refresh mechanism
-- **Authorization**: RBAC with granular permissions (e.g., `ci:read`, `user:create`)
-- **Middleware stack**: Request ID → Logging → CORS → JWT Auth → RBAC → Audit Logging
+- **Authentication**: JWT tokens with refresh mechanism (24h access, 7d refresh)
+- **Authorization**: RBAC with granular permissions (e.g., `ci:read`, `user:create`, `system:admin`)
+- **Middleware stack**: Request ID → Logging → CORS → JWT Auth → Activity Tracking → RBAC → Audit Logging
 - **Key endpoints**:
   - `/auth/*` - Authentication (login, refresh)
   - `/ci/*` - Configuration Items CRUD
   - `/ci-types/*` - CI type management
-  - `/relationships/*` - CI relationships
+  - `/relationships/*` - CI relationships CRUD
+  - `/relationship-types/*` - Relationship type definitions
   - `/graph/*` - Graph visualization data
   - `/audit/*` - Audit logs and compliance
+  - `/users/*` - User management (admin only)
 
 ## Development Patterns
 
 ### Authentication Flow
 1. User logs in via `/auth/login` → JWT access + refresh tokens
-2. Access token (24h) used for API requests
-3. Refresh token (7d) used to get new access tokens
-4. RBAC middleware checks permissions based on user roles
+2. Access token (24h) used for API requests via Authorization header
+3. Refresh token (7d) used to get new access tokens via `/auth/refresh`
+4. JWT middleware validates tokens and extracts user context
+5. RBAC middleware checks permissions based on user roles
 
 ### CI Management
 1. **Taxonomy**: Domain → Category → Subcategory → CI Type
 2. **Relationships**: Stored in Neo4j with bidirectional connections
 3. **Audit Trail**: All changes logged with user context and timestamps
+4. **Caching**: Redis caching for frequently accessed data (CI types, relationship types)
 
 ### Error Handling
 - Structured error responses with proper HTTP status codes
 - Zerolog structured logging with request context
 - Graceful degradation for external service dependencies
+- Service-level error wrapping for better debugging
 
 ### Testing Strategy
 - Unit tests for service layer business logic (internal/ci/, internal/auth/)
@@ -173,6 +187,7 @@ web/src/
 1. Copy `.env.example` to `.env` and update values
 2. Minimum required: DATABASE_URL, NEO4J_URI, REDIS_URL, JWT_SECRET
 3. Run `make dev` to start full environment
+4. Admin user is created automatically on startup from config
 
 ### Key Configuration Files
 - `.env` / `.env.example` - Environment variables
@@ -194,7 +209,7 @@ web/src/
 ### Common Issues
 - **Database connection**: Ensure Docker services are running (`make docker-up`)
 - **Migration failures**: Check PostgreSQL connection and user permissions
-- **Neo4j connection**: Verify Neo4j auth credentials and plugin configuration
+- **Neo4j connection**: Verify Neo4j auth credentials and APOC plugin configuration
 - **CORS errors**: Update `CORS_ALLOWED_ORIGINS` in `.env`
 - **JWT validation**: Check token expiration and secret configuration
 
@@ -204,6 +219,8 @@ web/src/
 docker-compose ps
 docker-compose logs postgres
 docker-compose logs neo4j
+docker-compose logs api
+docker-compose logs frontend
 
 # Test API health
 curl http://localhost:8080/health
@@ -214,4 +231,5 @@ docker exec -it pustaka-neo4j cypher-shell -u neo4j -p password "RETURN 1;"
 
 # Run specific tests with coverage
 go test -cover ./internal/ci/
+go test -v -run TestSpecificFunction ./internal/ci/
 ```

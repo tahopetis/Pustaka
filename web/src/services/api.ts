@@ -9,6 +9,9 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  paramsSerializer: {
+    indexes: null, // Serialize arrays without brackets: ci_types=value1&ci_types=value2
+  },
 })
 
 // Request interceptor

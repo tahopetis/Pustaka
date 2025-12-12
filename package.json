@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/tahopetis/Pustaka#readme",
   "devDependencies": {
-    "@playwright/test": "^1.55.1",
+    "@playwright/test": "^1.57.0",
     "@types/node": "^24.6.2"
   }
 }
