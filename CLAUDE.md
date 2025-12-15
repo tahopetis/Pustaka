@@ -234,3 +234,4 @@ go test -cover ./internal/ci/
 go test -v -run TestSpecificFunction ./internal/ci/
 ```
 - use docker compose down && docker compose up --build -d to rebuild the app after modifying the code
+- use agents if necessary
