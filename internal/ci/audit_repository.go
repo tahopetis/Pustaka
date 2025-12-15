@@ -499,3 +499,48 @@ func (r *auditLogRepository) DeleteOld(ctx context.Context, olderThan time.Time)
 
 	return rowsAffected, nil
 }
+
+func (r *auditLogRepository) GetRelationshipCreationsByDate(ctx context.Context, fromDate, toDate string) ([]DailyCount, error) {
+	query := `
+		SELECT DATE(timestamp) as date, COUNT(*) as count
+		FROM audit_logs
+		WHERE entity_type = 'relationship'
+		  AND action = 'create'
+		  AND timestamp >= $1::date
+		  AND timestamp < ($2::date + INTERVAL '1 day')
+		GROUP BY DATE(timestamp)
+		ORDER BY date
+	`
+
+	rows, err := r.pool.Query(ctx, query, fromDate, toDate)
+	if err != nil {
+		r.logger.Error().
+			Err(err).
+			Str("from_date", fromDate).
+			Str("to_date", toDate).
+			Msg("Failed to get relationship creations by date")
+		return nil, fmt.Errorf("failed to get relationship creations by date: %w", err)
+	}
+	defer rows.Close()
+
+	var results []DailyCount
+	for rows.Next() {
+		var date time.Time
+		var count int64
+		if err := rows.Scan(&date, &count); err != nil {
+			r.logger.Error().Err(err).Msg("Failed to scan relationship creation data")
+			return nil, fmt.Errorf("failed to scan relationship creation data: %w", err)
+		}
+		results = append(results, DailyCount{
+			Date:  date.Format("2006-01-02"),
+			Count: count,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		r.logger.Error().Err(err).Msg("Error iterating relationship creation data")
+		return nil, fmt.Errorf("error iterating relationship creation data: %w", err)
+	}
+
+	return results, nil
+}

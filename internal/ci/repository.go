@@ -941,3 +941,44 @@ func (r *Repository) CountUsers(ctx context.Context) (int64, error) {
 
 	return count, nil
 }
+
+func (r *Repository) GetCICreationsByDate(ctx context.Context, fromDate, toDate string) ([]DailyCount, error) {
+	query := `
+		SELECT DATE(created_at) as date, COUNT(*) as count
+		FROM configuration_items
+		WHERE created_at >= $1::date AND created_at < ($2::date + INTERVAL '1 day')
+		GROUP BY DATE(created_at)
+		ORDER BY date
+	`
+
+	rows, err := r.db.Query(ctx, query, fromDate, toDate)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, map[string]interface{}{
+			"from_date": fromDate,
+			"to_date":   toDate,
+		})
+		return nil, fmt.Errorf("failed to get CI creations by date: %w", err)
+	}
+	defer rows.Close()
+
+	var results []DailyCount
+	for rows.Next() {
+		var date time.Time
+		var count int64
+		if err := rows.Scan(&date, &count); err != nil {
+			r.logger.ErrorDatabase("SCAN", "configuration_items", err, nil)
+			return nil, fmt.Errorf("failed to scan CI creation data: %w", err)
+		}
+		results = append(results, DailyCount{
+			Date:  date.Format("2006-01-02"),
+			Count: count,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		r.logger.ErrorDatabase("ROWS", "configuration_items", err, nil)
+		return nil, fmt.Errorf("error iterating CI creation data: %w", err)
+	}
+
+	return results, nil
+}

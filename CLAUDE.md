@@ -233,3 +233,4 @@ docker exec -it pustaka-neo4j cypher-shell -u neo4j -p password "RETURN 1;"
 go test -cover ./internal/ci/
 go test -v -run TestSpecificFunction ./internal/ci/
 ```
+- use docker compose down && docker compose up --build -d to rebuild the app after modifying the code

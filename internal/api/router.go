@@ -95,6 +95,7 @@ func (r *Router) setupRoutes() {
 	analytics.HandleFunc("/cycles", r.relHandlers.FindCycles).Methods("GET")
 	analytics.HandleFunc("/most-connected", r.relHandlers.GetMostConnectedCIs).Methods("GET")
 	analytics.HandleFunc("/ci-types/usage", r.typeHandlers.GetCITypesByUsage).Methods("GET")
+	analytics.HandleFunc("/ci-growth", r.ciHandlers.GetCIGrowth).Methods("GET")
 
 	// Dashboard
 	v1.HandleFunc("/dashboard/stats", r.ciHandlers.GetDashboardStats).Methods("GET")

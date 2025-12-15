@@ -468,3 +468,31 @@ func (h *CIHandlers) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 
 	h.writeJSON(w, http.StatusOK, stats)
 }
+
+// GetCIGrowth godoc
+// @Summary Get CI and relationship growth over time
+// @Description Get time-series data showing CI and relationship creation counts
+// @Tags analytics
+// @Produce json
+// @Param from_date query string false "Start date (YYYY-MM-DD)"
+// @Param to_date query string false "End date (YYYY-MM-DD)"
+// @Success 200 {object} ci.GrowthData
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/analytics/ci-growth [get]
+func (h *CIHandlers) GetCIGrowth(w http.ResponseWriter, r *http.Request) {
+	fromDate := h.getQueryString(r, "from_date")
+	toDate := h.getQueryString(r, "to_date")
+
+	growthData, err := h.ciService.GetCIGrowth(r.Context(), fromDate, toDate)
+	if err != nil {
+		h.logger.ErrorService("analytics", "GET_CI_GROWTH", err, map[string]interface{}{
+			"from_date": fromDate,
+			"to_date":   toDate,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to get CI growth data")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, growthData)
+}

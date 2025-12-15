@@ -447,6 +447,8 @@ func setupRouter(
 				r.Get("/ci-types/usage", ciTypeHandlers.GetCITypesByUsage)
 				r.Get("/cycles", relationshipHandlers.FindCycles)
 				r.Get("/most-connected", relationshipHandlers.GetMostConnectedCIs)
+				r.Get("/ci-growth", ciHandlers.GetCIGrowth)
+				r.Get("/relationship-types/usage", relationshipTypeHandlers.GetRelationshipTypeUsage)
 			})
 
 			// Current user profile

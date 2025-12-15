@@ -59,4 +59,5 @@ type AuditLogRepository interface {
 	GetStats(ctx context.Context, filters AuditLogFilters) (*AuditLogStats, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	DeleteOld(ctx context.Context, olderThan time.Time) (int64, error)
+	GetRelationshipCreationsByDate(ctx context.Context, fromDate, toDate string) ([]DailyCount, error)
 }

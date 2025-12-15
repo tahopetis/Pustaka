@@ -589,6 +589,16 @@ type DashboardStats struct {
 	TotalUsers       int64 `json:"total_users"`
 }
 
+type GrowthData struct {
+	CIGrowth           []DailyCount `json:"ci_growth"`
+	RelationshipGrowth []DailyCount `json:"relationship_growth"`
+}
+
+type DailyCount struct {
+	Date  string `json:"date"`
+	Count int64  `json:"count"`
+}
+
 func (s *Service) GetDashboardStats(ctx context.Context) (*DashboardStats, error) {
 	// Get counts concurrently for better performance
 	type result struct {
@@ -658,6 +668,36 @@ func (s *Service) GetDashboardStats(ctx context.Context) (*DashboardStats, error
 	}
 
 	return stats, nil
+}
+
+func (s *Service) GetCIGrowth(ctx context.Context, fromDate, toDate string) (*GrowthData, error) {
+	// Set default dates if not provided (last 30 days)
+	if fromDate == "" || toDate == "" {
+		now := time.Now()
+		if toDate == "" {
+			toDate = now.Format("2006-01-02")
+		}
+		if fromDate == "" {
+			fromDate = now.AddDate(0, 0, -30).Format("2006-01-02")
+		}
+	}
+
+	// Get CI growth data
+	ciGrowth, err := s.repo.GetCICreationsByDate(ctx, fromDate, toDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CI growth data: %w", err)
+	}
+
+	// Get relationship growth data from audit logs
+	relGrowth, err := s.auditService.repo.GetRelationshipCreationsByDate(ctx, fromDate, toDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get relationship growth data: %w", err)
+	}
+
+	return &GrowthData{
+		CIGrowth:           ciGrowth,
+		RelationshipGrowth: relGrowth,
+	}, nil
 }
 
 // Custom error types
