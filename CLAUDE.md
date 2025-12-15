@@ -235,3 +235,6 @@ go test -v -run TestSpecificFunction ./internal/ci/
 ```
 - use docker compose down && docker compose up --build -d to rebuild the app after modifying the code
 - use agents if necessary
+- always assume app runs on docker, so if you want to know the state of the app use docker ps
+- to apply changes, use docker compose down && docker compose up --build -d
+- use agents to help your tasks if necessary
