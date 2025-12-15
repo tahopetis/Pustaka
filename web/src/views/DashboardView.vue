@@ -1,7 +1,7 @@
 <template>
   <div class="page-container page-content">
     <!-- Page header -->
-    <div class="page-header flex justify-between items-center mb-6">
+    <div class="page-header flex justify-between items-center mb-5">
       <div>
         <h1 class="page-title">Dashboard</h1>
         <p class="page-subtitle">Welcome back, {{ user?.username }}!</p>
@@ -32,12 +32,12 @@
     </div>
 
     <!-- Time Range Filter -->
-    <div class="mb-6">
+    <div class="mb-4">
       <TimeRangeFilter @change="handleTimeRangeChange" />
     </div>
 
     <!-- Stats cards -->
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-5">
       <DashboardWidget
         title="Total CIs"
         :loading="loadingState.stats"
@@ -46,8 +46,8 @@
       >
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-7 h-7 bg-blue-500 rounded-md flex items-center justify-center">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
               </svg>
             </div>
@@ -69,8 +69,8 @@
       >
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-7 h-7 bg-green-500 rounded-md flex items-center justify-center">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
               </svg>
             </div>
@@ -92,8 +92,8 @@
       >
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-7 h-7 bg-purple-500 rounded-md flex items-center justify-center">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
               </svg>
             </div>
@@ -115,8 +115,8 @@
       >
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-7 h-7 bg-yellow-500 rounded-md flex items-center justify-center">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
               </svg>
             </div>
@@ -132,9 +132,9 @@
     </div>
 
     <!-- Analytics Charts - Custom Layout -->
-    <div class="space-y-6 mb-8">
+    <div class="space-y-4 mb-5">
       <!-- Activity Trend and Heatmap - Side by Side -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Activity Trend Chart -->
         <DashboardWidget
           title="Activity Trend"
@@ -143,12 +143,12 @@
           :empty="!hasActivityData"
           @retry="retryDataSource('auditStats')"
         >
-          <div class="px-2 py-4">
+          <div class="px-2 py-3">
             <TrendChart
               v-if="hasActivityData"
               :data="activityTrendData"
               title=""
-              :height="320"
+              :height="280"
               x-axis-label="Date"
               y-axis-label="Events"
             />
@@ -163,7 +163,7 @@
           :empty="!hasActivityData"
           @retry="retryDataSource('auditStats')"
         >
-          <div class="px-4 py-6">
+          <div class="px-3 py-4">
             <ActivityHeatmap
               v-if="hasActivityData"
               :data="auditStats?.daily_activity || {}"
@@ -184,19 +184,19 @@
           :empty="!ciTypeUsage || ciTypeUsage.length === 0"
           @retry="retryDataSource('ciTypeUsage')"
         >
-          <div class="flex items-center justify-center px-4 py-6">
+          <div class="flex items-center justify-center px-3 py-4">
             <DonutChart
               v-if="ciTypeUsage && ciTypeUsage.length > 0"
               :data="ciTypeDistributionData"
               title=""
-              :size="320"
+              :size="280"
             />
           </div>
         </DashboardWidget>
       </div>
 
       <!-- Most Connected CIs and Relationship Type Distribution - Side by Side -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Most Connected CIs -->
         <DashboardWidget
           title="Most Connected CIs"
@@ -224,12 +224,12 @@
           :empty="!relationshipTypeUsage || relationshipTypeUsage.length === 0"
           @retry="retryDataSource('relationshipTypeUsage')"
         >
-          <div class="flex items-center justify-center px-4 py-6">
+          <div class="flex items-center justify-center px-3 py-4">
             <DonutChart
               v-if="relationshipTypeUsage && relationshipTypeUsage.length > 0"
               :data="relationshipTypeDistributionData"
               title=""
-              :size="320"
+              :size="280"
             />
           </div>
         </DashboardWidget>
@@ -237,10 +237,10 @@
     </div>
 
     <!-- Quick actions -->
-    <div v-if="hasCreatePermissions" class="bg-white shadow-sm rounded-lg mb-8">
-      <div class="px-6 py-6 sm:px-8">
-        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-5">Quick Actions</h3>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div v-if="hasCreatePermissions" class="bg-white shadow-sm rounded-lg mb-5">
+      <div class="px-6 py-5 sm:px-8">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Quick Actions</h3>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <router-link
             v-if="hasPermission('ci:create')"
             to="/ci/new"
@@ -279,23 +279,23 @@
 
     <!-- Recent activity -->
     <div class="bg-white shadow-sm rounded-lg">
-      <div class="px-6 py-6 sm:px-8">
-        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-5">Recent Activity</h3>
-        <div class="space-y-4">
-          <div v-if="loadingState.auditStats" class="text-gray-500 text-center py-12">
+      <div class="px-6 py-5 sm:px-8">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Recent Activity</h3>
+        <div class="space-y-3">
+          <div v-if="loadingState.auditStats" class="text-gray-500 text-center py-10">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-3"></div>
             <p>Loading recent activity...</p>
           </div>
-          <div v-else-if="!auditStats || !auditStats.recent_activity || auditStats.recent_activity.length === 0" class="text-gray-500 text-center py-12">
+          <div v-else-if="!auditStats || !auditStats.recent_activity || auditStats.recent_activity.length === 0" class="text-gray-500 text-center py-10">
             <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
             </svg>
             <p>No recent activity to display.</p>
           </div>
-          <div v-else v-for="activity in auditStats.recent_activity.slice(0, 10)" :key="activity.id" class="flex items-center space-x-4 py-3 border-b border-gray-100 last:border-0">
+          <div v-else v-for="activity in auditStats.recent_activity.slice(0, 10)" :key="activity.id" class="flex items-center space-x-4 py-2 border-b border-gray-100 last:border-0">
             <div class="flex-shrink-0">
-              <div class="w-10 h-10 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
-                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-9 h-9 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
               </div>
