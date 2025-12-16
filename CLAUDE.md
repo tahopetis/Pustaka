@@ -238,3 +238,39 @@ go test -v -run TestSpecificFunction ./internal/ci/
 - always assume app runs on docker, so if you want to know the state of the app use docker ps
 - to apply changes, use docker compose down && docker compose up --build -d
 - use agents to help your tasks if necessary
+
+## Pending Feature: IT Asset Amortization Module
+
+**Status:** Planned, ready for implementation
+
+**Documentation:**
+- PRD: `docs/prd-amortization-module.md`
+- Implementation Plan: `docs/implementation-plan-amortization-module.md`
+
+**Summary:** Automated depreciation tracking for IT assets with status-aware financial calculations, ledger-based audit trail, and monthly scheduler.
+
+**Phase 1 Scope (MVP):**
+1. Database migrations:
+   - Add `is_amortizable` to `ci_type_definitions`
+   - Add `amortization_behavior` (pending/active/terminal) to `lifecycle_statuses`
+   - Add financial columns to `configuration_items` (purchase_cost, salvage_value, amort_start_date, useful_life_months, current_book_value)
+   - Create `amortization_ledger` and `amortization_runs` tables
+
+2. Backend:
+   - New `internal/amortization/` package (models, repository, service, scheduler)
+   - New handlers at `internal/api/handlers/amortization_handlers.go`
+   - Modify CI service to detect terminal status changes and trigger write-offs
+
+3. Frontend:
+   - CI Type form: Add "Is Amortizable" checkbox
+   - Lifecycle Status form: Add "Amortization Behavior" dropdown
+   - CI Edit: Add "Financials" tab (visible only for amortizable CI types)
+
+**Key Design Decisions:**
+- Single currency via `AMORTIZATION_CURRENCY` env variable
+- Daily scheduler at 00:00 with checkpoint mechanism (not month-end)
+- Prospective recalculation when useful life changes (history preserved)
+- Adjustment entries for corrections (never delete ledger records)
+- Write-offs and adjustments logged to main audit_logs table
+
+**To start implementation:** Run `implement amortization module phase 1` or follow the implementation plan in docs/
