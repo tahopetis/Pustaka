@@ -23,13 +23,21 @@ func NewRepository(db *pgxpool.Pool, logger *pustakaLogger.Logger) *Repository {
 	}
 }
 
+// Helper function to convert *string to string
+func getStringOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // Configuration Item operations
 
 func (r *Repository) CreateCI(ctx context.Context, ci *ConfigurationItem) (*ConfigurationItem, error) {
 	query := `
-		INSERT INTO configuration_items (id, name, ci_type, attributes, tags, created_by, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id, name, ci_type, attributes, tags, created_at, updated_at, created_by, updated_by
+		INSERT INTO configuration_items (id, name, ci_type, attributes, tags, lifecycle_status_id, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id, name, ci_type, attributes, tags, lifecycle_status_id, created_at, updated_at, created_by, updated_by
 	`
 
 	if ci.ID == uuid.Nil {
@@ -44,6 +52,7 @@ func (r *Repository) CreateCI(ctx context.Context, ci *ConfigurationItem) (*Conf
 		ci.CIType,
 		ci.Attributes,
 		ci.Tags,
+		ci.LifecycleStatusID,
 		ci.CreatedBy,
 		now,
 		now,
@@ -53,6 +62,7 @@ func (r *Repository) CreateCI(ctx context.Context, ci *ConfigurationItem) (*Conf
 		&result.CIType,
 		&result.Attributes,
 		&result.Tags,
+		&result.LifecycleStatusID,
 		&result.CreatedAt,
 		&result.UpdatedAt,
 		&result.CreatedBy,
@@ -77,23 +87,45 @@ func (r *Repository) CreateCI(ctx context.Context, ci *ConfigurationItem) (*Conf
 
 func (r *Repository) GetCI(ctx context.Context, id uuid.UUID) (*ConfigurationItem, error) {
 	query := `
-		SELECT id, name, ci_type, attributes, tags, created_at, updated_at, created_by, updated_by
-		FROM configuration_items
-		WHERE id = $1
+		SELECT ci.id, ci.name, ci.ci_type, ci.attributes, ci.tags, ci.lifecycle_status_id,
+		       ls.name, ls.display_name, ls.description, ls.color, ls.icon,
+		       ci.created_at, ci.updated_at, ci.created_by, ci.updated_by
+		FROM configuration_items ci
+		LEFT JOIN lifecycle_statuses ls ON ci.lifecycle_status_id = ls.id
+		WHERE ci.id = $1
 	`
 
 	var ci ConfigurationItem
+	var lifecycleStatusName, lifecycleStatusDisplayName, lifecycleStatusDescription, lifecycleStatusColor, lifecycleStatusIcon *string
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&ci.ID,
 		&ci.Name,
 		&ci.CIType,
 		&ci.Attributes,
 		&ci.Tags,
+		&ci.LifecycleStatusID,
+		&lifecycleStatusName,
+		&lifecycleStatusDisplayName,
+		&lifecycleStatusDescription,
+		&lifecycleStatusColor,
+		&lifecycleStatusIcon,
 		&ci.CreatedAt,
 		&ci.UpdatedAt,
 		&ci.CreatedBy,
 		&ci.UpdatedBy,
 	)
+
+	// Build lifecycle status object if present
+	if ci.LifecycleStatusID != nil {
+		ci.LifecycleStatus = &LifecycleStatus{
+			ID:          *ci.LifecycleStatusID,
+			Name:        getStringOrEmpty(lifecycleStatusName),
+			DisplayName: getStringOrEmpty(lifecycleStatusDisplayName),
+			Description: lifecycleStatusDescription,
+			Color:       lifecycleStatusColor,
+			Icon:        lifecycleStatusIcon,
+		}
+	}
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -140,12 +172,18 @@ func (r *Repository) ListCIs(ctx context.Context, filters ListCIFilters, page, l
 		argIndex++
 	}
 
+	if filters.LifecycleStatusID != nil {
+		whereClause += fmt.Sprintf(" AND lifecycle_status_id = $%d", argIndex)
+		args = append(args, filters.LifecycleStatusID)
+		argIndex++
+	}
+
 	// Build ORDER BY clause
 	orderBy := "ORDER BY created_at DESC"
 	if filters.Sort != "" {
 		orderField := filters.Sort
 		if orderField == "name" {
-			orderField = "name"
+			orderField = "ci.name"  // Use table alias to avoid ambiguity with lifecycle_status.name
 		} else if orderField == "type" {
 			orderField = "ci_type"
 		} else if orderField == "updated_at" {
@@ -172,8 +210,12 @@ func (r *Repository) ListCIs(ctx context.Context, filters ListCIFilters, page, l
 
 	// Get paginated results
 	query := fmt.Sprintf(`
-		SELECT id, name, ci_type, attributes, tags, created_at, updated_at, created_by, updated_by
-		FROM configuration_items %s %s
+		SELECT ci.id, ci.name, ci.ci_type, ci.attributes, ci.tags, ci.lifecycle_status_id,
+		       ls.name, ls.display_name, ls.description, ls.color, ls.icon,
+		       ci.created_at, ci.updated_at, ci.created_by, ci.updated_by
+		FROM configuration_items ci
+		LEFT JOIN lifecycle_statuses ls ON ci.lifecycle_status_id = ls.id
+		%s %s
 		LIMIT $%d OFFSET $%d
 	`, whereClause, orderBy, argIndex, argIndex+1)
 
@@ -189,17 +231,36 @@ func (r *Repository) ListCIs(ctx context.Context, filters ListCIFilters, page, l
 	var cis []ConfigurationItem
 	for rows.Next() {
 		var ci ConfigurationItem
+		var lifecycleStatusName, lifecycleStatusDisplayName, lifecycleStatusDescription, lifecycleStatusColor, lifecycleStatusIcon *string
 		err := rows.Scan(
 			&ci.ID,
 			&ci.Name,
 			&ci.CIType,
 			&ci.Attributes,
 			&ci.Tags,
+			&ci.LifecycleStatusID,
+			&lifecycleStatusName,
+			&lifecycleStatusDisplayName,
+			&lifecycleStatusDescription,
+			&lifecycleStatusColor,
+			&lifecycleStatusIcon,
 			&ci.CreatedAt,
 			&ci.UpdatedAt,
 			&ci.CreatedBy,
 			&ci.UpdatedBy,
 		)
+
+		// Build lifecycle status object if present
+		if ci.LifecycleStatusID != nil {
+			ci.LifecycleStatus = &LifecycleStatus{
+				ID:          *ci.LifecycleStatusID,
+				Name:        getStringOrEmpty(lifecycleStatusName),
+				DisplayName: getStringOrEmpty(lifecycleStatusDisplayName),
+				Description: lifecycleStatusDescription,
+				Color:       lifecycleStatusColor,
+				Icon:        lifecycleStatusIcon,
+			}
+		}
 		if err != nil {
 			r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
 			return nil, fmt.Errorf("failed to scan CI: %w", err)
@@ -242,6 +303,12 @@ func (r *Repository) UpdateCI(ctx context.Context, id uuid.UUID, updates *Update
 		argIndex++
 	}
 
+	if updates.LifecycleStatusID != nil {
+		setClauses = append(setClauses, fmt.Sprintf("lifecycle_status_id = $%d", argIndex))
+		args = append(args, updates.LifecycleStatusID)
+		argIndex++
+	}
+
 	if len(setClauses) == 0 {
 		return current, nil
 	}
@@ -259,7 +326,7 @@ func (r *Repository) UpdateCI(ctx context.Context, id uuid.UUID, updates *Update
 		setClause += ", " + setClauses[i]
 	}
 
-	query := fmt.Sprintf("UPDATE configuration_items %s WHERE id = $%d RETURNING id, name, ci_type, attributes, tags, created_at, updated_at, created_by, updated_by", setClause, argIndex)
+	query := fmt.Sprintf("UPDATE configuration_items %s WHERE id = $%d RETURNING id, name, ci_type, attributes, tags, lifecycle_status_id, created_at, updated_at, created_by, updated_by", setClause, argIndex)
 	args = append(args, id)
 
 	var result ConfigurationItem
@@ -269,6 +336,7 @@ func (r *Repository) UpdateCI(ctx context.Context, id uuid.UUID, updates *Update
 		&result.CIType,
 		&result.Attributes,
 		&result.Tags,
+		&result.LifecycleStatusID,
 		&result.CreatedAt,
 		&result.UpdatedAt,
 		&result.CreatedBy,
@@ -981,4 +1049,20 @@ func (r *Repository) GetCICreationsByDate(ctx context.Context, fromDate, toDate 
 	}
 
 	return results, nil
+}
+
+// CountCIsWithStatus counts how many CIs have a specific lifecycle status
+func (r *Repository) CountCIsWithStatus(ctx context.Context, statusID uuid.UUID) (int64, error) {
+	query := `SELECT COUNT(*) FROM configuration_items WHERE lifecycle_status_id = $1`
+
+	var count int64
+	err := r.db.QueryRow(ctx, query, statusID).Scan(&count)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, map[string]interface{}{
+			"status_id": statusID,
+		})
+		return 0, fmt.Errorf("failed to count CIs with lifecycle status: %w", err)
+	}
+
+	return count, nil
 }

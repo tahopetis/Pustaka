@@ -1,9 +1,13 @@
+import { LifecycleStatus } from './lifecycle'
+
 export interface CI {
   id: string
   name: string
   ci_type: string
   attributes: Record<string, any>
   tags: string[]
+  lifecycle_status_id?: string
+  lifecycle_status?: LifecycleStatus
   created_at: string
   updated_at: string
   created_by: string
@@ -38,11 +42,13 @@ export interface CreateCIData {
   ci_type: string
   attributes: Record<string, any>
   tags?: string[]
+  lifecycle_status_id?: string
 }
 
 export interface UpdateCIData {
   attributes?: Record<string, any>
   tags?: string[]
+  lifecycle_status_id?: string
 }
 
 export interface CIListResponse {

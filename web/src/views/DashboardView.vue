@@ -37,7 +37,7 @@
     </div>
 
     <!-- Stats cards -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-5">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-5">
       <DashboardWidget
         title="Total CIs"
         :loading="loadingState.stats"
@@ -126,6 +126,52 @@
               <dt class="text-sm font-medium text-gray-500 truncate">Active Users</dt>
               <dd class="text-2xl font-bold text-gray-900">{{ stats?.total_users || 0 }}</dd>
             </dl>
+          </div>
+        </div>
+      </DashboardWidget>
+
+      <!-- CI Status Distribution Widget -->
+      <DashboardWidget
+        title="CI Status Distribution"
+        :loading="loadingState.ciStatusDistribution"
+        :error="errorState.ciStatusDistribution"
+        @retry="loadCIStatusDistribution"
+      >
+        <div class="px-2 py-3">
+          <div v-if="ciStatusDistribution && ciStatusDistribution.length > 0" class="space-y-2">
+            <div
+              v-for="status in ciStatusDistribution"
+              :key="status.status_name"
+              class="flex items-center justify-between"
+            >
+              <div class="flex items-center flex-1">
+                <div
+                  v-if="status.color"
+                  class="w-3 h-3 rounded-full mr-2"
+                  :style="{ backgroundColor: status.color }"
+                ></div>
+                <span class="text-sm font-medium text-gray-700">{{ status.display_name }}</span>
+              </div>
+              <div class="flex items-center space-x-4">
+                <div class="text-right">
+                  <span class="text-sm font-bold text-gray-900">{{ status.count }}</span>
+                  <span class="text-xs text-gray-500">CIs</span>
+                </div>
+                <div class="w-24 bg-gray-200 rounded-full h-2">
+                  <div
+                    class="h-2 rounded-full"
+                    :style="{
+                      backgroundColor: status.color,
+                      width: `${status.percentage}%`
+                    }"
+                  ></div>
+                </div>
+                <span class="text-xs text-gray-500 w-12 text-right">{{ status.percentage.toFixed(1) }}%</span>
+              </div>
+            </div>
+            <div v-if="ciStatusDistribution.length === 0" class="text-center py-4 text-gray-500">
+              <p class="text-sm">No CIs with lifecycle status assigned</p>
+            </div>
           </div>
         </div>
       </DashboardWidget>
@@ -320,6 +366,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useLifecycleStatusStore } from '@/stores/lifecycleStatus'
 import { useDashboardData } from '@/composables/useDashboardData'
 import TimeRangeFilter from '@/components/dashboard/TimeRangeFilter.vue'
 import DashboardWidget from '@/components/dashboard/DashboardWidget.vue'
@@ -332,8 +379,10 @@ import type { MostConnectedCI } from '@/types/dashboard'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const lifecycleStatusStore = useLifecycleStatusStore()
 
 const user = computed(() => authStore.user)
+const ciStatusDistribution = ref<Array<any>>([])
 
 // Use dashboard data composable
 const {
@@ -351,8 +400,27 @@ const {
   retryDataSource,
 } = useDashboardData()
 
+// Add CI status distribution to loading states
+loadingState.value.ciStatusDistribution = ref(false)
+errorState.value.ciStatusDistribution = ref(null)
+
 const hasPermission = (permission: string) => {
   return authStore.hasPermission(permission)
+}
+
+const loadCIStatusDistribution = async () => {
+  loadingState.value.ciStatusDistribution = true
+  try {
+    const distribution = await lifecycleStatusStore.getCIStatusDistribution()
+    ciStatusDistribution.value = distribution
+    errorState.value.ciStatusDistribution = null
+  } catch (error) {
+    console.error('Failed to load CI status distribution:', error)
+    ciStatusDistribution.value = []
+    errorState.value.ciStatusDistribution = error
+  } finally {
+    loadingState.value.ciStatusDistribution = false
+  }
 }
 
 const hasCreatePermissions = computed(() => {
@@ -394,8 +462,8 @@ const ciTypeDistributionData = computed(() => {
   if (!ciTypeUsage.value || ciTypeUsage.value.length === 0) return []
 
   return ciTypeUsage.value.map((item, index) => ({
-    label: item.ci_type.name,
-    value: item.usage_count,
+    label: item.type,
+    value: item.count,
     color: getColor(index),
   }))
 })
@@ -424,7 +492,10 @@ const handleTimeRangeChange = async (range: TimeRange) => {
 }
 
 const refreshAllData = async () => {
-  await refreshData()
+  await Promise.all([
+    refreshData(),
+    loadCIStatusDistribution()
+  ])
 }
 
 const handleCIClick = (ci: MostConnectedCI) => {
@@ -438,6 +509,9 @@ const handleDayClick = (date: string, count: number) => {
 
 // Load data on mount
 onMounted(async () => {
-  await fetchAllData()
+  await Promise.all([
+    fetchAllData(),
+    loadCIStatusDistribution()
+  ])
 })
 </script>

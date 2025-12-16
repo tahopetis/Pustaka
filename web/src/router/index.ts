@@ -51,6 +51,24 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/lifecycle-status',
+      name: 'LifecycleStatus',
+      component: () => import('@/views/lifecycle-statuses/LifecycleStatusListView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'lifecycle_status:read' }
+    },
+    {
+      path: '/lifecycle-status/new',
+      name: 'CreateLifecycleStatus',
+      component: () => import('@/views/lifecycle-statuses/LifecycleStatusFormView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'lifecycle_status:create' }
+    },
+    {
+      path: '/lifecycle-status/:id/edit',
+      name: 'EditLifecycleStatus',
+      component: () => import('@/views/lifecycle-statuses/LifecycleStatusFormView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'lifecycle_status:update' }
+    },
+    {
       path: '/relationships',
       name: 'Relationships',
       component: () => import('@/views/relationships/RelationshipListView.vue'),

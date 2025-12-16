@@ -73,6 +73,29 @@
                   </dd>
                 </div>
                 <div>
+                  <dt class="text-sm font-medium text-gray-500">Lifecycle Status</dt>
+                  <dd class="mt-1">
+                    <div v-if="ci.lifecycle_status" class="flex items-center">
+                      <div
+                        v-if="ci.lifecycle_status.color"
+                        class="w-3 h-3 rounded-full mr-2"
+                        :style="{ backgroundColor: ci.lifecycle_status.color }"
+                      ></div>
+                      <span
+                        class="badge"
+                        :style="{
+                          backgroundColor: ci.lifecycle_status.color + '20',
+                          color: ci.lifecycle_status.color,
+                          borderColor: ci.lifecycle_status.color
+                        }"
+                      >
+                        {{ ci.lifecycle_status.display_name }}
+                      </span>
+                    </div>
+                    <span v-else class="text-gray-400 text-sm">No status assigned</span>
+                  </dd>
+                </div>
+                <div>
                   <dt class="text-sm font-medium text-gray-500">Created</dt>
                   <dd class="mt-1 text-sm text-gray-900">{{ formatDate(ci.created_at) }}</dd>
                 </div>

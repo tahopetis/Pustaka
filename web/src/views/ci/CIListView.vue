@@ -67,6 +67,7 @@
                 <tr>
                   <th class="table-header-cell">Name</th>
                   <th class="table-header-cell">Type</th>
+                  <th class="table-header-cell">Lifecycle Status</th>
                   <th class="table-header-cell">Tags</th>
                   <th class="table-header-cell">Created</th>
                   <th class="table-header-cell">Updated</th>
@@ -82,6 +83,26 @@
                   </td>
                   <td class="table-cell">
                     <span class="badge badge-info">{{ ci.ci_type }}</span>
+                  </td>
+                  <td class="table-cell">
+                    <div v-if="ci.lifecycle_status" class="flex items-center">
+                      <div
+                        v-if="ci.lifecycle_status.color"
+                        class="w-3 h-3 rounded-full mr-2"
+                        :style="{ backgroundColor: ci.lifecycle_status.color }"
+                      ></div>
+                      <span
+                        class="badge"
+                        :style="{
+                          backgroundColor: ci.lifecycle_status.color + '20',
+                          color: ci.lifecycle_status.color,
+                          borderColor: ci.lifecycle_status.color
+                        }"
+                      >
+                        {{ ci.lifecycle_status.display_name }}
+                      </span>
+                    </div>
+                    <span v-else class="text-gray-400 text-sm">No status</span>
                   </td>
                   <td class="table-cell">
                     <div class="flex flex-wrap gap-1">

@@ -253,9 +253,49 @@ export const relationshipTypeAPI = {
     target_type: string
   }) => api.post('/relationship-types/validate', data),
 
-  getStats: () => api.get('/relationship-types/stats'),
+  getStats: () => api.get('/relationship-types/statistics'),
 
   getUsage: () => api.get('/analytics/relationship-types/usage'),
+}
+
+export const lifecycleStatusAPI = {
+  list: (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    is_active?: boolean
+    is_system?: boolean
+    sort?: string
+    order?: string
+  }) => api.get('/lifecycle-status', { params }),
+
+  get: (id: string) => api.get(`/lifecycle-status/${id}`),
+
+  create: (data: {
+    name: string
+    display_name: string
+    description?: string
+    color?: string
+    icon?: string
+    sort_order?: number
+  }) => api.post('/lifecycle-status', data),
+
+  update: (id: string, data: {
+    display_name?: string
+    description?: string
+    color?: string
+    icon?: string
+    sort_order?: number
+    is_active?: boolean
+  }) => api.put(`/lifecycle-status/${id}`, data),
+
+  delete: (id: string) => api.delete(`/lifecycle-status/${id}`),
+
+  getActive: () => api.get('/lifecycle-status/active'),
+
+  getUsage: () => api.get('/lifecycle-status/usage'),
+
+  getDistribution: () => api.get('/lifecycle-status/distribution'),
 }
 
 export const graphAPI = {

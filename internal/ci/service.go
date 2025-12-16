@@ -64,11 +64,12 @@ func (s *Service) CreateCI(ctx context.Context, req *CreateCIRequest, userID uui
 
 	// Create CI
 	ci := &ConfigurationItem{
-		Name:      req.Name,
-		CIType:    req.CIType,
-		Attributes: req.Attributes,
-		Tags:      req.Tags,
-		CreatedBy: userID,
+		Name:              req.Name,
+		CIType:            req.CIType,
+		Attributes:        req.Attributes,
+		Tags:              req.Tags,
+		LifecycleStatusID: req.LifecycleStatusID,
+		CreatedBy:         userID,
 	}
 
 	result, err := s.repo.CreateCI(ctx, ci)
@@ -169,12 +170,23 @@ func (s *Service) UpdateCI(ctx context.Context, id uuid.UUID, req *UpdateCIReque
 	// Invalidate cache
 	s.invalidateCICache(ctx, id)
 
-	// Log audit event
-	s.logAuditEvent(ctx, "ci", id.String(), "update", userID.String(), map[string]interface{}{
+	// Prepare audit details
+	details := map[string]interface{}{
 		"ci_name": result.Name,
 		"ci_type": result.CIType,
 		"changes": req,
-	})
+	}
+
+	// Track lifecycle status changes
+	if req.LifecycleStatusID != nil {
+		if current.LifecycleStatusID == nil || *current.LifecycleStatusID != *req.LifecycleStatusID {
+			details["old_lifecycle_status_id"] = current.LifecycleStatusID
+			details["new_lifecycle_status_id"] = req.LifecycleStatusID
+		}
+	}
+
+	// Log audit event
+	s.logAuditEvent(ctx, "ci", id.String(), "update", userID.String(), details)
 
 	s.logger.InfoService("ci", "update_ci", map[string]interface{}{
 		"ci_id":   id,

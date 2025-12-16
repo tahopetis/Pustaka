@@ -44,6 +44,22 @@
                   </option>
                 </select>
               </div>
+              <div>
+                <label class="form-label">Lifecycle Status</label>
+                <select
+                  v-model="form.lifecycle_status_id"
+                  class="form-input"
+                  :disabled="loading"
+                >
+                  <option value="">Select Lifecycle Status</option>
+                  <option v-for="status in activeLifecycleStatuses" :key="status.id" :value="status.id">
+                    {{ status.display_name }}
+                  </option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">
+                  Current lifecycle status of this CI (optional)
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -188,6 +204,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useLifecycleStatusStore } from '@/stores/lifecycleStatus'
 import { ciAPI, ciTypeAPI } from '@/services/api'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import DynamicAttributeField from '@/components/ci/DynamicAttributeField.vue'
@@ -197,6 +214,7 @@ import type { CI, CIType, CreateCIData, UpdateCIData } from '@/types/ci'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const lifecycleStatusStore = useLifecycleStatusStore()
 
 const loading = ref(false)
 const ciTypes = ref<CIType[]>([])
@@ -210,7 +228,10 @@ const form = reactive({
   ci_type: '',
   attributes: {} as Record<string, any>,
   tags: [] as string[],
+  lifecycle_status_id: '',
 })
+
+const activeLifecycleStatuses = computed(() => lifecycleStatusStore.activeLifecycleStatuses)
 
 const selectedCIType = computed(() => {
   return ciTypes.value.find(type => type.name === form.ci_type)
@@ -318,6 +339,7 @@ const loadCI = async () => {
     form.ci_type = existingCI.value.ci_type
     form.attributes = { ...existingCI.value.attributes }
     form.tags = existingCI.value.tags ? [...existingCI.value.tags] : []
+    form.lifecycle_status_id = existingCI.value.lifecycle_status_id || ''
 
     // Wait for CI type to be loaded and set up validation
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -357,12 +379,14 @@ const handleSubmit = async () => {
       ci_type: form.ci_type,
       attributes: form.attributes,
       tags: form.tags.filter(tag => tag.trim()),
+      lifecycle_status_id: form.lifecycle_status_id || undefined,
     }
 
     if (isEdit.value) {
       await ciAPI.update(route.params.id as string, {
         attributes: data.attributes,
         tags: data.tags,
+        lifecycle_status_id: data.lifecycle_status_id,
       } as UpdateCIData)
       showSuccessToast('Configuration item updated successfully')
     } else {
@@ -381,7 +405,10 @@ const handleSubmit = async () => {
 }
 
 onMounted(async () => {
-  await loadCITypes()
+  await Promise.all([
+    loadCITypes(),
+    lifecycleStatusStore.getActiveLifecycleStatuses()
+  ])
 
   if (isEdit.value) {
     await loadCI()

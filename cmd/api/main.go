@@ -180,6 +180,10 @@ func main() {
 	relationshipTypeRepo := ci.NewRelationshipTypeRepository(postgresDB.Pool)
 	relationshipTypeService := ci.NewRelationshipTypeService(relationshipTypeRepo, ciRepo, neo4jService, redisDB.Client, auditService, logger, postgresDB.Pool)
 
+	// Create lifecycle status services
+	lifecycleStatusRepo := ci.NewLifecycleStatusRepository(postgresDB.Pool)
+	lifecycleStatusService := ci.NewLifecycleStatusService(lifecycleStatusRepo, ciRepo, redisDB.Client, auditService, logger)
+
 	// Initialize admin user
 	if err := initializeAdminUser(postgresDB.Pool, rbacService, passwordService, cfg.Admin, logger); err != nil {
 		logger.Error().Err(err).Msg("Failed to initialize admin user")
@@ -193,10 +197,11 @@ func main() {
 	ciTypeHandlers := api.NewCITypeHandlers(baseHandler, ciService)
 	relationshipHandlers := api.NewRelationshipHandlers(baseHandler, ciService)
 	relationshipTypeHandlers := handlers.NewRelationshipTypeHandler(relationshipTypeService, rbacService, logger)
+	lifecycleStatusHandlers := handlers.NewLifecycleStatusHandler(lifecycleStatusService, rbacService, logger)
 	auditHandlers := api.NewAuditHandlers(baseHandler, auditService)
 
 	// Setup router
-	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, auditHandlers, jwtService, rbacService)
+	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, jwtService, rbacService)
 
 	// Create HTTP server
 	server := &http.Server{
@@ -245,6 +250,7 @@ func setupRouter(
 	ciTypeHandlers *api.CITypeHandlers,
 	relationshipHandlers *api.RelationshipHandlers,
 	relationshipTypeHandlers *handlers.RelationshipTypeHandler,
+	lifecycleStatusHandlers *handlers.LifecycleStatusHandler,
 	auditHandlers *api.AuditHandlers,
 	jwtService *auth.JWTService,
 	rbacService *auth.RBACService,
@@ -409,6 +415,28 @@ func setupRouter(
 				r.Group(func(r chi.Router) {
 					r.Use(middleware.RBAC("relationship_type:delete"))
 					r.Delete("/{id}", relationshipTypeHandlers.DeleteRelationshipType)
+				})
+			})
+
+			// Lifecycle Status routes
+			r.Route("/lifecycle-status", func(r chi.Router) {
+				r.Use(middleware.RBAC("lifecycle_status:read"))
+				r.Get("/", lifecycleStatusHandlers.ListLifecycleStatuses)
+				r.Get("/active", lifecycleStatusHandlers.GetActiveLifecycleStatuses)
+				r.Get("/usage", lifecycleStatusHandlers.GetLifecycleStatusUsage)
+				r.Get("/distribution", lifecycleStatusHandlers.GetCIStatusDistribution)
+				r.Get("/{id}", lifecycleStatusHandlers.GetLifecycleStatus)
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("lifecycle_status:create"))
+					r.Post("/", lifecycleStatusHandlers.CreateLifecycleStatus)
+				})
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("lifecycle_status:update"))
+					r.Put("/{id}", lifecycleStatusHandlers.UpdateLifecycleStatus)
+				})
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("lifecycle_status:delete"))
+					r.Delete("/{id}", lifecycleStatusHandlers.DeleteLifecycleStatus)
 				})
 			})
 

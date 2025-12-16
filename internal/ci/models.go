@@ -9,15 +9,17 @@ import (
 )
 
 type ConfigurationItem struct {
-	ID        uuid.UUID            `json:"id" db:"id"`
-	Name      string               `json:"name" db:"name"`
-	CIType    string               `json:"ci_type" db:"ci_type"`
-	Attributes map[string]interface{} `json:"attributes" db:"attributes"`
-	Tags      []string             `json:"tags" db:"tags"`
-	CreatedAt time.Time            `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time            `json:"updated_at" db:"updated_at"`
-	CreatedBy uuid.UUID            `json:"created_by" db:"created_by"`
-	UpdatedBy *uuid.UUID           `json:"updated_by,omitempty" db:"updated_by"`
+	ID                uuid.UUID            `json:"id" db:"id"`
+	Name              string               `json:"name" db:"name"`
+	CIType            string               `json:"ci_type" db:"ci_type"`
+	Attributes        map[string]interface{} `json:"attributes" db:"attributes"`
+	Tags              []string             `json:"tags" db:"tags"`
+	LifecycleStatusID *uuid.UUID           `json:"lifecycle_status_id,omitempty" db:"lifecycle_status_id"`
+	LifecycleStatus   *LifecycleStatus     `json:"lifecycle_status,omitempty"`
+	CreatedAt         time.Time            `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time            `json:"updated_at" db:"updated_at"`
+	CreatedBy         uuid.UUID            `json:"created_by" db:"created_by"`
+	UpdatedBy         *uuid.UUID           `json:"updated_by,omitempty" db:"updated_by"`
 }
 
 type CITypeDefinition struct {
@@ -61,15 +63,17 @@ type Relationship struct {
 }
 
 type CreateCIRequest struct {
-	Name      string                 `json:"name" validate:"required"`
-	CIType    string                 `json:"ci_type" validate:"required"`
-	Attributes map[string]interface{} `json:"attributes" validate:"required"`
-	Tags      []string               `json:"tags,omitempty"`
+	Name              string                 `json:"name" validate:"required"`
+	CIType            string                 `json:"ci_type" validate:"required"`
+	Attributes        map[string]interface{} `json:"attributes" validate:"required"`
+	Tags              []string               `json:"tags,omitempty"`
+	LifecycleStatusID *uuid.UUID             `json:"lifecycle_status_id,omitempty"`
 }
 
 type UpdateCIRequest struct {
-	Attributes map[string]interface{} `json:"attributes,omitempty"`
-	Tags      []string               `json:"tags,omitempty"`
+	Attributes        map[string]interface{} `json:"attributes,omitempty"`
+	Tags              []string               `json:"tags,omitempty"`
+	LifecycleStatusID *uuid.UUID             `json:"lifecycle_status_id,omitempty"`
 }
 
 type CreateCITypeRequest struct {
@@ -128,12 +132,13 @@ type PaginationResponse struct {
 }
 
 type ListCIFilters struct {
-	CIType   string   `json:"ci_type,omitempty"`
-	Search   string   `json:"search,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
-	CreatedBy string  `json:"created_by,omitempty"`
-	Sort     string   `json:"sort,omitempty"`
-	Order    string   `json:"order,omitempty"`
+	CIType            string     `json:"ci_type,omitempty"`
+	Search            string     `json:"search,omitempty"`
+	Tags              []string   `json:"tags,omitempty"`
+	CreatedBy         string     `json:"created_by,omitempty"`
+	LifecycleStatusID *uuid.UUID `json:"lifecycle_status_id,omitempty"`
+	Sort              string     `json:"sort,omitempty"`
+	Order             string     `json:"order,omitempty"`
 }
 
 type ListRelationshipFilters struct {

@@ -71,6 +71,28 @@
               CI Types
             </router-link>
 
+            <!-- Lifecycle Status -->
+            <router-link
+              v-if="hasAnyPermission(['lifecycle_status:read'])"
+              to="/lifecycle-status"
+              class="group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+              :class="isCurrentRoute('/lifecycle-status')
+                ? 'bg-blue-100 text-blue-900'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+            >
+              <svg
+                class="mr-3 h-5 w-5"
+                :class="isCurrentRoute('/lifecycle-status') ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              Lifecycle Status
+            </router-link>
+
             <!-- Relationships -->
             <router-link
               v-if="hasAnyPermission(['relationship:read'])"
