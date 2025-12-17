@@ -7,7 +7,7 @@
       </div>
       <router-link
         v-if="hasPermission('lifecycle_status:create')"
-        to="/lifecycle-statuses/new"
+        to="/lifecycle-status/new"
         class="btn btn-primary"
       >
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,7 +166,7 @@
             <button v-if="hasSearchOrFilter" @click="resetFilters" class="btn btn-outline">
               Clear Filters
             </button>
-            <router-link v-else-if="hasPermission('lifecycle_status:create')" to="/lifecycle-statuses/new" class="btn btn-primary">
+            <router-link v-else-if="hasPermission('lifecycle_status:create')" to="/lifecycle-status/new" class="btn btn-primary">
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
@@ -231,7 +231,7 @@
                 <td class="table-cell">
                   <div class="flex space-x-2">
                     <router-link
-                      :to="`/lifecycle-statuses/${status.id}`"
+                      :to="`/lifecycle-status/${status.id}`"
                       class="text-blue-600 hover:text-blue-900"
                       title="View"
                     >
@@ -242,7 +242,7 @@
                     </router-link>
                     <router-link
                       v-if="hasPermission('lifecycle_status:update') && !status.is_system"
-                      :to="`/lifecycle-statuses/${status.id}/edit`"
+                      :to="`/lifecycle-status/${status.id}/edit`"
                       class="text-indigo-600 hover:text-indigo-900"
                       title="Edit"
                     >

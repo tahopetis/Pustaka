@@ -139,7 +139,7 @@ test-results.xml
 .npmrc.local
 
 # Database dumps
-*.sql
+# *.sql
 *.dump
 
 # SSL certificates
