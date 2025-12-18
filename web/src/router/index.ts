@@ -170,6 +170,37 @@ const router = createRouter({
       component: () => import('@/views/audit/AuditViewDebug.vue'),
       meta: { requiresAuth: true, requiresPermission: 'audit:read' }
     },
+    // Amortization Module Routes
+    {
+      path: '/amortization',
+      name: 'AmortizationDashboard',
+      component: () => import('@/views/amortization/DashboardView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'amortization:read' }
+    },
+    {
+      path: '/amortization/ledger',
+      name: 'AmortizationLedger',
+      component: () => import('@/views/amortization/LedgerView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'amortization:read' }
+    },
+    {
+      path: '/amortization/reports',
+      name: 'AmortizationReports',
+      component: () => import('@/views/amortization/ReportsView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'amortization:read' }
+    },
+    {
+      path: '/amortization/settings',
+      name: 'AmortizationSettings',
+      component: () => import('@/views/amortization/SettingsView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'amortization:admin' }
+    },
+    {
+      path: '/amortization/scheduler',
+      name: 'AmortizationScheduler',
+      component: () => import('@/views/amortization/SchedulerView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'amortization:admin' }
+    },
     {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',

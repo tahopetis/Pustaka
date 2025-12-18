@@ -26,6 +26,7 @@ type CITypeDefinition struct {
 	ID                uuid.UUID              `json:"id" db:"id"`
 	Name              string                 `json:"name" db:"name"`
 	Description       *string                `json:"description,omitempty" db:"description"`
+	IsAmortizable     bool                   `json:"is_amortizable" db:"is_amortizable"`
 	RequiredAttributes []AttributeDefinition `json:"required_attributes" db:"required_attributes"`
 	OptionalAttributes []AttributeDefinition `json:"optional_attributes" db:"optional_attributes"`
 	CreatedBy         uuid.UUID              `json:"created_by" db:"created_by"`
@@ -79,12 +80,14 @@ type UpdateCIRequest struct {
 type CreateCITypeRequest struct {
 	Name              string                 `json:"name" validate:"required"`
 	Description       *string                `json:"description,omitempty"`
+	IsAmortizable     bool                   `json:"is_amortizable"`
 	RequiredAttributes []AttributeDefinition `json:"required_attributes" validate:"required,dive"`
 	OptionalAttributes []AttributeDefinition `json:"optional_attributes,omitempty,dive"`
 }
 
 type UpdateCITypeRequest struct {
 	Description       *string                `json:"description,omitempty"`
+	IsAmortizable     *bool                  `json:"is_amortizable,omitempty"`
 	RequiredAttributes []AttributeDefinition `json:"required_attributes,omitempty,dive"`
 	OptionalAttributes []AttributeDefinition `json:"optional_attributes,omitempty,dive"`
 }

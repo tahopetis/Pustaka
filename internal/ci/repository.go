@@ -393,9 +393,9 @@ func (r *Repository) DeleteCI(ctx context.Context, id uuid.UUID) error {
 
 func (r *Repository) CreateCIType(ctx context.Context, ciType *CITypeDefinition) (*CITypeDefinition, error) {
 	query := `
-		INSERT INTO ci_type_definitions (id, name, description, required_attributes, optional_attributes, created_by, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id, name, description, required_attributes, optional_attributes, created_by, created_at, updated_at
+		INSERT INTO ci_type_definitions (id, name, description, is_amortizable, required_attributes, optional_attributes, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id, name, description, is_amortizable, required_attributes, optional_attributes, created_by, created_at, updated_at
 	`
 
 	if ciType.ID == uuid.Nil {
@@ -408,6 +408,7 @@ func (r *Repository) CreateCIType(ctx context.Context, ciType *CITypeDefinition)
 		ciType.ID,
 		ciType.Name,
 		ciType.Description,
+		ciType.IsAmortizable,
 		ciType.RequiredAttributes,
 		ciType.OptionalAttributes,
 		ciType.CreatedBy,
@@ -417,6 +418,7 @@ func (r *Repository) CreateCIType(ctx context.Context, ciType *CITypeDefinition)
 		&result.ID,
 		&result.Name,
 		&result.Description,
+		&result.IsAmortizable,
 		&result.RequiredAttributes,
 		&result.OptionalAttributes,
 		&result.CreatedBy,
@@ -468,7 +470,7 @@ func (r *Repository) GetCIType(ctx context.Context, id uuid.UUID) (*CITypeDefini
 
 func (r *Repository) GetCITypeByName(ctx context.Context, name string) (*CITypeDefinition, error) {
 	query := `
-		SELECT id, name, description, required_attributes, optional_attributes, created_by, created_at, updated_at
+		SELECT id, name, description, is_amortizable, required_attributes, optional_attributes, created_by, created_at, updated_at
 		FROM ci_type_definitions
 		WHERE name = $1
 	`
@@ -478,6 +480,7 @@ func (r *Repository) GetCITypeByName(ctx context.Context, name string) (*CITypeD
 		&ciType.ID,
 		&ciType.Name,
 		&ciType.Description,
+		&ciType.IsAmortizable,
 		&ciType.RequiredAttributes,
 		&ciType.OptionalAttributes,
 		&ciType.CreatedBy,
@@ -522,7 +525,7 @@ func (r *Repository) ListCITypes(ctx context.Context, page, limit int, search st
 
 	// Get paginated results
 	query := fmt.Sprintf(`
-		SELECT id, name, description, required_attributes, optional_attributes, created_by, created_at, updated_at
+		SELECT id, name, description, is_amortizable, required_attributes, optional_attributes, created_by, created_at, updated_at
 		FROM ci_type_definitions %s
 		ORDER BY created_at DESC
 		LIMIT $%d OFFSET $%d
@@ -544,6 +547,7 @@ func (r *Repository) ListCITypes(ctx context.Context, page, limit int, search st
 			&ciType.ID,
 			&ciType.Name,
 			&ciType.Description,
+			&ciType.IsAmortizable,
 			&ciType.RequiredAttributes,
 			&ciType.OptionalAttributes,
 			&ciType.CreatedBy,
@@ -580,6 +584,12 @@ func (r *Repository) UpdateCIType(ctx context.Context, id uuid.UUID, updates *Up
 		argIndex++
 	}
 
+	if updates.IsAmortizable != nil {
+		setClauses = append(setClauses, fmt.Sprintf("is_amortizable = $%d", argIndex))
+		args = append(args, updates.IsAmortizable)
+		argIndex++
+	}
+
 	if updates.RequiredAttributes != nil {
 		setClauses = append(setClauses, fmt.Sprintf("required_attributes = $%d", argIndex))
 		args = append(args, updates.RequiredAttributes)
@@ -605,7 +615,7 @@ func (r *Repository) UpdateCIType(ctx context.Context, id uuid.UUID, updates *Up
 		setClause += ", " + setClauses[i]
 	}
 
-	query := fmt.Sprintf("UPDATE ci_type_definitions %s WHERE id = $%d RETURNING id, name, description, required_attributes, optional_attributes, created_by, created_at, updated_at", setClause, argIndex)
+	query := fmt.Sprintf("UPDATE ci_type_definitions %s WHERE id = $%d RETURNING id, name, description, is_amortizable, required_attributes, optional_attributes, created_by, created_at, updated_at", setClause, argIndex)
 	args = append(args, id)
 
 	var result CITypeDefinition
@@ -613,6 +623,7 @@ func (r *Repository) UpdateCIType(ctx context.Context, id uuid.UUID, updates *Up
 		&result.ID,
 		&result.Name,
 		&result.Description,
+		&result.IsAmortizable,
 		&result.RequiredAttributes,
 		&result.OptionalAttributes,
 		&result.CreatedBy,

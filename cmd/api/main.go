@@ -18,6 +18,7 @@ import (
 	"github.com/pustaka/pustaka/internal/api"
 	"github.com/pustaka/pustaka/internal/api/handlers"
 	"github.com/pustaka/pustaka/internal/api/middleware"
+	"github.com/pustaka/pustaka/internal/amortization"
 	"github.com/pustaka/pustaka/internal/auth"
 	"github.com/pustaka/pustaka/internal/ci"
 	"github.com/pustaka/pustaka/internal/config"
@@ -184,6 +185,38 @@ func main() {
 	lifecycleStatusRepo := ci.NewLifecycleStatusRepository(postgresDB.Pool)
 	lifecycleStatusService := ci.NewLifecycleStatusService(lifecycleStatusRepo, ciRepo, redisDB.Client, auditService, logger)
 
+	// Create amortization services
+	amortizationRepo := amortization.NewRepository(postgresDB.Pool, logger)
+	amortizationCache := amortization.NewCacheRepository(redisDB.Client, logger)
+	amortizationCalculator := amortization.NewCalculator(logger)
+	amortizationScheduler := amortization.NewScheduler(amortizationRepo, amortizationCache, logger)
+
+	// Create adapters for CI service interfaces
+	ciAdapter := &amortization.CIServiceAdapter{
+		Service: ciService,
+	}
+
+	lifecycleAdapter := &amortization.LifecycleServiceAdapter{
+		Service: lifecycleStatusService,
+	}
+
+	// Create simple stub implementations for missing interfaces
+	amortizationEventPublisher := amortization.NewEventPublisher(logger)
+	amortizationAuditLogger := amortization.NewAuditLogger(auditService, logger)
+
+	// Create amortization service with proper interface implementations
+	amortizationService := amortization.NewAmortizationService(
+		amortizationRepo,
+		amortizationCache,
+		amortizationCalculator,
+		amortizationScheduler,
+		amortizationEventPublisher,
+		amortizationAuditLogger,
+		ciAdapter,
+		lifecycleAdapter,
+		logger,
+	)
+
 	// Initialize admin user
 	if err := initializeAdminUser(postgresDB.Pool, rbacService, passwordService, cfg.Admin, logger); err != nil {
 		logger.Error().Err(err).Msg("Failed to initialize admin user")
@@ -199,9 +232,18 @@ func main() {
 	relationshipTypeHandlers := handlers.NewRelationshipTypeHandler(relationshipTypeService, rbacService, logger)
 	lifecycleStatusHandlers := handlers.NewLifecycleStatusHandler(lifecycleStatusService, rbacService, logger)
 	auditHandlers := api.NewAuditHandlers(baseHandler, auditService)
+	amortizationHandlers := handlers.NewAmortizationHandler(amortizationService, logger)
 
 	// Setup router
-	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, jwtService, rbacService)
+	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, amortizationHandlers, jwtService, rbacService)
+
+	// Start amortization scheduler in background
+	go func() {
+		logger.Info().Msg("Starting amortization scheduler")
+		if err := amortizationScheduler.ScheduleDailyRun(context.Background()); err != nil {
+			logger.Error().Err(err).Msg("Failed to start amortization scheduler")
+		}
+	}()
 
 	// Create HTTP server
 	server := &http.Server{
@@ -230,6 +272,11 @@ func main() {
 
 	logger.Info().Msg("Shutting down HTTP server...")
 
+	// Shutdown amortization scheduler
+	if err := amortizationScheduler.UnscheduleDailyRun(); err != nil {
+		logger.Error().Err(err).Msg("Failed to stop amortization scheduler")
+	}
+
 	// Shutdown server with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -252,6 +299,7 @@ func setupRouter(
 	relationshipTypeHandlers *handlers.RelationshipTypeHandler,
 	lifecycleStatusHandlers *handlers.LifecycleStatusHandler,
 	auditHandlers *api.AuditHandlers,
+	amortizationHandlers *handlers.AmortizationHandler,
 	jwtService *auth.JWTService,
 	rbacService *auth.RBACService,
 ) *chi.Mux {
@@ -393,7 +441,6 @@ func setupRouter(
 				})
 			})
 
-		
 			// Relationship Type routes
 			r.Route("/relationship-types", func(r chi.Router) {
 				r.Use(middleware.RBAC("relationship_type:read"))
@@ -437,6 +484,40 @@ func setupRouter(
 				r.Group(func(r chi.Router) {
 					r.Use(middleware.RBAC("lifecycle_status:delete"))
 					r.Delete("/{id}", lifecycleStatusHandlers.DeleteLifecycleStatus)
+				})
+			})
+
+			// Amortization routes
+			r.Route("/amortization", func(r chi.Router) {
+				// Read access for most operations
+				r.Use(middleware.RBAC("amortization:read"))
+
+				// Configuration Items with amortization
+				r.Get("/configuration-items", amortizationHandlers.ListAmortizableCIs)
+				r.Get("/configuration-items/{ciId}", amortizationHandlers.GetAmortizationDetails)
+
+				// Ledger management
+				r.Get("/ledger", amortizationHandlers.GetLedgerEntries)
+				r.Get("/ledger/{entryId}", amortizationHandlers.GetLedgerEntry)
+
+				// Amortization runs
+				r.Get("/runs", amortizationHandlers.ListAmortizationRuns)
+				r.Get("/runs/{runId}", amortizationHandlers.GetAmortizationRun)
+
+				// Reports and summaries
+				r.Get("/summaries", amortizationHandlers.GetAmortizationSummaries)
+				r.Get("/reports/depreciation-schedule", amortizationHandlers.GenerateDepreciationSchedule)
+
+				// Routes requiring additional permissions
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("amortization:configure"))
+					r.Put("/configuration-items/{ciId}", amortizationHandlers.UpdateAmortizationConfig)
+					r.Post("/adjustments", amortizationHandlers.CreateAdjustment)
+				})
+
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("amortization:run"))
+					r.Post("/runs", amortizationHandlers.TriggerManualRun)
 				})
 			})
 

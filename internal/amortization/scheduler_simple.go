@@ -1,0 +1,413 @@
+package amortization
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+)
+
+// Helper function to create string pointer
+func stringPtr(s string) *string {
+	return &s
+}
+
+// schedulerSimple implements the SchedulerInterface
+type schedulerSimple struct {
+	repo   Repository
+	logger *pustakaLogger.Logger
+}
+
+// NewScheduler creates a new amortization scheduler
+func NewScheduler(repo Repository, cache CacheRepositoryInterface, logger *pustakaLogger.Logger) SchedulerInterface {
+	return &schedulerSimple{
+		repo:   repo,
+		logger: logger,
+	}
+}
+
+// ScheduleDailyRun schedules the daily amortization run
+func (s *schedulerSimple) ScheduleDailyRun(ctx context.Context) error {
+	s.logger.Info().Msg("Starting daily amortization scheduler")
+	return nil
+}
+
+// UnscheduleDailyRun stops the daily scheduling
+func (s *schedulerSimple) UnscheduleDailyRun() error {
+	s.logger.Info().Msg("Stopping daily amortization scheduler")
+	return nil
+}
+
+// ExecuteScheduledRun executes a scheduled amortization run
+func (s *schedulerSimple) ExecuteScheduledRun(ctx context.Context, processingDate time.Time) (*AmortizationRun, error) {
+	s.logger.Info().Time("processing_date", processingDate).Msg("Executing scheduled amortization run")
+
+	// Create amortization run
+	runID := uuid.New()
+	now := time.Now()
+	run := &AmortizationRun{
+		ID:                 runID,
+		Status:             "started",
+		ProcessingDate:     processingDate,
+		StartedAt:          &now,
+		TotalAmortizableCIs: 0,
+		IsManual:           false,
+		CreatedAt:          now,
+	}
+
+	// Save run to database
+	if err := s.repo.CreateAmortizationRun(ctx, run); err != nil {
+		return nil, fmt.Errorf("failed to create amortization run: %w", err)
+	}
+
+	// Get CIs to process
+	ciIDs, err := s.repo.GetCIsForProcessing(ctx, processingDate, 1000) // Process in batches of 1000
+	if err != nil {
+		return s.markRunFailed(ctx, run, fmt.Sprintf("Failed to get CIs for processing: %v", err))
+	}
+
+	run.TotalAmortizableCIs = len(ciIDs)
+	totalDepreciation := 0.0
+	processed := 0
+	failed := 0
+	skipped := 0
+
+	// Process each CI
+	for _, ciID := range ciIDs {
+		result, err := s.processCIForAmortization(ctx, ciID, processingDate, run.ID, false)
+		if err != nil {
+			failed++
+			s.logger.Warn().Err(err).Str("ci_id", ciID.String()).Msg("Failed to process CI for amortization")
+			continue
+		}
+
+		switch result.Status {
+		case "processed":
+			processed++
+			if result.DepreciationAmount > 0 {
+				totalDepreciation += result.DepreciationAmount
+			}
+		case "skipped":
+			skipped++
+		case "failed":
+			failed++
+		}
+	}
+
+	// Complete the run
+	completedAt := time.Now()
+	status := "completed"
+	if failed > 0 {
+		status = "partial"
+	}
+
+	updates := &AmortizationRunUpdates{
+		Status:            &status,
+		CompletedAt:       &completedAt,
+		ProcessedCIs:      &processed,
+		FailedCIs:         &failed,
+		SkippedCIs:        &skipped,
+		TotalDepreciation: &totalDepreciation,
+	}
+
+	if err := s.repo.UpdateAmortizationRun(ctx, runID, updates); err != nil {
+		s.logger.Warn().Err(err).Str("run_id", runID.String()).Msg("Failed to update run completion status")
+	}
+
+	// Get updated run
+	completedRun, err := s.repo.GetAmortizationRun(ctx, runID)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("run_id", runID.String()).Msg("Failed to get completed run")
+		return run, nil // Return the original run if we can't get the updated one
+	}
+
+	s.logger.Info().
+		Str("run_id", runID.String()).
+		Time("processing_date", processingDate).
+		Int("total_cis", run.TotalAmortizableCIs).
+		Int("processed", processed).
+		Int("failed", failed).
+		Int("skipped", skipped).
+		Float64("total_depreciation", totalDepreciation).
+		Msg("Completed scheduled amortization run")
+
+	return completedRun, nil
+}
+
+// ExecuteManualRun executes a manual amortization run
+func (s *schedulerSimple) ExecuteManualRun(ctx context.Context, req *ManualRunRequest, userID uuid.UUID) (*AmortizationRun, error) {
+	s.logger.Info().
+		Str("user_id", userID.String()).
+		Bool("dry_run", req.DryRun).
+		Msg("Executing manual amortization run")
+
+	// Determine processing date
+	processingDate := time.Now()
+	if req.DateOverride != nil {
+		processingDate = *req.DateOverride
+	}
+
+	// Create manual run
+	runID := uuid.New()
+	now := time.Now()
+	run := &AmortizationRun{
+		ID:                 runID,
+		Status:             "started",
+		ProcessingDate:     processingDate,
+		StartedAt:          &now,
+		TotalAmortizableCIs: 0,
+		IsManual:           true,
+		DryRun:             req.DryRun,
+		TriggeredBy:        &userID,
+		CreatedAt:          now,
+	}
+
+	// Save run to database
+	if err := s.repo.CreateAmortizationRun(ctx, run); err != nil {
+		return nil, fmt.Errorf("failed to create manual amortization run: %w", err)
+	}
+
+	// If specific CIs are provided, process only those
+	ciIDs := req.CIIDs
+	if len(ciIDs) == 0 {
+		// Get all CIs to process
+		var err error
+		ciIDs, err = s.repo.GetCIsForProcessing(ctx, processingDate, 1000)
+		if err != nil {
+			return s.markRunFailed(ctx, run, fmt.Sprintf("Failed to get CIs for processing: %v", err))
+		}
+	}
+
+	run.TotalAmortizableCIs = len(ciIDs)
+	totalDepreciation := 0.0
+	processed := 0
+	failed := 0
+	skipped := 0
+
+	// Process each CI
+	for _, ciID := range ciIDs {
+		result, err := s.processCIForAmortization(ctx, ciID, processingDate, runID, req.DryRun)
+		if err != nil {
+			failed++
+			s.logger.Warn().Err(err).Str("ci_id", ciID.String()).Msg("Failed to process CI for amortization")
+			continue
+		}
+
+		switch result.Status {
+		case "processed":
+			processed++
+			if result.DepreciationAmount > 0 {
+				totalDepreciation += result.DepreciationAmount
+			}
+		case "skipped":
+			skipped++
+		case "failed":
+			failed++
+		}
+	}
+
+	// Complete the run
+	completedAt := time.Now()
+	status := "completed"
+	if failed > 0 {
+		status = "partial"
+	}
+
+	updates := &AmortizationRunUpdates{
+		Status:            &status,
+		CompletedAt:       &completedAt,
+		ProcessedCIs:      &processed,
+		FailedCIs:         &failed,
+		SkippedCIs:        &skipped,
+		TotalDepreciation: &totalDepreciation,
+	}
+
+	if err := s.repo.UpdateAmortizationRun(ctx, runID, updates); err != nil {
+		s.logger.Warn().Err(err).Str("run_id", runID.String()).Msg("Failed to update run completion status")
+	}
+
+	// Get updated run
+	completedRun, err := s.repo.GetAmortizationRun(ctx, runID)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("run_id", runID.String()).Msg("Failed to get completed run")
+		return run, nil
+	}
+
+	s.logger.Info().
+		Str("run_id", runID.String()).
+		Str("user_id", userID.String()).
+		Bool("dry_run", req.DryRun).
+		Time("processing_date", processingDate).
+		Int("total_cis", run.TotalAmortizableCIs).
+		Int("processed", processed).
+		Int("failed", failed).
+		Int("skipped", skipped).
+		Float64("total_depreciation", totalDepreciation).
+		Msg("Completed manual amortization run")
+
+	return completedRun, nil
+}
+
+// Helper methods
+
+func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uuid.UUID, processingDate time.Time, runID uuid.UUID, dryRun bool) (*ProcessingResult, error) {
+	// Get CI
+	ci, err := s.repo.GetAmortizableCI(ctx, ciID)
+	if err != nil {
+		return &ProcessingResult{
+			CIID:        ciID,
+			Status:      "failed",
+			ErrorMessage: stringPtr(fmt.Sprintf("Failed to get CI: %v", err)),
+			ProcessedAt:  time.Now(),
+		}, nil
+	}
+
+	// Check if CI should be processed
+	if !s.shouldProcessCI(ci, processingDate) {
+		return &ProcessingResult{
+			CIID:        ciID,
+			Status:      "skipped",
+			ProcessedAt: time.Now(),
+		}, nil
+	}
+
+	// Calculate depreciation
+	calculation, err := s.calculateDepreciation(ci, processingDate)
+	if err != nil {
+		return &ProcessingResult{
+			CIID:        ciID,
+			Status:      "failed",
+			ErrorMessage: stringPtr(fmt.Sprintf("Calculation failed: %v", err)),
+			ProcessedAt:  time.Now(),
+		}, nil
+	}
+
+	// If this is a dry run, just return the calculation
+	if dryRun {
+		return &ProcessingResult{
+			CIID:              ciID,
+			Status:            "processed",
+			DepreciationAmount: calculation.Amount,
+			ProcessedAt:       time.Now(),
+		}, nil
+	}
+
+	// Create ledger entry (skip if dry run)
+	entry := &LedgerEntry{
+		ID:                         uuid.New(),
+		CIID:                       ciID,
+		EntryType:                  "monthly_depreciation",
+		EntryDate:                  processingDate,
+		Amount:                     calculation.Amount,
+		BookValueBefore:            calculation.BookValueBefore,
+		BookValueAfter:             calculation.BookValueAfter,
+		AccumulatedDepreciationBefore: calculation.AccumulatedDepreciationBefore,
+		AccumulatedDepreciationAfter:  calculation.AccumulatedDepreciationAfter,
+		AmortizationRunID:          &runID,
+		CreatedAt:                  time.Now(),
+		CreatedBy:                  &uuid.UUID{}, // System generated
+	}
+
+	if err := s.repo.CreateLedgerEntry(ctx, entry); err != nil {
+		return &ProcessingResult{
+			CIID:        ciID,
+			Status:      "failed",
+			ErrorMessage: stringPtr(fmt.Sprintf("Failed to create ledger entry: %v", err)),
+			ProcessedAt:  time.Now(),
+		}, nil
+	}
+
+	// Update CI book value
+	updates := &AmortizationConfigUpdates{
+		CurrentBookValue:           &calculation.BookValueAfter,
+		AccumulatedDepreciation:    &calculation.AccumulatedDepreciationAfter,
+		UpdatedBy:                 &uuid.UUID{}, // System generated
+		UpdatedAt:                 func(t time.Time) *time.Time { return &t }(time.Now()),
+	}
+
+	if err := s.repo.UpdateAmortizationConfig(ctx, ciID, updates); err != nil {
+		s.logger.Warn().Err(err).Str("ci_id", ciID.String()).Msg("Failed to update CI book value after depreciation")
+	}
+
+	return &ProcessingResult{
+		CIID:              ciID,
+		Status:            "processed",
+		DepreciationAmount: calculation.Amount,
+		ProcessedAt:       time.Now(),
+	}, nil
+}
+
+func (s *schedulerSimple) shouldProcessCI(ci *AmortizableCI, processingDate time.Time) bool {
+	// Check if amortization has started
+	if ci.AmortStartDate == nil || processingDate.Before(*ci.AmortStartDate) {
+		return false
+	}
+
+	// Check if CI has remaining book value
+	if ci.CurrentBookValue <= ci.SalvageValue {
+		return false
+	}
+
+	// Check amortization behavior
+	if ci.LifecycleStatus != nil {
+		switch ci.LifecycleStatus.AmortizationBehavior {
+		case "pending", "terminal":
+			return false
+		case "active":
+			return true
+		}
+	}
+
+	// Default to processing if behavior is not explicitly set
+	return true
+}
+
+func (s *schedulerSimple) calculateDepreciation(ci *AmortizableCI, processingDate time.Time) (*DepreciationCalculation, error) {
+	// Simplified calculation - monthly depreciation
+	if ci.UsefulLifeMonths <= 0 {
+		return nil, fmt.Errorf("invalid useful life months")
+	}
+
+	monthlyDepreciation := (ci.PurchaseCost - ci.SalvageValue) / float64(ci.UsefulLifeMonths)
+
+	bookValueAfter := ci.CurrentBookValue - monthlyDepreciation
+	if bookValueAfter < ci.SalvageValue {
+		monthlyDepreciation = ci.CurrentBookValue - ci.SalvageValue
+		bookValueAfter = ci.SalvageValue
+	}
+
+	return &DepreciationCalculation{
+		Amount:                     monthlyDepreciation,
+		BookValueBefore:            ci.CurrentBookValue,
+		BookValueAfter:             bookValueAfter,
+		AccumulatedDepreciationBefore: ci.AccumulatedDepreciation,
+		AccumulatedDepreciationAfter:  ci.AccumulatedDepreciation + monthlyDepreciation,
+		CalculationDate:            processingDate,
+	}, nil
+}
+
+func (s *schedulerSimple) markRunFailed(ctx context.Context, run *AmortizationRun, errorMessage string) (*AmortizationRun, error) {
+	status := "failed"
+	completedAt := time.Now()
+
+	updates := &AmortizationRunUpdates{
+		Status:       &status,
+		CompletedAt:  &completedAt,
+		ErrorSummary: &errorMessage,
+	}
+
+	if err := s.repo.UpdateAmortizationRun(ctx, run.ID, updates); err != nil {
+		return nil, fmt.Errorf("failed to mark run as failed: %w", err)
+	}
+
+	// Get updated run
+	failedRun, err := s.repo.GetAmortizationRun(ctx, run.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get failed run: %w", err)
+	}
+
+	return failedRun, nil
+}
+

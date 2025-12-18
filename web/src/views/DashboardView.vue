@@ -37,7 +37,7 @@
     </div>
 
     <!-- Stats cards -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-5">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6 mb-5">
       <DashboardWidget
         title="Total CIs"
         :loading="loadingState.stats"
@@ -126,6 +126,39 @@
               <dt class="text-sm font-medium text-gray-500 truncate">Active Users</dt>
               <dd class="text-2xl font-bold text-gray-900">{{ stats?.total_users || 0 }}</dd>
             </dl>
+          </div>
+        </div>
+      </DashboardWidget>
+
+      <!-- Amortization Widget -->
+      <DashboardWidget
+        v-if="hasAnyPermission(['amortization:read'])"
+        title="Amortizable Assets"
+        :loading="loadingState.amortizationMetrics"
+        :error="errorState.amortizationMetrics"
+        @retry="loadAmortizationMetrics"
+      >
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div class="w-7 h-7 bg-indigo-500 rounded-md flex items-center justify-center">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Amortizable Assets</dt>
+              <dd class="text-2xl font-bold text-gray-900">{{ amortizationMetrics?.total_amortizable_assets || 0 }}</dd>
+            </dl>
+          </div>
+        </div>
+        <div class="mt-3 pt-3 border-t border-gray-100">
+          <div class="flex items-center text-sm">
+            <span class="text-gray-500">Monthly Depreciation:</span>
+            <span class="ml-2 font-medium text-gray-900">
+              {{ formatCurrency(amortizationMetrics?.monthly_depreciation || 0) }}
+            </span>
           </div>
         </div>
       </DashboardWidget>
@@ -367,6 +400,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLifecycleStatusStore } from '@/stores/lifecycleStatus'
+import { useAmortizationStore } from '@/stores/amortization'
 import { useDashboardData } from '@/composables/useDashboardData'
 import TimeRangeFilter from '@/components/dashboard/TimeRangeFilter.vue'
 import DashboardWidget from '@/components/dashboard/DashboardWidget.vue'
@@ -380,9 +414,11 @@ import type { MostConnectedCI } from '@/types/dashboard'
 const router = useRouter()
 const authStore = useAuthStore()
 const lifecycleStatusStore = useLifecycleStatusStore()
+const amortizationStore = useAmortizationStore()
 
 const user = computed(() => authStore.user)
 const ciStatusDistribution = ref<Array<any>>([])
+const amortizationMetrics = ref<any>(null)
 
 // Use dashboard data composable
 const {
@@ -404,8 +440,23 @@ const {
 loadingState.value.ciStatusDistribution = ref(false)
 errorState.value.ciStatusDistribution = ref(null)
 
+// Add amortization metrics to loading states
+loadingState.value.amortizationMetrics = ref(false)
+errorState.value.amortizationMetrics = ref(null)
+
 const hasPermission = (permission: string) => {
   return authStore.hasPermission(permission)
+}
+
+const hasAnyPermission = (permissions: string[]) => {
+  return authStore.hasAnyPermission(permissions)
+}
+
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format(amount)
 }
 
 const loadCIStatusDistribution = async () => {
@@ -420,6 +471,21 @@ const loadCIStatusDistribution = async () => {
     errorState.value.ciStatusDistribution = error
   } finally {
     loadingState.value.ciStatusDistribution = false
+  }
+}
+
+const loadAmortizationMetrics = async () => {
+  loadingState.value.amortizationMetrics = true
+  try {
+    const response = await amortizationStore.loadMetrics()
+    amortizationMetrics.value = response.data
+    errorState.value.amortizationMetrics = null
+  } catch (error) {
+    console.error('Failed to load amortization metrics:', error)
+    amortizationMetrics.value = null
+    errorState.value.amortizationMetrics = error
+  } finally {
+    loadingState.value.amortizationMetrics = false
   }
 }
 
@@ -511,7 +577,8 @@ const handleDayClick = (date: string, count: number) => {
 onMounted(async () => {
   await Promise.all([
     fetchAllData(),
-    loadCIStatusDistribution()
+    loadCIStatusDistribution(),
+    loadAmortizationMetrics()
   ])
 })
 </script>

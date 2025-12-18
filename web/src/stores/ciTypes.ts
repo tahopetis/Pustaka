@@ -21,6 +21,7 @@ export interface CIType {
   id: string
   name: string
   description?: string
+  is_amortizable: boolean
   required_attributes: AttributeDefinition[]
   optional_attributes: AttributeDefinition[]
   created_by: string
@@ -44,12 +45,14 @@ export interface CITypeUsage {
 export interface CreateCITypeRequest {
   name: string
   description?: string
+  is_amortizable?: boolean
   required_attributes: AttributeDefinition[]
   optional_attributes: AttributeDefinition[]
 }
 
 export interface UpdateCITypeRequest {
   description?: string
+  is_amortizable?: boolean
   required_attributes?: AttributeDefinition[]
   optional_attributes?: AttributeDefinition[]
 }
@@ -156,6 +159,9 @@ export const useCITypesStore = defineStore('ciTypes', () => {
       const updateData: any = {}
       if (data.description !== undefined) {
         updateData.description = data.description
+      }
+      if (data.is_amortizable !== undefined) {
+        updateData.is_amortizable = data.is_amortizable
       }
       if (data.required_attributes !== undefined) {
         updateData.required_attributes = data.required_attributes

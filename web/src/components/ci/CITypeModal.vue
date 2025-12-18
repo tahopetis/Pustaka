@@ -46,6 +46,20 @@
                 rows="3"
               />
             </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                <input
+                  type="checkbox"
+                  v-model="form.is_amortizable"
+                  class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span class="ml-2">Is Amortizable</span>
+              </label>
+              <p class="text-xs text-gray-500 mt-1">
+                Enable amortization tracking for assets of this type
+              </p>
+            </div>
           </div>
 
           <!-- Schema Preview -->
@@ -173,6 +187,7 @@ interface CITypeForm {
   id?: string
   name: string
   description?: string
+  is_amortizable: boolean
   required_attributes: AttributeDefinition[]
   optional_attributes: AttributeDefinition[]
 }
@@ -194,6 +209,7 @@ const isSubmitting = ref(false)
 const form = ref<CITypeForm>({
   name: '',
   description: '',
+  is_amortizable: false,
   required_attributes: [],
   optional_attributes: []
 })
@@ -203,6 +219,7 @@ const resetForm = () => {
   form.value = {
     name: '',
     description: '',
+    is_amortizable: false,
     required_attributes: [],
     optional_attributes: []
   }
@@ -215,6 +232,7 @@ watch(() => props.ciType, (ciType) => {
       id: ciType.id,
       name: ciType.name,
       description: ciType.description || '',
+      is_amortizable: ciType.is_amortizable || false,
       required_attributes: [...ciType.required_attributes],
       optional_attributes: [...ciType.optional_attributes]
     }
@@ -227,6 +245,7 @@ const schemaPreview = computed(() => {
   return JSON.stringify({
     name: form.value.name,
     description: form.value.description,
+    is_amortizable: form.value.is_amortizable,
     required_attributes: form.value.required_attributes,
     optional_attributes: form.value.optional_attributes
   }, null, 2)
@@ -343,6 +362,7 @@ const handleSubmit = async () => {
     // Clean and prepare the data
     const cleanedData = {
       description: form.value.description?.trim() || undefined,
+      is_amortizable: form.value.is_amortizable,
       required_attributes: cleanAttributeData(form.value.required_attributes),
       optional_attributes: cleanAttributeData(form.value.optional_attributes)
     }

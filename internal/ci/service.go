@@ -261,6 +261,7 @@ func (s *Service) CreateCIType(ctx context.Context, req *CreateCITypeRequest, us
 	ciType := &CITypeDefinition{
 		Name:                req.Name,
 		Description:         req.Description,
+		IsAmortizable:       req.IsAmortizable,
 		RequiredAttributes: req.RequiredAttributes,
 		OptionalAttributes: req.OptionalAttributes,
 		CreatedBy:           userID,

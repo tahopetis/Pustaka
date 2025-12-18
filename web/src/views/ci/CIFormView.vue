@@ -179,6 +179,88 @@
           </div>
         </div>
 
+        <!-- Financials - Only for amortizable CI types -->
+        <div v-if="selectedCIType && selectedCIType.is_amortizable" class="card">
+          <div class="card-header">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Financial Information</h3>
+            <p class="mt-1 text-sm text-gray-500">
+              Configure amortization and depreciation settings for this {{ selectedCIType.name }}
+            </p>
+          </div>
+          <div class="card-body">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="form-label">Purchase Cost</label>
+                <input
+                  v-model="form.financials.purchase_cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="form-input"
+                  placeholder="0.00"
+                  :disabled="loading"
+                >
+                <p class="text-xs text-gray-500 mt-1">Initial purchase cost of the asset</p>
+              </div>
+              <div>
+                <label class="form-label">Salvage Value</label>
+                <input
+                  v-model="form.financials.salvage_value"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="form-input"
+                  placeholder="0.00"
+                  :disabled="loading"
+                >
+                <p class="text-xs text-gray-500 mt-1">Expected value at end of useful life</p>
+              </div>
+              <div>
+                <label class="form-label">Amortization Start Date</label>
+                <input
+                  v-model="form.financials.amort_start_date"
+                  type="date"
+                  class="form-input"
+                  :disabled="loading"
+                >
+                <p class="text-xs text-gray-500 mt-1">Date when depreciation calculation begins</p>
+              </div>
+              <div>
+                <label class="form-label">Useful Life (months)</label>
+                <input
+                  v-model.number="form.financials.useful_life_months"
+                  type="number"
+                  min="1"
+                  max="600"
+                  class="form-input"
+                  placeholder="60"
+                  :disabled="loading"
+                >
+                <p class="text-xs text-gray-500 mt-1">Expected useful life in months (1-600)</p>
+              </div>
+            </div>
+
+            <!-- Calculated Values Display -->
+            <div v-if="form.financials.purchase_cost && form.financials.useful_life_months" class="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h4 class="text-sm font-medium text-gray-900 mb-3">Calculated Values</h4>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span class="text-gray-500">Monthly Depreciation:</span>
+                  <div class="font-medium text-gray-900">{{ formatCurrency(calculateMonthlyDepreciation()) }}</div>
+                </div>
+                <div>
+                  <span class="text-gray-500">Current Book Value:</span>
+                  <div class="font-medium text-gray-900">{{ formatCurrency(form.financials.current_book_value || calculateCurrentBookValue()) }}</div>
+                </div>
+                <div>
+                  <span class="text-gray-500">Remaining Months:</span>
+                  <div class="font-medium text-gray-900">{{ calculateRemainingMonths() }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Actions -->
         <div class="flex justify-end space-x-3">
           <router-link
@@ -205,6 +287,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLifecycleStatusStore } from '@/stores/lifecycleStatus'
+import { useAmortizationStore } from '@/stores/amortization'
 import { ciAPI, ciTypeAPI } from '@/services/api'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import DynamicAttributeField from '@/components/ci/DynamicAttributeField.vue'
@@ -215,6 +298,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const lifecycleStatusStore = useLifecycleStatusStore()
+const amortizationStore = useAmortizationStore()
 
 const loading = ref(false)
 const ciTypes = ref<CIType[]>([])
@@ -229,6 +313,13 @@ const form = reactive({
   attributes: {} as Record<string, any>,
   tags: [] as string[],
   lifecycle_status_id: '',
+  financials: {
+    purchase_cost: null as number | null,
+    salvage_value: null as number | null,
+    amort_start_date: '' as string,
+    useful_life_months: null as number | null,
+    current_book_value: null as number | null,
+  },
 })
 
 const activeLifecycleStatuses = computed(() => lifecycleStatusStore.activeLifecycleStatuses)
@@ -317,6 +408,50 @@ const removeTag = (index: number) => {
   form.tags.splice(index, 1)
 }
 
+// Financial calculation functions
+const formatCurrency = (amount: number | null): string => {
+  if (amount === null || amount === undefined) return '$0.00'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount)
+}
+
+const calculateMonthlyDepreciation = (): number => {
+  if (!form.financials.purchase_cost || !form.financials.useful_life_months) return 0
+  const depreciableAmount = form.financials.purchase_cost - (form.financials.salvage_value || 0)
+  return depreciableAmount / form.financials.useful_life_months
+}
+
+const calculateCurrentBookValue = (): number => {
+  if (!form.financials.purchase_cost || !form.financials.amort_start_date) return 0
+
+  const monthlyDepreciation = calculateMonthlyDepreciation()
+  const startDate = new Date(form.financials.amort_start_date)
+  const currentDate = new Date()
+
+  const monthsPassed = Math.max(0,
+    Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
+  )
+
+  const totalDepreciation = Math.min(
+    monthsPassed * monthlyDepreciation,
+    form.financials.purchase_cost - (form.financials.salvage_value || 0)
+  )
+
+  return form.financials.purchase_cost - totalDepreciation
+}
+
+const calculateRemainingMonths = (): number => {
+  if (!form.financials.useful_life_months || !form.financials.amort_start_date) return 0
+
+  const startDate = new Date(form.financials.amort_start_date)
+  const currentDate = new Date()
+  const monthsPassed = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
+
+  return Math.max(0, form.financials.useful_life_months - monthsPassed)
+}
+
 const loadCITypes = async () => {
   try {
     const response = await ciTypeAPI.list()
@@ -343,6 +478,23 @@ const loadCI = async () => {
 
     // Wait for CI type to be loaded and set up validation
     await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Load financial data if this is an amortizable CI type (after CI type is resolved)
+    if (selectedCIType.value && selectedCIType.value.is_amortizable) {
+      try {
+        const financialResponse = await amortizationStore.loadAssetFinancials(existingCI.value.id)
+        if (financialResponse.data) {
+          form.financials.purchase_cost = financialResponse.data.purchase_cost || null
+          form.financials.salvage_value = financialResponse.data.salvage_value || null
+          form.financials.amort_start_date = financialResponse.data.amort_start_date || ''
+          form.financials.useful_life_months = financialResponse.data.useful_life_months || null
+          form.financials.current_book_value = financialResponse.data.current_book_value || null
+        }
+      } catch (error) {
+        console.error('Failed to load financial data:', error)
+        // Don't fail the entire form load if financial data fails
+      }
+    }
 
     // Initialize validation for loaded CI
     if (selectedCIType.value) {
@@ -388,9 +540,60 @@ const handleSubmit = async () => {
         tags: data.tags,
         lifecycle_status_id: data.lifecycle_status_id,
       } as UpdateCIData)
+
+      // Update financial data if CI type is amortizable and financial data is provided
+      if (selectedCIType.value && selectedCIType.value.is_amortizable) {
+        const financialData = {
+          purchase_cost: form.financials.purchase_cost,
+          salvage_value: form.financials.salvage_value,
+          amort_start_date: form.financials.amort_start_date || undefined,
+          useful_life_months: form.financials.useful_life_months,
+        }
+
+        // Only send financial data that has values
+        const hasFinancialData = Object.values(financialData).some(val => val !== null && val !== '' && val !== undefined)
+
+        if (hasFinancialData) {
+          try {
+            const existingFinancials = await amortizationStore.loadAssetFinancials(route.params.id as string)
+            if (existingFinancials.data) {
+              await amortizationStore.updateAssetFinancials(route.params.id as string, financialData)
+            } else {
+              await amortizationStore.createAssetFinancials(route.params.id as string, financialData)
+            }
+          } catch (error) {
+            console.error('Failed to save financial data:', error)
+            showErrorToast('Configuration item updated but financial data failed to save')
+          }
+        }
+      }
+
       showSuccessToast('Configuration item updated successfully')
     } else {
-      await ciAPI.create(data as CreateCIData)
+      const createResponse = await ciAPI.create(data as CreateCIData)
+
+      // Save financial data if CI type is amortizable and financial data is provided
+      if (selectedCIType.value && selectedCIType.value.is_amortizable) {
+        const financialData = {
+          purchase_cost: form.financials.purchase_cost,
+          salvage_value: form.financials.salvage_value,
+          amort_start_date: form.financials.amort_start_date || undefined,
+          useful_life_months: form.financials.useful_life_months,
+        }
+
+        // Only send financial data that has values
+        const hasFinancialData = Object.values(financialData).some(val => val !== null && val !== '' && val !== undefined)
+
+        if (hasFinancialData) {
+          try {
+            await amortizationStore.createAssetFinancials(createResponse.data.id, financialData)
+          } catch (error) {
+            console.error('Failed to save financial data:', error)
+            showErrorToast('Configuration item created but financial data failed to save')
+          }
+        }
+      }
+
       showSuccessToast('Configuration item created successfully')
     }
 
@@ -403,6 +606,26 @@ const handleSubmit = async () => {
     loading.value = false
   }
 }
+
+// Watch for changes in CI type to handle financial fields visibility
+watch(() => selectedCIType.value, (newType) => {
+  if (newType && newType.is_amortizable && isEdit.value && existingCI.value) {
+    // Load financial data when switching to an amortizable CI type
+    amortizationStore.loadAssetFinancials(existingCI.value.id)
+      .then(response => {
+        if (response.data) {
+          form.financials.purchase_cost = response.data.purchase_cost || null
+          form.financials.salvage_value = response.data.salvage_value || null
+          form.financials.amort_start_date = response.data.amort_start_date || ''
+          form.financials.useful_life_months = response.data.useful_life_months || null
+          form.financials.current_book_value = response.data.current_book_value || null
+        }
+      })
+      .catch(error => {
+        console.error('Failed to load financial data:', error)
+      })
+  }
+}, { immediate: true })
 
 onMounted(async () => {
   await Promise.all([
