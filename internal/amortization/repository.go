@@ -592,19 +592,21 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 	// Main query
 	query := fmt.Sprintf(`
 		SELECT
-			id,
-			ci_id,
-			entry_type,
-			entry_date,
-			amount,
-			book_value_before,
-			book_value_after,
-			accumulated_depreciation,
-			description,
-			amortization_run_id,
-			created_at,
-			created_by
-		FROM amortization_ledger
+			ale.id,
+			ale.ci_id,
+			ci.name as ci_name,
+			ale.entry_type,
+			ale.entry_date,
+			ale.amount,
+			ale.book_value_before,
+			ale.book_value_after,
+			ale.accumulated_depreciation,
+			ale.description,
+			ale.amortization_run_id,
+			ale.created_at,
+			ale.created_by
+		FROM amortization_ledger ale
+		JOIN configuration_items ci ON ale.ci_id = ci.id
 		%s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
@@ -630,6 +632,7 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 		err := rows.Scan(
 			&entry.ID,
 			&entry.CIID,
+			&entry.CIName,
 			&entry.EntryType,
 			&entry.EntryDate,
 			&entry.Amount,

@@ -46,6 +46,7 @@ type AmortizableCI struct {
 type AmortizationEntry struct {
 	ID                       uuid.UUID  `json:"id"`
 	CIID                     uuid.UUID  `json:"ci_id"`
+	CIName                   string     `json:"ci_name"`
 	AmortizationRunID        *uuid.UUID `json:"amortization_run_id,omitempty"`
 	EntryType                string     `json:"entry_type"` // "depreciation", "adjustment", "write_off", "reversal"
 	EntryDate                time.Time  `json:"entry_date"`
