@@ -54,7 +54,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
     clearError()
     try {
       const response = await amortizationApi.getSettings()
-      settings.value = response.data
+      settings.value = response
       return response
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load amortization settings')
@@ -69,7 +69,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
     clearError()
     try {
       const response = await amortizationApi.updateSettings(settingsData)
-      settings.value = response.data
+      settings.value = response
       return response
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to update amortization settings')
@@ -130,10 +130,20 @@ export const useAmortizationStore = defineStore('amortization', () => {
     setLoading(true)
     clearError()
     try {
+      console.log('Loading asset summaries with filters:', filters)
       const response = await amortizationApi.getAssetSummaries(filters)
-      assets.value = response.data.data
+      console.log('Asset summaries response:', response)
+
+      if (!response) {
+        throw new Error('Invalid response from API')
+      }
+
+      // The backend returns AmortizationCIList structure directly
+      assets.value = response.cis || []
+
       return response
     } catch (err: any) {
+      console.error('Error loading asset summaries:', err)
       setError(err.response?.data?.message || 'Failed to load asset summaries')
       throw err
     } finally {
@@ -146,7 +156,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
     clearError()
     try {
       const response = await amortizationApi.getAssetSummary()
-      metrics.value = response.data
+      metrics.value = response
       return response
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load amortization metrics')
@@ -162,7 +172,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
     clearError()
     try {
       const response = await amortizationApi.getLedgerEntries(filters)
-      ledgerEntries.value = response.data.data
+      ledgerEntries.value = response.data
       return response
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load ledger entries')
@@ -208,7 +218,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
     clearError()
     try {
       const response = await amortizationApi.getSchedulerStatus()
-      schedulerStatus.value = response.data
+      schedulerStatus.value = response
       return response
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load scheduler status')

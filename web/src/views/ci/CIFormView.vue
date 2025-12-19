@@ -191,28 +191,34 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label class="form-label">Purchase Cost</label>
-                <input
-                  v-model="form.financials.purchase_cost"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="form-input"
-                  placeholder="0.00"
-                  :disabled="loading"
-                >
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
+                  <input
+                    v-model="rawCurrencyInputs.purchase_cost"
+                    @input="handleCurrencyInput('purchase_cost', $event)"
+                    @blur="handleCurrencyBlur('purchase_cost')"
+                    type="text"
+                    class="form-input pl-8"
+                    placeholder="1,000.00"
+                    :disabled="loading"
+                  >
+                </div>
                 <p class="text-xs text-gray-500 mt-1">Initial purchase cost of the asset</p>
               </div>
               <div>
                 <label class="form-label">Salvage Value</label>
-                <input
-                  v-model="form.financials.salvage_value"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="form-input"
-                  placeholder="0.00"
-                  :disabled="loading"
-                >
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
+                  <input
+                    v-model="rawCurrencyInputs.salvage_value"
+                    @input="handleCurrencyInput('salvage_value', $event)"
+                    @blur="handleCurrencyBlur('salvage_value')"
+                    type="text"
+                    class="form-input pl-8"
+                    placeholder="100.00"
+                    :disabled="loading"
+                  >
+                </div>
                 <p class="text-xs text-gray-500 mt-1">Expected value at end of useful life</p>
               </div>
               <div>
@@ -417,6 +423,51 @@ const formatCurrency = (amount: number | null): string => {
   }).format(amount)
 }
 
+// Store raw input values for smooth editing experience
+const rawCurrencyInputs = ref({
+  purchase_cost: '',
+  salvage_value: ''
+})
+
+// Format currency for display in input fields (without currency symbol)
+const formatCurrencyDisplay = (amount: number | null): string => {
+  if (amount === null || amount === undefined) return ''
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: true,
+  }).format(amount)
+}
+
+// Handle currency input - allow raw typing, only parse on blur
+const handleCurrencyInput = (field: 'purchase_cost' | 'salvage_value', event: Event) => {
+  const target = event.target as HTMLInputElement
+  const inputValue = target.value
+
+  // Update raw input for display
+  rawCurrencyInputs.value[field] = inputValue
+}
+
+// Format currency when leaving the field
+const handleCurrencyBlur = (field: 'purchase_cost' | 'salvage_value') => {
+  const rawValue = rawCurrencyInputs.value[field]
+
+  // Parse the raw input to numeric value
+  const numericValue = rawValue.replace(/[^0-9.]/g, '')
+  const parsedValue = numericValue ? parseFloat(numericValue) : null
+
+  // Update the form model
+  form.financials[field] = parsedValue
+
+  // Update the display with formatted value
+  if (parsedValue !== null && parsedValue !== undefined) {
+    rawCurrencyInputs.value[field] = formatCurrencyDisplay(parsedValue)
+  } else {
+    rawCurrencyInputs.value[field] = ''
+  }
+}
+
+
 const calculateMonthlyDepreciation = (): number => {
   if (!form.financials.purchase_cost || !form.financials.useful_life_months) return 0
   const depreciableAmount = form.financials.purchase_cost - (form.financials.salvage_value || 0)
@@ -483,12 +534,20 @@ const loadCI = async () => {
     if (selectedCIType.value && selectedCIType.value.is_amortizable) {
       try {
         const financialResponse = await amortizationStore.loadAssetFinancials(existingCI.value.id)
-        if (financialResponse.data) {
-          form.financials.purchase_cost = financialResponse.data.purchase_cost || null
-          form.financials.salvage_value = financialResponse.data.salvage_value || null
-          form.financials.amort_start_date = financialResponse.data.amort_start_date || ''
-          form.financials.useful_life_months = financialResponse.data.useful_life_months || null
-          form.financials.current_book_value = financialResponse.data.current_book_value || null
+        if (financialResponse) {
+          form.financials.purchase_cost = financialResponse.purchase_cost || null
+          form.financials.salvage_value = financialResponse.salvage_value || null
+          form.financials.amort_start_date = financialResponse.amort_start_date || ''
+          form.financials.useful_life_months = financialResponse.useful_life_months || null
+          form.financials.current_book_value = financialResponse.current_book_value || null
+
+          // Initialize raw currency inputs with formatted values
+          if (financialResponse.purchase_cost) {
+            rawCurrencyInputs.value.purchase_cost = formatCurrencyDisplay(financialResponse.purchase_cost)
+          }
+          if (financialResponse.salvage_value) {
+            rawCurrencyInputs.value.salvage_value = formatCurrencyDisplay(financialResponse.salvage_value)
+          }
         }
       } catch (error) {
         console.error('Failed to load financial data:', error)
@@ -556,7 +615,7 @@ const handleSubmit = async () => {
         if (hasFinancialData) {
           try {
             const existingFinancials = await amortizationStore.loadAssetFinancials(route.params.id as string)
-            if (existingFinancials.data) {
+            if (existingFinancials) {
               await amortizationStore.updateAssetFinancials(route.params.id as string, financialData)
             } else {
               await amortizationStore.createAssetFinancials(route.params.id as string, financialData)
@@ -613,21 +672,48 @@ watch(() => selectedCIType.value, (newType) => {
     // Load financial data when switching to an amortizable CI type
     amortizationStore.loadAssetFinancials(existingCI.value.id)
       .then(response => {
-        if (response.data) {
-          form.financials.purchase_cost = response.data.purchase_cost || null
-          form.financials.salvage_value = response.data.salvage_value || null
-          form.financials.amort_start_date = response.data.amort_start_date || ''
-          form.financials.useful_life_months = response.data.useful_life_months || null
-          form.financials.current_book_value = response.data.current_book_value || null
+        if (response) {
+          form.financials.purchase_cost = response.purchase_cost || null
+          form.financials.salvage_value = response.salvage_value || null
+          form.financials.amort_start_date = response.amort_start_date || ''
+          form.financials.useful_life_months = response.useful_life_months || null
+          form.financials.current_book_value = response.current_book_value || null
+
+          // Initialize raw currency inputs with formatted values
+          if (response.purchase_cost) {
+            rawCurrencyInputs.value.purchase_cost = formatCurrencyDisplay(response.purchase_cost)
+          }
+          if (response.salvage_value) {
+            rawCurrencyInputs.value.salvage_value = formatCurrencyDisplay(response.salvage_value)
+          }
         }
       })
       .catch(error => {
         console.error('Failed to load financial data:', error)
       })
+  } else {
+    // Clear financial data and raw inputs when switching to non-amortizable CI type
+    form.financials = {
+      purchase_cost: null,
+      salvage_value: null,
+      amort_start_date: '',
+      useful_life_months: null,
+      current_book_value: null
+    }
+    rawCurrencyInputs.value = {
+      purchase_cost: '',
+      salvage_value: ''
+    }
   }
 }, { immediate: true })
 
 onMounted(async () => {
+  // Initialize raw inputs as empty for create mode
+  rawCurrencyInputs.value = {
+    purchase_cost: '',
+    salvage_value: ''
+  }
+
   await Promise.all([
     loadCITypes(),
     lifecycleStatusStore.getActiveLifecycleStatuses()

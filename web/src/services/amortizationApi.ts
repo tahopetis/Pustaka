@@ -50,83 +50,97 @@ class AmortizationApiService {
   }
 
   // Settings Management
-  async getSettings(): Promise<ApiResponse<AmortizationSettings>> {
+  async getSettings(): Promise<AmortizationSettings> {
     const response = await this.api.get('/settings')
     return response.data
   }
 
-  async updateSettings(settings: Partial<AmortizationSettings>): Promise<ApiResponse<AmortizationSettings>> {
+  async updateSettings(settings: Partial<AmortizationSettings>): Promise<AmortizationSettings> {
     const response = await this.api.put('/settings', settings)
     return response.data
   }
 
   // Asset Financials Management
-  async getAssetFinancials(ciId: string): Promise<ApiResponse<AssetFinancials>> {
+  async getAssetFinancials(ciId: string): Promise<AssetFinancials> {
     const response = await this.api.get(`/configuration-items/${ciId}`)
     return response.data
   }
 
-  async updateAssetFinancials(ciId: string, financials: Partial<AssetFinancials>): Promise<ApiResponse<AssetFinancials>> {
-    const response = await this.api.put(`/configuration-items/${ciId}`, financials)
+  async updateAssetFinancials(ciId: string, financials: Partial<AssetFinancials>): Promise<AssetFinancials> {
+    // Convert to the format expected by the backend UpdateAmortizationConfig
+    const updateData = {
+      purchase_cost: financials.purchase_cost,
+      salvage_value: financials.salvage_value,
+      amort_start_date: financials.amort_start_date ? new Date(financials.amort_start_date) : undefined,
+      useful_life_months: financials.useful_life_months,
+    }
+    const response = await this.api.put(`/configuration-items/${ciId}`, updateData)
     return response.data
   }
 
-  async createAssetFinancials(ciId: string, financials: AssetFinancials): Promise<ApiResponse<AssetFinancials>> {
-    const response = await this.api.put(`/configuration-items/${ciId}`, financials)
+  async createAssetFinancials(ciId: string, financials: AssetFinancials): Promise<AssetFinancials> {
+    // Convert to the format expected by the backend UpdateAmortizationConfig
+    const updateData = {
+      purchase_cost: financials.purchase_cost,
+      salvage_value: financials.salvage_value,
+      amort_start_date: financials.amort_start_date ? new Date(financials.amort_start_date) : undefined,
+      useful_life_months: financials.useful_life_months,
+    }
+    const response = await this.api.put(`/configuration-items/${ciId}`, updateData)
     return response.data
   }
 
-  async getAssetSummaries(filters?: AssetFinancialsFilters): Promise<ApiResponse<PaginatedResponse<AssetSummary>>> {
+  async getAssetSummaries(filters?: AssetFinancialsFilters): Promise<PaginatedResponse<AssetSummary>> {
     const response = await this.api.get('/configuration-items', { params: filters })
     return response.data
   }
 
-  async getAssetSummary(): Promise<ApiResponse<AmortizationMetrics>> {
+  async getAssetSummary(): Promise<AmortizationMetrics> {
     const response = await this.api.get('/summaries')
     return response.data
   }
 
   // Ledger Management
-  async getLedgerEntries(filters?: AmortizationLedgerFilters): Promise<ApiResponse<PaginatedResponse<AmortizationLedgerEntry>>> {
+  async getLedgerEntries(filters?: AmortizationLedgerFilters): Promise<PaginatedResponse<AmortizationLedgerEntry>> {
     const response = await this.api.get('/ledger', { params: filters })
     return response.data
   }
 
-  async getLedgerEntry(entryId: string): Promise<ApiResponse<AmortizationLedgerEntry>> {
+  async getLedgerEntry(entryId: string): Promise<AmortizationLedgerEntry> {
     const response = await this.api.get(`/ledger/${entryId}`)
     return response.data
   }
 
   // Reports
-  async getJournalReport(filters?: AmortizationLedgerFilters): Promise<ApiResponse<PaginatedResponse<AmortizationLedgerEntry>>> {
+  async getJournalReport(filters?: AmortizationLedgerFilters): Promise<PaginatedResponse<AmortizationLedgerEntry>> {
     const response = await this.api.get('/reports/journal', { params: filters })
     return response.data
   }
 
   // Scheduler Management
-  async runScheduler(): Promise<ApiResponse<AmortizationRun>> {
+  async runScheduler(): Promise<AmortizationRun> {
     const response = await this.api.post('/scheduler/run')
     return response.data
   }
 
-  async getSchedulerStatus(): Promise<ApiResponse<SchedulerStatus>> {
+  async getSchedulerStatus(): Promise<SchedulerStatus> {
     const response = await this.api.get('/scheduler/status')
     return response.data
   }
 
-  async getSchedulerRuns(): Promise<ApiResponse<PaginatedResponse<AmortizationRun>>> {
+  async getSchedulerRuns(): Promise<PaginatedResponse<AmortizationRun>> {
     const response = await this.api.get('/scheduler/runs')
     return response.data
   }
 
   // Bulk Operations
-  async bulkUpdateFinancials(update: BulkFinancialsUpdate): Promise<ApiResponse<{ updated: number; failed: number }>> {
+  async bulkUpdateFinancials(update: BulkFinancialsUpdate): Promise<{ updated: number; failed: number }> {
     const response = await this.api.post('/bulk/financials', update)
     return response.data
   }
 
   // Adjustment Entries
-  async createAdjustment(ciId: string, adjustment: AdjustmentEntry): Promise<ApiResponse<AmortizationLedgerEntry>> {
+  async createAdjustment(ciId: string, adjustment: AdjustmentEntry): Promise<AmortizationLedgerEntry> {
     const response = await this.api.post('/adjustments', { ...adjustment, ci_id: ciId })
     return response.data
   }

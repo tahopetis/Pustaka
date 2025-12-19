@@ -130,6 +130,53 @@
             </div>
           </div>
 
+          <!-- Financial Information -->
+          <div v-if="isAmortizable" class="card">
+            <div class="card-header">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Financial Information</h3>
+            </div>
+            <div class="card-body">
+              <div v-if="loadingFinancial" class="text-center py-8">
+                <div class="spinner w-6 h-6 mx-auto mb-2"></div>
+                <p class="text-gray-500">Loading financial data...</p>
+              </div>
+              <div v-else-if="!financialData" class="text-center py-8">
+                <p class="text-gray-500">No financial data available</p>
+                <router-link
+                  v-if="hasPermission('ci:update')"
+                  :to="`/ci/${ci.id}/edit`"
+                  class="inline-block mt-2 btn btn-outline text-sm"
+                >
+                  Add Financial Data
+                </router-link>
+              </div>
+              <div v-else class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 class="font-medium text-gray-900">Purchase Cost</h4>
+                    <p class="text-lg text-gray-700">${{ financialData.purchase_cost?.toLocaleString() || '0' }}</p>
+                  </div>
+                  <div>
+                    <h4 class="font-medium text-gray-900">Salvage Value</h4>
+                    <p class="text-lg text-gray-700">${{ financialData.salvage_value?.toLocaleString() || '0' }}</p>
+                  </div>
+                  <div>
+                    <h4 class="font-medium text-gray-900">Current Book Value</h4>
+                    <p class="text-lg text-gray-700">${{ financialData.current_book_value?.toLocaleString() || '0' }}</p>
+                  </div>
+                  <div>
+                    <h4 class="font-medium text-gray-900">Useful Life</h4>
+                    <p class="text-lg text-gray-700">{{ financialData.useful_life_months || 0 }} months</p>
+                  </div>
+                </div>
+                <div v-if="financialData.amort_start_date" class="pt-2 border-t">
+                  <h4 class="font-medium text-gray-900">Amortization Start Date</h4>
+                  <p class="text-gray-700">{{ new Date(financialData.amort_start_date).toLocaleDateString() }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Relationships -->
           <div class="card">
             <div class="card-header">
@@ -232,27 +279,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ciAPI, relationshipAPI, ciTypeAPI } from '@/services/api'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import FlexibleAttributeDisplay from '@/components/ci/FlexibleAttributeDisplay.vue'
+import { useAmortizationStore } from '@/stores/amortization'
 import type { CI, Relationship, CIType } from '@/types/ci'
+import type { AssetFinancials } from '@/types/amortization'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const amortizationStore = useAmortizationStore()
 
 const loading = ref(false)
 const loadingRelationships = ref(false)
 const ci = ref<CI | null>(null)
 const ciType = ref<CIType | null>(null)
 const relationships = ref<Relationship[]>([])
+const financialData = ref<AssetFinancials | null>(null)
+const loadingFinancial = ref(false)
 
 const hasPermission = (permission: string) => {
   return authStore.hasPermission(permission)
 }
+
+const isAmortizable = computed(() => {
+  return ciType.value?.is_amortizable || false
+})
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString()
@@ -299,6 +355,22 @@ const loadCIType = async () => {
     ciType.value = ciTypes.find(type => type.name === ci.value.ci_type) || null
   } catch (error) {
     console.error('Failed to load CI type:', error)
+  }
+}
+
+const loadFinancialData = async () => {
+  if (!ci.value || !isAmortizable.value) return
+
+  loadingFinancial.value = true
+  try {
+    const response = await amortizationStore.loadAssetFinancials(ci.value.id)
+    financialData.value = response
+  } catch (error) {
+    console.error('Failed to load financial data:', error)
+    // Don't show error toast for missing financial data
+    financialData.value = null
+  } finally {
+    loadingFinancial.value = false
   }
 }
 
@@ -386,6 +458,7 @@ const confirmDelete = async () => {
 onMounted(async () => {
   await loadCI()
   await loadCIType()
+  await loadFinancialData()
   await loadRelationships()
 })
 </script>

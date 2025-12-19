@@ -38,11 +38,11 @@ func (r *repository) GetAmortizableCI(ctx context.Context, ciID uuid.UUID) (*Amo
 			ci.attributes,
 			ci.tags,
 			ci.lifecycle_status_id,
-			ci.purchase_cost,
-			ci.salvage_value,
+			COALESCE(ci.purchase_cost, 0) as purchase_cost,
+			COALESCE(ci.salvage_value, 0) as salvage_value,
 			ci.amort_start_date,
-			ci.useful_life_months,
-			ci.current_book_value,
+			COALESCE(ci.useful_life_months, 0) as useful_life_months,
+			COALESCE(ci.current_book_value, 0) as current_book_value,
 			COALESCE(ci.purchase_cost - COALESCE(ci.current_book_value, 0), 0) as accumulated_depreciation,
 			ci.created_at,
 			ci.updated_at,
@@ -271,15 +271,15 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 			ci.id,
 			ci.name,
 			ci.ci_type,
-			ci.ci_type as ci_type_id,
+			ctd.id as ci_type_id,
 			ci.attributes,
 			ci.tags,
 			ci.lifecycle_status_id,
-			ci.purchase_cost,
-			ci.salvage_value,
+			COALESCE(ci.purchase_cost, 0) as purchase_cost,
+			COALESCE(ci.salvage_value, 0) as salvage_value,
 			ci.amort_start_date,
-			ci.useful_life_months,
-			ci.current_book_value,
+			COALESCE(ci.useful_life_months, 0) as useful_life_months,
+			COALESCE(ci.current_book_value, 0) as current_book_value,
 			COALESCE(ci.purchase_cost - COALESCE(ci.current_book_value, 0), 0) as accumulated_depreciation,
 			ci.created_at,
 			ci.updated_at,
@@ -311,22 +311,21 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 	var cis []AmortizableCI
 	for rows.Next() {
 		var ci AmortizableCI
-		var attributesJSON []byte
-		var tagsJSON []byte
 		var lifecycleStatusName sql.NullString
 		var amortizationBehavior sql.NullString
+		var amortStartDate sql.NullTime
 
 		err := rows.Scan(
 			&ci.ID,
 			&ci.Name,
 			&ci.CIType,
 			&ci.CITypeID,
-			&attributesJSON,
-			&tagsJSON,
+			&ci.Attributes,
+			&ci.Tags,
 			&ci.LifecycleStatusID,
 			&ci.PurchaseCost,
 			&ci.SalvageValue,
-			&ci.AmortStartDate,
+			&amortStartDate,
 			&ci.UsefulLifeMonths,
 			&ci.CurrentBookValue,
 			&ci.AccumulatedDepreciation,
@@ -345,17 +344,9 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 			return nil, fmt.Errorf("failed to scan amortizable CI row: %w", err)
 		}
 
-		// Parse JSON fields
-		if len(attributesJSON) > 0 {
-			if err := parseJSON(attributesJSON, &ci.Attributes); err != nil {
-				r.logger.Warn().Err(err).Str("ci_id", ci.ID.String()).Msg("Failed to parse CI attributes")
-			}
-		}
-
-		if len(tagsJSON) > 0 {
-			if err := parseJSON(tagsJSON, &ci.Tags); err != nil {
-				r.logger.Warn().Err(err).Str("ci_id", ci.ID.String()).Msg("Failed to parse CI tags")
-			}
+		// Handle nullable amortization start date
+		if amortStartDate.Valid {
+			ci.AmortStartDate = &amortStartDate.Time
 		}
 
 		// Set lifecycle status if available
