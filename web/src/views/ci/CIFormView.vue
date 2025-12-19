@@ -537,7 +537,10 @@ const loadCI = async () => {
         if (financialResponse) {
           form.financials.purchase_cost = financialResponse.purchase_cost || null
           form.financials.salvage_value = financialResponse.salvage_value || null
-          form.financials.amort_start_date = financialResponse.amort_start_date || ''
+          // Format date for HTML date input (yyyy-MM-dd)
+          form.financials.amort_start_date = financialResponse.amort_start_date
+            ? new Date(financialResponse.amort_start_date).toISOString().split('T')[0]
+            : ''
           form.financials.useful_life_months = financialResponse.useful_life_months || null
           form.financials.current_book_value = financialResponse.current_book_value || null
 
@@ -675,7 +678,10 @@ watch(() => selectedCIType.value, (newType) => {
         if (response) {
           form.financials.purchase_cost = response.purchase_cost || null
           form.financials.salvage_value = response.salvage_value || null
-          form.financials.amort_start_date = response.amort_start_date || ''
+          // Format date for HTML date input (yyyy-MM-dd)
+          form.financials.amort_start_date = response.amort_start_date
+            ? new Date(response.amort_start_date).toISOString().split('T')[0]
+            : ''
           form.financials.useful_life_months = response.useful_life_months || null
           form.financials.current_book_value = response.current_book_value || null
 
