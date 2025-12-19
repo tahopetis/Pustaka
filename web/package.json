@@ -16,6 +16,7 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.1.0",
     "@headlessui/vue": "^1.7.19",
     "@heroicons/vue": "^2.0.18",
     "axios": "^1.6.0",

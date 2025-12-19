@@ -44,20 +44,18 @@ type AmortizableCI struct {
 
 // AmortizationEntry represents a single amortization ledger entry
 type AmortizationEntry struct {
-	ID                         uuid.UUID  `json:"id"`
-	CIID                       uuid.UUID  `json:"ci_id"`
-	EntryType                  string     `json:"entry_type"` // "monthly_depreciation", "adjustment", "write_off"
-	EntryDate                  time.Time  `json:"entry_date"`
-	Amount                     float64    `json:"amount"`
-	BookValueBefore            float64    `json:"book_value_before"`
-	BookValueAfter             float64    `json:"book_value_after"`
-	AccumulatedDepreciationBefore float64  `json:"accumulated_depreciation_before"`
-	AccumulatedDepreciationAfter  float64  `json:"accumulated_depreciation_after"`
-	Description                *string    `json:"description,omitempty"`
-	ReferenceID                *uuid.UUID `json:"reference_id,omitempty"` // For adjustments, write-offs, etc.
-	AmortizationRunID          *uuid.UUID `json:"amortization_run_id,omitempty"`
-	CreatedAt                  time.Time  `json:"created_at"`
-	CreatedBy                  *uuid.UUID `json:"created_by,omitempty"`
+	ID                       uuid.UUID  `json:"id"`
+	CIID                     uuid.UUID  `json:"ci_id"`
+	AmortizationRunID        *uuid.UUID `json:"amortization_run_id,omitempty"`
+	EntryType                string     `json:"entry_type"` // "depreciation", "adjustment", "write_off", "reversal"
+	EntryDate                time.Time  `json:"entry_date"`
+	Description              *string    `json:"description,omitempty"`
+	Amount                   float64    `json:"amount"`
+	BookValueBefore          float64    `json:"book_value_before"`
+	BookValueAfter           float64    `json:"book_value_after"`
+	AccumulatedDepreciation float64    `json:"accumulated_depreciation"`
+	CreatedAt                time.Time  `json:"created_at"`
+	CreatedBy                *uuid.UUID `json:"created_by,omitempty"`
 }
 
 // AmortizationRun represents a batch amortization processing run

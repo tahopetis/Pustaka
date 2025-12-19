@@ -423,19 +423,20 @@ func (r *repository) CreateLedgerEntry(ctx context.Context, entry *LedgerEntry) 
 			amount,
 			book_value_before,
 			book_value_after,
-			period_start_date,
-			period_end_date,
-			days_in_period,
-			adjustment_reason,
-			adjustment_reference,
-			corrects_entry_id,
+			accumulated_depreciation,
+			description,
+			amortization_run_id,
 			created_at,
 			created_by,
-			is_system_generated,
-			batch_run_id,
-			sequence_number
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+			metadata
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
+
+	// Prepare metadata
+	metadata := map[string]interface{}{}
+	if entry.Description != nil {
+		metadata["description"] = *entry.Description
+	}
 
 	_, err := r.db.Exec(ctx, query,
 		entry.ID,
@@ -445,17 +446,12 @@ func (r *repository) CreateLedgerEntry(ctx context.Context, entry *LedgerEntry) 
 		entry.Amount,
 		entry.BookValueBefore,
 		entry.BookValueAfter,
-		nil, // period_start_date
-		nil, // period_end_date
-		nil, // days_in_period
-		nil, // adjustment_reason
-		nil, // adjustment_reference
-		nil, // corrects_entry_id
+		entry.AccumulatedDepreciation,
+		entry.Description,
+		entry.AmortizationRunID,
 		entry.CreatedAt,
 		entry.CreatedBy,
-		false, // is_system_generated
-		nil, // batch_run_id
-		1, // sequence_number (will be set by trigger)
+		metadata,
 	)
 
 	if err != nil {
@@ -519,8 +515,7 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 			"entry_date": "entry_date",
 			"amount":     "amount",
 			"created_at": "created_at",
-			"sequence_number": "sequence_number",
-		}
+					}
 		if sortField, ok := validSorts[*filters.SortBy]; ok {
 			orderBy = sortField
 			if filters.SortOrder != nil && *filters.SortOrder == "asc" {
@@ -576,15 +571,11 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 			amount,
 			book_value_before,
 			book_value_after,
-			period_start_date,
-			period_end_date,
-			days_in_period,
-			adjustment_reason,
-			adjustment_reference,
-			corrects_entry_id,
+			accumulated_depreciation,
+			description,
+			amortization_run_id,
 			created_at,
-			created_by,
-			sequence_number
+			created_by
 		FROM amortization_ledger
 		%s
 		ORDER BY %s
@@ -606,15 +597,7 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 	for rows.Next() {
 		var entry LedgerEntry
 		var description sql.NullString
-		var periodStartDate sql.NullTime
-		var periodEndDate sql.NullTime
-		var daysInPeriod sql.NullInt32
-		var adjustmentReason sql.NullString
-		var adjustmentReference sql.NullString
-		var correctsEntryID sql.NullString
-		var referenceID sql.NullString
 		var runID sql.NullString
-		var sequenceNumber sql.NullInt32
 
 		err := rows.Scan(
 			&entry.ID,
@@ -624,15 +607,11 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 			&entry.Amount,
 			&entry.BookValueBefore,
 			&entry.BookValueAfter,
-			&periodStartDate,
-			&periodEndDate,
-			&daysInPeriod,
-			&adjustmentReason,
-			&adjustmentReference,
-			&correctsEntryID,
+			&entry.AccumulatedDepreciation,
+			&description,
+			&runID,
 			&entry.CreatedAt,
 			&entry.CreatedBy,
-			&sequenceNumber,
 		)
 
 		if err != nil {
@@ -642,12 +621,6 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 
 		if description.Valid {
 			entry.Description = &description.String
-		}
-		if referenceID.Valid {
-			// Parse UUID from string
-			if refUUID, err := uuid.Parse(referenceID.String); err == nil {
-				entry.ReferenceID = &refUUID
-			}
 		}
 		if runID.Valid {
 			// Parse UUID from string
@@ -681,30 +654,20 @@ func (r *repository) GetLedgerEntry(ctx context.Context, entryID uuid.UUID) (*Le
 			amount,
 			book_value_before,
 			book_value_after,
-			period_start_date,
-			period_end_date,
-			days_in_period,
-			adjustment_reason,
-			adjustment_reference,
-			corrects_entry_id,
+			accumulated_depreciation,
+			description,
+			amortization_run_id,
 			created_at,
 			created_by,
-			sequence_number
+			metadata
 		FROM amortization_ledger
 		WHERE id = $1
 	`
 
 	var entry LedgerEntry
 	var description sql.NullString
-	var periodStartDate sql.NullTime
-	var periodEndDate sql.NullTime
-	var daysInPeriod sql.NullInt32
-	var adjustmentReason sql.NullString
-	var adjustmentReference sql.NullString
-	var correctsEntryID sql.NullString
-	var referenceID sql.NullString
-	var runID sql.NullString
-	var sequenceNumber sql.NullInt32
+	var amortizationRunID sql.NullString
+	var metadata sql.NullString
 
 	err := r.db.QueryRow(ctx, query, entryID).Scan(
 		&entry.ID,
@@ -714,15 +677,12 @@ func (r *repository) GetLedgerEntry(ctx context.Context, entryID uuid.UUID) (*Le
 		&entry.Amount,
 		&entry.BookValueBefore,
 		&entry.BookValueAfter,
-		&periodStartDate,
-		&periodEndDate,
-		&daysInPeriod,
-		&adjustmentReason,
-		&adjustmentReference,
-		&correctsEntryID,
+		&entry.AccumulatedDepreciation,
+		&description,
+		&amortizationRunID,
 		&entry.CreatedAt,
 		&entry.CreatedBy,
-		&sequenceNumber,
+		&metadata,
 	)
 
 	if err != nil {
@@ -738,15 +698,9 @@ func (r *repository) GetLedgerEntry(ctx context.Context, entryID uuid.UUID) (*Le
 	if description.Valid {
 		entry.Description = &description.String
 	}
-	if referenceID.Valid {
+	if amortizationRunID.Valid {
 		// Parse UUID from string
-		if refUUID, err := uuid.Parse(referenceID.String); err == nil {
-			entry.ReferenceID = &refUUID
-		}
-	}
-	if runID.Valid {
-		// Parse UUID from string
-		if runUUID, err := uuid.Parse(runID.String); err == nil {
+		if runUUID, err := uuid.Parse(amortizationRunID.String); err == nil {
 			entry.AmortizationRunID = &runUUID
 		}
 	}
@@ -765,15 +719,11 @@ func (r *repository) GetCILatestLedgerEntry(ctx context.Context, ciID uuid.UUID)
 			amount,
 			book_value_before,
 			book_value_after,
-			period_start_date,
-			period_end_date,
-			days_in_period,
-			adjustment_reason,
-			adjustment_reference,
-			corrects_entry_id,
+			accumulated_depreciation,
+			description,
+			amortization_run_id,
 			created_at,
-			created_by,
-			sequence_number
+			created_by
 		FROM amortization_ledger
 		WHERE ci_id = $1
 		ORDER BY entry_date DESC, created_at DESC
@@ -782,15 +732,7 @@ func (r *repository) GetCILatestLedgerEntry(ctx context.Context, ciID uuid.UUID)
 
 	var entry LedgerEntry
 	var description sql.NullString
-	var periodStartDate sql.NullTime
-	var periodEndDate sql.NullTime
-	var daysInPeriod sql.NullInt32
-	var adjustmentReason sql.NullString
-	var adjustmentReference sql.NullString
-	var correctsEntryID sql.NullString
-	var referenceID sql.NullString
-	var runID sql.NullString
-	var sequenceNumber sql.NullInt32
+	var amortizationRunID sql.NullString
 
 	err := r.db.QueryRow(ctx, query, ciID).Scan(
 		&entry.ID,
@@ -800,15 +742,11 @@ func (r *repository) GetCILatestLedgerEntry(ctx context.Context, ciID uuid.UUID)
 		&entry.Amount,
 		&entry.BookValueBefore,
 		&entry.BookValueAfter,
-		&periodStartDate,
-		&periodEndDate,
-		&daysInPeriod,
-		&adjustmentReason,
-		&adjustmentReference,
-		&correctsEntryID,
+		&entry.AccumulatedDepreciation,
+		&description,
+		&amortizationRunID,
 		&entry.CreatedAt,
 		&entry.CreatedBy,
-		&sequenceNumber,
 	)
 
 	if err != nil {
@@ -824,15 +762,9 @@ func (r *repository) GetCILatestLedgerEntry(ctx context.Context, ciID uuid.UUID)
 	if description.Valid {
 		entry.Description = &description.String
 	}
-	if referenceID.Valid {
+	if amortizationRunID.Valid {
 		// Parse UUID from string
-		if refUUID, err := uuid.Parse(referenceID.String); err == nil {
-			entry.ReferenceID = &refUUID
-		}
-	}
-	if runID.Valid {
-		// Parse UUID from string
-		if runUUID, err := uuid.Parse(runID.String); err == nil {
+		if runUUID, err := uuid.Parse(amortizationRunID.String); err == nil {
 			entry.AmortizationRunID = &runUUID
 		}
 	}
@@ -1196,15 +1128,40 @@ func (r *repository) ListAmortizationRuns(ctx context.Context, filters *Amortiza
 
 // GetAmortizationSummaries retrieves amortization summaries for reporting
 func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryRequest) (*AmortizationSummary, error) {
-	// This is a complex reporting query that would need to be implemented
-	// based on the specific grouping and aggregation requirements
-	// For now, return a basic implementation
+	query := `
+		SELECT
+			COUNT(ci.id) as total_cis,
+			COALESCE(SUM(ci.current_book_value), 0) as total_book_value,
+			COALESCE(SUM(CASE
+				WHEN ci.purchase_cost > 0 AND ci.current_book_value IS NOT NULL
+				THEN ci.purchase_cost - COALESCE(ci.current_book_value, 0)
+				ELSE 0
+			END), 0) as total_depreciation
+		FROM configuration_items ci
+		JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
+		LEFT JOIN lifecycle_statuses ls ON ci.lifecycle_status_id = ls.id
+		WHERE ctd.is_amortizable = true
+		AND ci.amort_start_date IS NOT NULL
+	`
+
+	var totalCIs int64
+	var totalBookValue float64
+	var totalDepreciation float64
+
+	err := r.db.QueryRow(ctx, query).Scan(&totalCIs, &totalBookValue, &totalDepreciation)
+	if err != nil {
+		r.logger.ErrorService("amortization", "get_amortization_summaries", err, map[string]interface{}{
+			"request": req,
+		})
+		return nil, fmt.Errorf("failed to get amortization summaries: %w", err)
+	}
+
 	return &AmortizationSummary{
 		GroupBy:            "all",
 		Groups:             []AmortizationGroup{},
-		TotalCIs:           0,
-		TotalBookValue:     0,
-		TotalDepreciation:  0,
+		TotalCIs:           int(totalCIs),
+		TotalBookValue:     totalBookValue,
+		TotalDepreciation:  totalDepreciation,
 		GeneratedAt:        time.Now(),
 	}, nil
 }

@@ -76,22 +76,19 @@ tmp/
 *.tmp
 *.temp
 
-# Debug files
+# Debug files and investigation reports
 debug_*.js
 test_*.js
 test-*.js
-debug-investigation-report.md
-README-DEBUG.md
-README-AUDIT-DEBUG.md
 *-debug.md
+*-investigation.md
+*-ANALYSIS.md
+*-ENHANCEMENTS.md
+*_FIX.md
+README-*.md
 comprehensive-debug-guide.md
 run-debug-test.*
-test-final-verification.js
-test-summary-verification.js
-manual-investigation.md
-RELATIONSHIP_TYPES_ISSUE_ANALYSIS.md
-RELATIONSHIP_TYPE_ENHANCEMENTS.md
-BIDIRECTIONAL_RELATIONSHIP_FIX.md
+test-*-verification.js
 
 # Lock files (keep package-lock.json but ignore others)
 # package-lock.json is kept for dependency consistency
@@ -138,8 +135,7 @@ test-results.xml
 .pnpm-store
 .npmrc.local
 
-# Database dumps
-# *.sql
+# Database dumps (but keep migration files)
 *.dump
 
 # SSL certificates
@@ -183,20 +179,10 @@ traces/
 
 # Test result images and artifacts
 *-test.png
-audit-*.png
 screenshot-*.png
-test-*.png
-page-*.png
-modal-*.png
 debug-*.png
-relationship-types-*.png
-submit-button-test-*.png
-method-*.png
-validation-test-*.png
-exact-form-data-*.png
-crud-test-*.png
-before-deletion.png
-after-deletion.png
-final-verification-*.png
-summary-verification-*.png
-simple-relationship-types-test-*.png
+audit-*.png
+before-*.png
+after-*.png
+final-*.png
+verification-*.png

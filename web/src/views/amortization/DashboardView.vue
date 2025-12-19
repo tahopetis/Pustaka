@@ -15,7 +15,7 @@
         </div>
         <div class="metric-content">
           <h3>Total Amortizable Assets</h3>
-          <div class="metric-value">{{ metrics.totalAmortizableAssets }}</div>
+          <div class="metric-value">{{ metrics.total_amortizable_assets }}</div>
         </div>
       </div>
 
@@ -25,7 +25,7 @@
         </div>
         <div class="metric-content">
           <h3>Total Book Value</h3>
-          <div class="metric-value">{{ formatCurrency(metrics.totalBookValue) }}</div>
+          <div class="metric-value">{{ formatCurrency(metrics.total_book_value) }}</div>
         </div>
       </div>
 
@@ -35,7 +35,7 @@
         </div>
         <div class="metric-content">
           <h3>Monthly Depreciation</h3>
-          <div class="metric-value">{{ formatCurrency(metrics.monthlyDepreciation) }}</div>
+          <div class="metric-value">{{ formatCurrency(metrics.monthly_depreciation) }}</div>
         </div>
       </div>
 
@@ -45,7 +45,7 @@
         </div>
         <div class="metric-content">
           <h3>Active Amortizations</h3>
-          <div class="metric-value">{{ metrics.activeAmortizations }}</div>
+          <div class="metric-value">{{ metrics.active_amortizations }}</div>
         </div>
       </div>
     </div>
@@ -120,10 +120,10 @@ const amortizationStore = useAmortizationStore()
 
 const loading = ref(true)
 const metrics = ref<AmortizationMetrics>({
-  totalAmortizableAssets: 0,
-  totalBookValue: 0,
-  monthlyDepreciation: 0,
-  activeAmortizations: 0,
+  total_amortizable_assets: 0,
+  total_book_value: 0,
+  monthly_depreciation: 0,
+  active_amortizations: 0,
 })
 const recentActivity = ref<AmortizationLedgerEntry[]>([])
 
@@ -135,19 +135,19 @@ onMounted(async () => {
 const loadDashboardData = async () => {
   try {
     // Load metrics
-    const summaryResponse = await amortizationStore.getAssetSummary()
-    if (summaryResponse.data) {
-      metrics.value = summaryResponse.data
+    const summaryResponse = await amortizationStore.loadMetrics()
+    if (summaryResponse) {
+      metrics.value = summaryResponse
     }
 
     // Load recent activity
-    const ledgerResponse = await amortizationStore.getLedgerEntries({
+    const ledgerResponse = await amortizationStore.loadLedgerEntries({
       limit: 10,
       sort_by: 'entry_date',
       sort_order: 'desc'
     })
-    if (ledgerResponse.data) {
-      recentActivity.value = ledgerResponse.data.entries || []
+    if (ledgerResponse && ledgerResponse.data) {
+      recentActivity.value = ledgerResponse.data || []
     }
   } catch (error) {
     console.error('Failed to load dashboard data:', error)

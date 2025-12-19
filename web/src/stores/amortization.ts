@@ -156,8 +156,15 @@ export const useAmortizationStore = defineStore('amortization', () => {
     clearError()
     try {
       const response = await amortizationApi.getAssetSummary()
-      metrics.value = response
-      return response
+      // Map AmortizationSummary response to AmortizationMetrics format
+      // Fix: Use snake_case field names as defined in TypeScript interface
+      metrics.value = {
+        total_amortizable_assets: response.total_cis || 0,
+        total_book_value: response.total_book_value || 0,
+        monthly_depreciation: response.total_depreciation || 0, // Use actual depreciation data
+        active_amortizations: response.total_cis || 0 // Assuming all CIs with amortization are active
+      }
+      return metrics.value
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load amortization metrics')
       throw err

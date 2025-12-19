@@ -303,8 +303,7 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 		Amount:                     calculation.Amount,
 		BookValueBefore:            calculation.BookValueBefore,
 		BookValueAfter:             calculation.BookValueAfter,
-		AccumulatedDepreciationBefore: calculation.AccumulatedDepreciationBefore,
-		AccumulatedDepreciationAfter:  calculation.AccumulatedDepreciationAfter,
+		AccumulatedDepreciation: calculation.AccumulatedDepreciationAfter,
 		AmortizationRunID:          &runID,
 		CreatedAt:                  time.Now(),
 		CreatedBy:                  &uuid.UUID{}, // System generated
