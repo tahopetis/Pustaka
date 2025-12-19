@@ -16,15 +16,18 @@ func stringPtr(s string) *string {
 
 // schedulerSimple implements the SchedulerInterface
 type schedulerSimple struct {
-	repo   Repository
-	logger *pustakaLogger.Logger
+	repo      Repository
+	calculator CalculatorInterface
+	logger     *pustakaLogger.Logger
 }
 
 // NewScheduler creates a new amortization scheduler
 func NewScheduler(repo Repository, cache CacheRepositoryInterface, logger *pustakaLogger.Logger) SchedulerInterface {
+	calculator := NewCalculator(logger)
 	return &schedulerSimple{
-		repo:   repo,
-		logger: logger,
+		repo:      repo,
+		calculator: calculator,
+		logger:     logger,
 	}
 }
 
@@ -273,15 +276,53 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 		}, nil
 	}
 
-	// Calculate depreciation
-	calculation, err := s.calculateDepreciation(ci, processingDate)
+	// Check if this CI has existing ledger entries
+	hasExistingEntries, err := s.repo.HasLedgerEntriesForCI(ctx, ciID)
 	if err != nil {
 		return &ProcessingResult{
 			CIID:        ciID,
 			Status:      "failed",
-			ErrorMessage: stringPtr(fmt.Sprintf("Calculation failed: %v", err)),
+			ErrorMessage: stringPtr(fmt.Sprintf("Failed to check ledger entries: %v", err)),
 			ProcessedAt:  time.Now(),
 		}, nil
+	}
+
+	// Calculate depreciation
+	var depreciationAmount float64
+	var bookValueBefore, bookValueAfter, accumulatedDepreciationAfter float64
+
+	if !hasExistingEntries {
+		// Use catch-up depreciation for first-time processing
+		catchUpCalc, err := s.calculator.CalculateCatchUpDepreciation(ctx, ci, processingDate)
+		if err != nil {
+			return &ProcessingResult{
+				CIID:        ciID,
+				Status:      "failed",
+				ErrorMessage: stringPtr(fmt.Sprintf("Catch-up calculation failed: %v", err)),
+				ProcessedAt:  time.Now(),
+			}, nil
+		}
+
+		depreciationAmount = catchUpCalc.TotalDepreciationAmount
+		bookValueBefore = catchUpCalc.BookValueBefore
+		bookValueAfter = catchUpCalc.BookValueAfter
+		accumulatedDepreciationAfter = catchUpCalc.AccumulatedDepreciationAfter
+	} else {
+		// Use regular monthly depreciation
+		calculation, err := s.calculateDepreciation(ci, processingDate)
+		if err != nil {
+			return &ProcessingResult{
+				CIID:        ciID,
+				Status:      "failed",
+				ErrorMessage: stringPtr(fmt.Sprintf("Calculation failed: %v", err)),
+				ProcessedAt:  time.Now(),
+			}, nil
+		}
+
+		depreciationAmount = calculation.Amount
+		bookValueBefore = calculation.BookValueBefore
+		bookValueAfter = calculation.BookValueAfter
+		accumulatedDepreciationAfter = calculation.AccumulatedDepreciationAfter
 	}
 
 	// If this is a dry run, just return the calculation
@@ -289,24 +330,30 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 		return &ProcessingResult{
 			CIID:              ciID,
 			Status:            "processed",
-			DepreciationAmount: calculation.Amount,
+			DepreciationAmount: depreciationAmount,
 			ProcessedAt:       time.Now(),
 		}, nil
+	}
+
+	// Determine entry type based on whether this is catch-up or regular depreciation
+	entryType := "monthly_depreciation"
+	if !hasExistingEntries {
+		entryType = "catch_up_depreciation"
 	}
 
 	// Create ledger entry (skip if dry run)
 	entry := &LedgerEntry{
 		ID:                         uuid.New(),
 		CIID:                       ciID,
-		EntryType:                  "monthly_depreciation",
+		EntryType:                  entryType,
 		EntryDate:                  processingDate,
-		Amount:                     calculation.Amount,
-		BookValueBefore:            calculation.BookValueBefore,
-		BookValueAfter:             calculation.BookValueAfter,
-		AccumulatedDepreciation: calculation.AccumulatedDepreciationAfter,
+		Amount:                     depreciationAmount,
+		BookValueBefore:            bookValueBefore,
+		BookValueAfter:             bookValueAfter,
+		AccumulatedDepreciation: accumulatedDepreciationAfter,
 		AmortizationRunID:          &runID,
 		CreatedAt:                  time.Now(),
-		CreatedBy:                  &uuid.UUID{}, // System generated
+		CreatedBy:                  func() *uuid.UUID { id := uuid.MustParse("fd13d040-48a4-45c1-b7fa-1e71b20a29de"); return &id }(), // Admin user for now
 	}
 
 	if err := s.repo.CreateLedgerEntry(ctx, entry); err != nil {
@@ -320,9 +367,9 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 
 	// Update CI book value
 	updates := &AmortizationConfigUpdates{
-		CurrentBookValue:           &calculation.BookValueAfter,
-		AccumulatedDepreciation:    &calculation.AccumulatedDepreciationAfter,
-		UpdatedBy:                 &uuid.UUID{}, // System generated
+		CurrentBookValue:           &bookValueAfter,
+		AccumulatedDepreciation:    &accumulatedDepreciationAfter,
+		UpdatedBy:                 func() *uuid.UUID { id := uuid.MustParse("fd13d040-48a4-45c1-b7fa-1e71b20a29de"); return &id }(), // Admin user for now
 		UpdatedAt:                 func(t time.Time) *time.Time { return &t }(time.Now()),
 	}
 
@@ -333,7 +380,7 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 	return &ProcessingResult{
 		CIID:              ciID,
 		Status:            "processed",
-		DepreciationAmount: calculation.Amount,
+		DepreciationAmount: depreciationAmount,
 		ProcessedAt:       time.Now(),
 	}, nil
 }

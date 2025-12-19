@@ -179,7 +179,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
     clearError()
     try {
       const response = await amortizationApi.getLedgerEntries(filters)
-      ledgerEntries.value = response.data
+      ledgerEntries.value = response.entries || []
       return response
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load ledger entries')

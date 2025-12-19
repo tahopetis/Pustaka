@@ -142,12 +142,12 @@ const loadDashboardData = async () => {
 
     // Load recent activity
     const ledgerResponse = await amortizationStore.loadLedgerEntries({
-      limit: 10,
+      page_size: 10,
       sort_by: 'entry_date',
       sort_order: 'desc'
     })
-    if (ledgerResponse && ledgerResponse.data) {
-      recentActivity.value = ledgerResponse.data || []
+    if (ledgerResponse && ledgerResponse.entries) {
+      recentActivity.value = ledgerResponse.entries || []
     }
   } catch (error) {
     console.error('Failed to load dashboard data:', error)
@@ -167,6 +167,8 @@ const formatDate = (dateString: string): string => {
 
 const getActivityIcon = (entryType: string): string => {
   switch (entryType) {
+    case 'monthly_depreciation':
+    case 'catch_up_depreciation':
     case 'depreciation':
       return 'fas fa-chart-line'
     case 'adjustment':

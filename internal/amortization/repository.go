@@ -43,7 +43,13 @@ func (r *repository) GetAmortizableCI(ctx context.Context, ciID uuid.UUID) (*Amo
 			ci.amort_start_date,
 			COALESCE(ci.useful_life_months, 0) as useful_life_months,
 			COALESCE(ci.current_book_value, 0) as current_book_value,
-			COALESCE(ci.purchase_cost - COALESCE(ci.current_book_value, 0), 0) as accumulated_depreciation,
+			COALESCE(
+				(SELECT COALESCE(SUM(amount), 0)
+				 FROM amortization_ledger ale
+				 WHERE ale.ci_id = ci.id AND ale.entry_type IN ('monthly_depreciation', 'catch_up_depreciation', 'depreciation')
+				),
+				0
+			) as accumulated_depreciation,
 			ci.created_at,
 			ci.updated_at,
 			ci.created_by,
@@ -463,6 +469,28 @@ func (r *repository) CreateLedgerEntry(ctx context.Context, entry *LedgerEntry) 
 	}
 
 	return nil
+}
+
+// HasLedgerEntriesForCI checks if a CI has any existing ledger entries
+func (r *repository) HasLedgerEntriesForCI(ctx context.Context, ciID uuid.UUID) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM amortization_ledger WHERE ci_id = $1 LIMIT 1)`
+
+	var exists bool
+	err := r.db.QueryRow(ctx, query, ciID).Scan(&exists)
+	if err != nil {
+		r.logger.Error().
+			Err(err).
+			Str("ci_id", ciID.String()).
+			Msg("Failed to check if CI has ledger entries")
+		return false, fmt.Errorf("failed to check if CI has ledger entries: %w", err)
+	}
+
+	r.logger.Info().
+		Str("ci_id", ciID.String()).
+		Bool("has_entries", exists).
+		Msg("Checked for existing ledger entries")
+
+	return exists, nil
 }
 
 // GetLedgerEntries retrieves ledger entries with filtering
@@ -1176,7 +1204,7 @@ func (r *repository) GetDepreciationScheduleData(ctx context.Context, req *Depre
 // GetCIsForProcessing retrieves CIs that need amortization processing
 func (r *repository) GetCIsForProcessing(ctx context.Context, processingDate time.Time, limit int) ([]uuid.UUID, error) {
 	query := `
-		SELECT DISTINCT ci.id
+		SELECT ci.id
 		FROM configuration_items ci
 		JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
 		LEFT JOIN lifecycle_statuses ls ON ci.lifecycle_status_id = ls.id
@@ -1189,7 +1217,7 @@ func (r *repository) GetCIsForProcessing(ctx context.Context, processingDate tim
 			SELECT 1 FROM amortization_ledger al
 			WHERE al.ci_id = ci.id
 			AND al.entry_date = $1
-			AND al.entry_type = 'depreciation'
+			AND al.entry_type = 'monthly_depreciation'
 		)
 		ORDER BY ci.amort_start_date, ci.id
 		LIMIT $2
@@ -1199,10 +1227,13 @@ func (r *repository) GetCIsForProcessing(ctx context.Context, processingDate tim
 	if err != nil {
 		r.logger.ErrorService("amortization", "get_cis_for_processing", err, map[string]interface{}{
 			"processing_date": processingDate,
+			"query":          query,
 		})
 		return nil, fmt.Errorf("failed to get CIs for processing: %w", err)
 	}
 	defer rows.Close()
+
+	r.logger.Debug().Str("component", "GetCIsForProcessing").Time("processing_date", processingDate).Int("limit", limit).Msg("Executing GetCIsForProcessing query")
 
 	var ciIDs []uuid.UUID
 	for rows.Next() {
@@ -1212,8 +1243,10 @@ func (r *repository) GetCIsForProcessing(ctx context.Context, processingDate tim
 			return nil, fmt.Errorf("failed to scan CI ID: %w", err)
 		}
 		ciIDs = append(ciIDs, ciID)
+		r.logger.Debug().Str("component", "GetCIsForProcessing").Str("ci_id", ciID.String()).Msg("Found eligible CI")
 	}
 
+	r.logger.Info().Str("component", "GetCIsForProcessing").Int("found_cis", len(ciIDs)).Msg("GetCIsForProcessing completed")
 	return ciIDs, nil
 }
 

@@ -118,18 +118,23 @@ class AmortizationApiService {
   }
 
   // Scheduler Management
-  async runScheduler(): Promise<AmortizationRun> {
-    const response = await this.api.post('/scheduler/run')
+  async runScheduler(dryRun = false): Promise<AmortizationRun> {
+    const response = await this.api.post('/runs', { dry_run: dryRun })
     return response.data
   }
 
   async getSchedulerStatus(): Promise<SchedulerStatus> {
-    const response = await this.api.get('/scheduler/status')
-    return response.data
+    // This endpoint might not be implemented yet, using runs list as fallback
+    const response = await this.api.get('/runs?limit=1')
+    return {
+      is_enabled: true,
+      last_run: response.data.data?.[0] || null,
+      next_run: null
+    }
   }
 
   async getSchedulerRuns(): Promise<PaginatedResponse<AmortizationRun>> {
-    const response = await this.api.get('/scheduler/runs')
+    const response = await this.api.get('/runs')
     return response.data
   }
 

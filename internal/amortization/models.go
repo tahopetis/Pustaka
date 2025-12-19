@@ -305,6 +305,18 @@ type DepreciationCalculation struct {
 	Method                     string     `json:"method"`
 }
 
+// CatchUpDepreciationCalculation represents a catch-up depreciation calculation result
+type CatchUpDepreciationCalculation struct {
+	MonthsDepreciated          int       `json:"months_depreciated"`
+	TotalDepreciationAmount    float64   `json:"total_depreciation_amount"`
+	MonthlyDepreciationAmount  float64   `json:"monthly_depreciation_amount"`
+	BookValueBefore            float64   `json:"book_value_before"`
+	BookValueAfter             float64   `json:"book_value_after"`
+	AccumulatedDepreciationAfter float64 `json:"accumulated_depreciation_after"`
+	CalculationDate            time.Time `json:"calculation_date"`
+	Method                     string    `json:"method"`
+}
+
 // WriteOffCalculation represents a write-off calculation result
 type WriteOffCalculation struct {
 	WriteOffAmount              float64   `json:"write_off_amount"`

@@ -49,6 +49,7 @@ type Repository interface {
 	GetLedgerEntries(ctx context.Context, filters *LedgerFilters) (*LedgerEntryList, error)
 	GetLedgerEntry(ctx context.Context, entryID uuid.UUID) (*LedgerEntry, error)
 	GetCILatestLedgerEntry(ctx context.Context, ciID uuid.UUID) (*LedgerEntry, error)
+	HasLedgerEntriesForCI(ctx context.Context, ciID uuid.UUID) (bool, error)
 
 	// Amortization Run Management
 	CreateAmortizationRun(ctx context.Context, run *AmortizationRun) error
@@ -112,6 +113,7 @@ type CacheRepositoryInterface interface {
 type CalculatorInterface interface {
 	// Core calculations
 	CalculateMonthlyDepreciation(ctx context.Context, ci *AmortizableCI, entryDate time.Time) (*DepreciationCalculation, error)
+	CalculateCatchUpDepreciation(ctx context.Context, ci *AmortizableCI, asOfDate time.Time) (*CatchUpDepreciationCalculation, error)
 	CalculateWriteOff(ctx context.Context, ci *AmortizableCI, writeOffDate time.Time) (*WriteOffCalculation, error)
 	CalculateDepreciationToDate(ctx context.Context, ci *AmortizableCI, asOfDate time.Time) ([]DepreciationCalculation, error)
 	CalculateRemainingLife(ctx context.Context, ci *AmortizableCI, asOfDate time.Time) (int, error)

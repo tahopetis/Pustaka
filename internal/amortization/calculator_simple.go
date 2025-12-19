@@ -93,6 +93,77 @@ func (c *calculatorSimple) CalculateMonthlyDepreciation(ctx context.Context, ci 
 	return calculation, nil
 }
 
+// CalculateCatchUpDepreciation calculates all missed depreciation from start date to current date
+func (c *calculatorSimple) CalculateCatchUpDepreciation(ctx context.Context, ci *AmortizableCI, asOfDate time.Time) (*CatchUpDepreciationCalculation, error) {
+	// Validation
+	if ci.PurchaseCost <= 0 {
+		return nil, fmt.Errorf("invalid purchase cost")
+	}
+	if ci.UsefulLifeMonths <= 0 {
+		return nil, fmt.Errorf("invalid useful life months")
+	}
+	if ci.AmortStartDate == nil {
+		return nil, fmt.Errorf("amortization start date is not set")
+	}
+
+	// Check if depreciation should be calculated
+	if !c.shouldDepreciateForDate(ci, asOfDate) {
+		return nil, fmt.Errorf("CI does not require depreciation as of %s", asOfDate.Format("2006-01-02"))
+	}
+
+	// Calculate monthly depreciation amount
+	monthlyDepreciation := (ci.PurchaseCost - ci.SalvageValue) / float64(ci.UsefulLifeMonths)
+
+	// Calculate how many months of depreciation should have been calculated
+	monthsSinceStart := c.calculateElapsedMonths(*ci.AmortStartDate, asOfDate)
+
+	// Don't exceed useful life
+	maxDepreciationMonths := ci.UsefulLifeMonths
+	if monthsSinceStart > maxDepreciationMonths {
+		monthsSinceStart = maxDepreciationMonths
+	}
+
+	// Calculate total catch-up depreciation
+	totalCatchUpDepreciation := float64(monthsSinceStart) * monthlyDepreciation
+
+	// Ensure we don't depreciate below salvage value
+	maxAllowableDepreciation := ci.PurchaseCost - ci.SalvageValue
+	if totalCatchUpDepreciation > maxAllowableDepreciation {
+		totalCatchUpDepreciation = maxAllowableDepreciation
+	}
+
+	// Calculate current book value after catch-up
+	bookValueAfter := ci.PurchaseCost - totalCatchUpDepreciation
+	if bookValueAfter < ci.SalvageValue {
+		bookValueAfter = ci.SalvageValue
+	}
+
+	// New accumulated depreciation
+	newAccumulatedDepreciation := totalCatchUpDepreciation
+
+	calculation := &CatchUpDepreciationCalculation{
+		MonthsDepreciated:          monthsSinceStart,
+		TotalDepreciationAmount:    totalCatchUpDepreciation,
+		MonthlyDepreciationAmount:  monthlyDepreciation,
+		BookValueBefore:            ci.PurchaseCost,
+		BookValueAfter:             bookValueAfter,
+		AccumulatedDepreciationAfter: newAccumulatedDepreciation,
+		CalculationDate:            asOfDate,
+		Method:                     "straight_line_catch_up",
+	}
+
+	c.logger.Info().
+		Str("ci_id", ci.ID.String()).
+		Time("start_date", *ci.AmortStartDate).
+		Time("as_of_date", asOfDate).
+		Int("months_depreciated", monthsSinceStart).
+		Float64("total_depreciation", totalCatchUpDepreciation).
+		Float64("book_value_after", bookValueAfter).
+		Msg("Calculated catch-up depreciation")
+
+	return calculation, nil
+}
+
 // CalculateWriteOff calculates the write-off amount for an asset
 func (c *calculatorSimple) CalculateWriteOff(ctx context.Context, ci *AmortizableCI, writeOffDate time.Time) (*WriteOffCalculation, error) {
 	if ci.PurchaseCost <= 0 {
@@ -361,6 +432,26 @@ func (c *calculatorSimple) calculateRemainingLife(ci *AmortizableCI, asOfDate ti
 	}
 
 	return remainingMonths
+}
+
+func (c *calculatorSimple) calculateElapsedMonths(startDate, endDate time.Time) int {
+	// Calculate full months between two dates
+	years := endDate.Year() - startDate.Year()
+	months := endDate.Month() - startDate.Month()
+
+	// Adjust for day of month
+	if endDate.Day() < startDate.Day() {
+		months--
+	}
+
+	totalMonths := years*12 + int(months)
+
+	// Ensure we don't return negative months
+	if totalMonths < 0 {
+		return 0
+	}
+
+	return totalMonths
 }
 
 func (c *calculatorSimple) calculateConfidenceLevel(ci *AmortizableCI, projectionDate time.Time) string {

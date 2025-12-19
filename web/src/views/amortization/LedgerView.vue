@@ -18,6 +18,8 @@
             multiple
             class="filter-select"
           >
+            <option value="monthly_depreciation">Monthly Depreciation</option>
+            <option value="catch_up_depreciation">Catch-Up Depreciation</option>
             <option value="depreciation">Depreciation</option>
             <option value="adjustment">Adjustment</option>
             <option value="write_off">Write Off</option>
@@ -194,9 +196,13 @@ const loadLedgerEntries = async () => {
   loading.value = true
   try {
     const response = await amortizationStore.loadLedgerEntries(filters.value)
-    if (response.data) {
-      ledgerEntries.value = response.data.data
-      pagination.value = response.data.pagination
+    ledgerEntries.value = amortizationStore.ledgerEntries
+    pagination.value = {
+      total: response.total_count,
+      limit: response.page_size,
+      offset: ((response.page - 1) * response.page_size),
+      has_prev: response.page > 1,
+      has_next: response.page < response.total_pages
     }
   } catch (error) {
     console.error('Failed to load ledger entries:', error)
