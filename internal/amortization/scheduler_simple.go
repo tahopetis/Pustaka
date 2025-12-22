@@ -79,7 +79,8 @@ func (s *schedulerSimple) ExecuteScheduledRun(ctx context.Context, processingDat
 
 	// Process each CI
 	for _, ciID := range ciIDs {
-		result, err := s.processCIForAmortization(ctx, ciID, processingDate, run.ID, false)
+		adminUserID := uuid.MustParse("5c2a9afd-1439-4c3f-aaea-05bc0aab6638") // System user for scheduled runs
+		result, err := s.processCIForAmortization(ctx, ciID, processingDate, run.ID, adminUserID, false)
 		if err != nil {
 			failed++
 			s.logger.Warn().Err(err).Str("ci_id", ciID.String()).Msg("Failed to process CI for amortization")
@@ -191,7 +192,7 @@ func (s *schedulerSimple) ExecuteManualRun(ctx context.Context, req *ManualRunRe
 
 	// Process each CI
 	for _, ciID := range ciIDs {
-		result, err := s.processCIForAmortization(ctx, ciID, processingDate, runID, req.DryRun)
+		result, err := s.processCIForAmortization(ctx, ciID, processingDate, runID, userID, req.DryRun)
 		if err != nil {
 			failed++
 			s.logger.Warn().Err(err).Str("ci_id", ciID.String()).Msg("Failed to process CI for amortization")
@@ -255,7 +256,7 @@ func (s *schedulerSimple) ExecuteManualRun(ctx context.Context, req *ManualRunRe
 
 // Helper methods
 
-func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uuid.UUID, processingDate time.Time, runID uuid.UUID, dryRun bool) (*ProcessingResult, error) {
+func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uuid.UUID, processingDate time.Time, runID uuid.UUID, userID uuid.UUID, dryRun bool) (*ProcessingResult, error) {
 	// Get CI
 	ci, err := s.repo.GetAmortizableCI(ctx, ciID)
 	if err != nil {
@@ -380,7 +381,7 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 		AccumulatedDepreciation: accumulatedDepreciationAfter,
 		AmortizationRunID:          &runID,
 		CreatedAt:                  time.Now(),
-		CreatedBy:                  func() *uuid.UUID { id := uuid.MustParse("fd13d040-48a4-45c1-b7fa-1e71b20a29de"); return &id }(), // Admin user for now
+		CreatedBy:                  &userID,
 	}
 
 	if err := s.repo.CreateLedgerEntry(ctx, entry); err != nil {
@@ -396,7 +397,7 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 	updates := &AmortizationConfigUpdates{
 		CurrentBookValue:           &bookValueAfter,
 		AccumulatedDepreciation:    &accumulatedDepreciationAfter,
-		UpdatedBy:                 func() *uuid.UUID { id := uuid.MustParse("fd13d040-48a4-45c1-b7fa-1e71b20a29de"); return &id }(), // Admin user for now
+		UpdatedBy:                 &userID,
 		UpdatedAt:                 func(t time.Time) *time.Time { return &t }(time.Now()),
 	}
 

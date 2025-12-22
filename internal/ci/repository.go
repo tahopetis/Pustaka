@@ -438,7 +438,7 @@ func (r *Repository) CreateCIType(ctx context.Context, ciType *CITypeDefinition)
 
 func (r *Repository) GetCIType(ctx context.Context, id uuid.UUID) (*CITypeDefinition, error) {
 	query := `
-		SELECT id, name, description, required_attributes, optional_attributes, created_by, created_at, updated_at
+		SELECT id, name, description, is_amortizable, required_attributes, optional_attributes, created_by, created_at, updated_at
 		FROM ci_type_definitions
 		WHERE id = $1
 	`
@@ -448,6 +448,7 @@ func (r *Repository) GetCIType(ctx context.Context, id uuid.UUID) (*CITypeDefini
 		&ciType.ID,
 		&ciType.Name,
 		&ciType.Description,
+		&ciType.IsAmortizable,
 		&ciType.RequiredAttributes,
 		&ciType.OptionalAttributes,
 		&ciType.CreatedBy,

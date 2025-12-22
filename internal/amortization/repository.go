@@ -433,16 +433,9 @@ func (r *repository) CreateLedgerEntry(ctx context.Context, entry *LedgerEntry) 
 			description,
 			amortization_run_id,
 			created_at,
-			created_by,
-			metadata
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+			created_by
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
-
-	// Prepare metadata
-	metadata := map[string]interface{}{}
-	if entry.Description != nil {
-		metadata["description"] = *entry.Description
-	}
 
 	_, err := r.db.Exec(ctx, query,
 		entry.ID,
@@ -457,7 +450,6 @@ func (r *repository) CreateLedgerEntry(ctx context.Context, entry *LedgerEntry) 
 		entry.AmortizationRunID,
 		entry.CreatedAt,
 		entry.CreatedBy,
-		metadata,
 	)
 
 	if err != nil {
@@ -689,8 +681,7 @@ func (r *repository) GetLedgerEntry(ctx context.Context, entryID uuid.UUID) (*Le
 			description,
 			amortization_run_id,
 			created_at,
-			created_by,
-			metadata
+			created_by
 		FROM amortization_ledger
 		WHERE id = $1
 	`
@@ -698,7 +689,6 @@ func (r *repository) GetLedgerEntry(ctx context.Context, entryID uuid.UUID) (*Le
 	var entry LedgerEntry
 	var description sql.NullString
 	var amortizationRunID sql.NullString
-	var metadata sql.NullString
 
 	err := r.db.QueryRow(ctx, query, entryID).Scan(
 		&entry.ID,
@@ -713,7 +703,6 @@ func (r *repository) GetLedgerEntry(ctx context.Context, entryID uuid.UUID) (*Le
 		&amortizationRunID,
 		&entry.CreatedAt,
 		&entry.CreatedBy,
-		&metadata,
 	)
 
 	if err != nil {
