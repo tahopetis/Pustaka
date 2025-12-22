@@ -1215,12 +1215,12 @@ func (r *repository) GetCIsForProcessing(ctx context.Context, processingDate tim
 		AND ci.amort_start_date IS NOT NULL
 		AND ci.useful_life_months IS NOT NULL
 		AND ci.current_book_value > 0
-		AND (ls.amortization_behavior = 'active' OR ls.amortization_behavior IS NULL)
+		AND (ls.amortization_behavior = 'active' OR ls.amortization_behavior = 'terminal' OR ls.amortization_behavior IS NULL)
 		AND NOT EXISTS (
 			SELECT 1 FROM amortization_ledger al
 			WHERE al.ci_id = ci.id
 			AND al.entry_date = $1
-			AND al.entry_type = 'monthly_depreciation'
+			AND al.entry_type IN ('monthly_depreciation', 'write_off')
 		)
 		ORDER BY ci.amort_start_date, ci.id
 		LIMIT $2

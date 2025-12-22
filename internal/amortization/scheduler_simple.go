@@ -290,8 +290,27 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 	// Calculate depreciation
 	var depreciationAmount float64
 	var bookValueBefore, bookValueAfter, accumulatedDepreciationAfter float64
+	var entryType string
 
-	if !hasExistingEntries {
+	// Check if this is a terminal status asset that needs write-off
+	if ci.LifecycleStatus != nil && ci.LifecycleStatus.AmortizationBehavior == "terminal" {
+		// Handle terminal status write-off
+		writeOffCalc, err := s.calculateWriteOff(ctx, ci, processingDate)
+		if err != nil {
+			return &ProcessingResult{
+				CIID:        ciID,
+				Status:      "failed",
+				ErrorMessage: stringPtr(fmt.Sprintf("Write-off calculation failed: %v", err)),
+				ProcessedAt:  time.Now(),
+			}, nil
+		}
+
+		depreciationAmount = writeOffCalc.WriteOffAmount
+		bookValueBefore = writeOffCalc.BookValueBefore
+		bookValueAfter = writeOffCalc.BookValueAfter
+		accumulatedDepreciationAfter = writeOffCalc.AccumulatedDepreciationAfter
+		entryType = "write_off"
+	} else if !hasExistingEntries {
 		// Use catch-up depreciation for first-time processing
 		catchUpCalc, err := s.calculator.CalculateCatchUpDepreciation(ctx, ci, processingDate)
 		if err != nil {
@@ -307,6 +326,7 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 		bookValueBefore = catchUpCalc.BookValueBefore
 		bookValueAfter = catchUpCalc.BookValueAfter
 		accumulatedDepreciationAfter = catchUpCalc.AccumulatedDepreciationAfter
+		entryType = "catch_up_depreciation"
 	} else {
 		// Use regular monthly depreciation
 		calculation, err := s.calculateDepreciation(ci, processingDate)
@@ -323,6 +343,7 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 		bookValueBefore = calculation.BookValueBefore
 		bookValueAfter = calculation.BookValueAfter
 		accumulatedDepreciationAfter = calculation.AccumulatedDepreciationAfter
+		entryType = "monthly_depreciation"
 	}
 
 	// If this is a dry run, just return the calculation
@@ -335,10 +356,15 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 		}, nil
 	}
 
-	// Determine entry type based on whether this is catch-up or regular depreciation
-	entryType := "monthly_depreciation"
-	if !hasExistingEntries {
-		entryType = "catch_up_depreciation"
+	// Create description based on entry type
+	var description *string
+	switch entryType {
+	case "write_off":
+		description = stringPtr(fmt.Sprintf("Automatic write-off for terminal status (%s)", ci.LifecycleStatus.DisplayName))
+	case "catch_up_depreciation":
+		description = stringPtr("Catch-up depreciation for amortization start date")
+	case "monthly_depreciation":
+		description = stringPtr("Monthly depreciation")
 	}
 
 	// Create ledger entry (skip if dry run)
@@ -347,6 +373,7 @@ func (s *schedulerSimple) processCIForAmortization(ctx context.Context, ciID uui
 		CIID:                       ciID,
 		EntryType:                  entryType,
 		EntryDate:                  processingDate,
+		Description:                description,
 		Amount:                     depreciationAmount,
 		BookValueBefore:            bookValueBefore,
 		BookValueAfter:             bookValueAfter,
@@ -399,8 +426,11 @@ func (s *schedulerSimple) shouldProcessCI(ci *AmortizableCI, processingDate time
 	// Check amortization behavior
 	if ci.LifecycleStatus != nil {
 		switch ci.LifecycleStatus.AmortizationBehavior {
-		case "pending", "terminal":
+		case "pending":
 			return false
+		case "terminal":
+			// For terminal status, only process if there's remaining book value to write off
+			return ci.CurrentBookValue > ci.SalvageValue
 		case "active":
 			return true
 		}
@@ -431,6 +461,25 @@ func (s *schedulerSimple) calculateDepreciation(ci *AmortizableCI, processingDat
 		AccumulatedDepreciationBefore: ci.AccumulatedDepreciation,
 		AccumulatedDepreciationAfter:  ci.AccumulatedDepreciation + monthlyDepreciation,
 		CalculationDate:            processingDate,
+	}, nil
+}
+
+func (s *schedulerSimple) calculateWriteOff(ctx context.Context, ci *AmortizableCI, processingDate time.Time) (*WriteOffCalculation, error) {
+	// Write-off calculation: write off all remaining book value above salvage value
+	if ci.CurrentBookValue <= ci.SalvageValue {
+		return nil, fmt.Errorf("no remaining book value to write off")
+	}
+
+	writeOffAmount := ci.CurrentBookValue - ci.SalvageValue
+
+	return &WriteOffCalculation{
+		WriteOffAmount:              writeOffAmount,
+		BookValueBefore:             ci.CurrentBookValue,
+		BookValueAfter:              ci.SalvageValue,
+		AccumulatedDepreciationBefore: ci.AccumulatedDepreciation,
+		AccumulatedDepreciationAfter:  ci.AccumulatedDepreciation + writeOffAmount,
+		WriteOffDate:                processingDate,
+		Reason:                      fmt.Sprintf("Terminal status: %s", ci.LifecycleStatus.DisplayName),
 	}, nil
 }
 

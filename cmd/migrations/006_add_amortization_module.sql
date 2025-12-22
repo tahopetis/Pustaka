@@ -36,50 +36,13 @@ ALTER TABLE configuration_items
         (purchase_cost IS NOT NULL AND useful_life_months IS NOT NULL)
     );
 
--- Create amortization ledger table (append-only audit trail)
-CREATE TABLE amortization_ledger (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ci_id UUID NOT NULL REFERENCES configuration_items(id) ON DELETE CASCADE,
-    entry_date DATE NOT NULL,
-    entry_type VARCHAR(20) NOT NULL
-    CONSTRAINT valid_entry_type
-    CHECK (entry_type IN ('depreciation', 'write_off', 'adjustment', 'correction')),
-
-    -- Financial amounts
-    amount DECIMAL(15,2) NOT NULL,
-    book_value_before DECIMAL(15,2) NOT NULL,
-    book_value_after DECIMAL(15,2) NOT NULL,
-
-    -- Period information for depreciation entries
-    period_start_date DATE,
-    period_end_date DATE,
-    days_in_period INTEGER,
-
-    -- Adjustment and correction metadata
-    adjustment_reason TEXT,
-    adjustment_reference VARCHAR(100),
-    corrects_entry_id UUID REFERENCES amortization_ledger(id),
-
-    -- Audit fields
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_by UUID REFERENCES users(id),
-
-    -- System-generated fields
-    is_system_generated BOOLEAN DEFAULT false,
-    batch_run_id UUID REFERENCES amortization_runs(id),
-    sequence_number INTEGER NOT NULL,
-
-    -- Natural ordering for audit trail
-    CONSTRAINT unique_ledger_entry UNIQUE (ci_id, entry_date, sequence_number)
-);
-
 -- Create amortization runs table (scheduler execution tracking)
 CREATE TABLE amortization_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     run_date DATE NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending'
     CONSTRAINT valid_run_status
-    CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+    CHECK (status IN ('pending', 'started', 'running', 'completed', 'partial', 'failed', 'cancelled')),
 
     -- Execution metrics
     started_at TIMESTAMP WITH TIME ZONE,
@@ -101,12 +64,57 @@ CREATE TABLE amortization_runs (
     -- Configuration snapshot
     run_config JSONB DEFAULT '{}',
 
+    -- Manual vs scheduled run identification
+    is_manual BOOLEAN DEFAULT false NOT NULL,
+
     -- System fields
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_by UUID REFERENCES users(id),
 
     -- Unique constraint for one run per day
     CONSTRAINT unique_run_per_date UNIQUE (run_date)
+);
+
+-- Create amortization ledger table (append-only audit trail)
+CREATE TABLE amortization_ledger (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ci_id UUID NOT NULL REFERENCES configuration_items(id) ON DELETE CASCADE,
+    entry_date DATE NOT NULL,
+    entry_type VARCHAR(20) NOT NULL
+    CONSTRAINT valid_entry_type
+    CHECK (entry_type IN ('depreciation', 'write_off', 'adjustment', 'correction')),
+
+    -- Financial amounts
+    amount DECIMAL(15,2) NOT NULL,
+    book_value_before DECIMAL(15,2) NOT NULL,
+    book_value_after DECIMAL(15,2) NOT NULL,
+    accumulated_depreciation DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+
+    -- Description field for all entry types
+    description TEXT,
+
+    -- Period information for depreciation entries
+    period_start_date DATE,
+    period_end_date DATE,
+    days_in_period INTEGER,
+
+    -- Adjustment and correction metadata
+    adjustment_reason TEXT,
+    adjustment_reference VARCHAR(100),
+    corrects_entry_id UUID REFERENCES amortization_ledger(id),
+
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by UUID REFERENCES users(id),
+
+    -- System-generated fields
+    is_system_generated BOOLEAN DEFAULT false,
+    batch_run_id UUID REFERENCES amortization_runs(id),
+    amortization_run_id UUID REFERENCES amortization_runs(id),
+    sequence_number INTEGER NOT NULL,
+
+    -- Natural ordering for audit trail
+    CONSTRAINT unique_ledger_entry UNIQUE (ci_id, entry_date, sequence_number)
 );
 
 -- Create amortization summaries table for optimized reporting
@@ -159,6 +167,7 @@ CREATE INDEX idx_ledger_entry_date ON amortization_ledger(entry_date);
 CREATE INDEX idx_ledger_entry_type ON amortization_ledger(entry_type);
 CREATE INDEX idx_ledger_created_at ON amortization_ledger(created_at);
 CREATE INDEX idx_ledger_batch_run ON amortization_ledger(batch_run_id) WHERE batch_run_id IS NOT NULL;
+CREATE INDEX idx_ledger_amortization_run ON amortization_ledger(amortization_run_id) WHERE amortization_run_id IS NOT NULL;
 
 -- Composite indexes for common queries
 CREATE INDEX idx_ledger_ci_date_type ON amortization_ledger(ci_id, entry_date, entry_type);
@@ -438,3 +447,13 @@ BEGIN
     RETURN next_seq;
 END;
 $$ language 'plpgsql';
+
+-- Fix amortization runs constraint to allow multiple manual runs
+ALTER TABLE amortization_runs
+    DROP CONSTRAINT IF EXISTS unique_run_per_date;
+
+-- Add the new constraint that allows multiple manual runs but only one scheduled run per day
+ALTER TABLE amortization_runs
+    ADD CONSTRAINT unique_scheduled_run_per_date
+    UNIQUE (run_date, is_manual)
+    DEFERRABLE INITIALLY DEFERRED;
