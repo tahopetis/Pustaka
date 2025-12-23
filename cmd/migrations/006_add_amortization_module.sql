@@ -280,15 +280,15 @@ CREATE TRIGGER set_ledger_sequence_trigger
 
 -- Update lifecycle statuses with amortization behavior
 UPDATE lifecycle_statuses SET amortization_behavior = 'pending' WHERE name IN (
-    'planned', 'on_order', 'in_stock', 'pending_install'
+    'planned', 'on_order'
 );
 
 UPDATE lifecycle_statuses SET amortization_behavior = 'active' WHERE name IN (
-    'operational', 'in_maintenance', 'defective_repair'
+    'operational', 'in_maintenance', 'defective_repair', 'in_stock', 'pending_install', 'retired'
 );
 
 UPDATE lifecycle_statuses SET amortization_behavior = 'terminal' WHERE name IN (
-    'retired', 'disposed', 'missing_stolen'
+    'disposed', 'missing_stolen'
 );
 
 -- Add RBAC permissions for amortization management
@@ -451,9 +451,11 @@ $$ language 'plpgsql';
 -- Fix amortization runs constraint to allow multiple manual runs
 ALTER TABLE amortization_runs
     DROP CONSTRAINT IF EXISTS unique_run_per_date;
-
--- Add the new constraint that allows multiple manual runs but only one scheduled run per day
 ALTER TABLE amortization_runs
-    ADD CONSTRAINT unique_scheduled_run_per_date
-    UNIQUE (run_date, is_manual)
-    DEFERRABLE INITIALLY DEFERRED;
+    DROP CONSTRAINT IF EXISTS unique_scheduled_run_per_date;
+
+-- Add a partial unique index that only restricts scheduled runs (is_manual=false)
+-- This allows multiple manual runs per day but only one scheduled run per day
+CREATE UNIQUE INDEX unique_scheduled_run_per_date
+    ON amortization_runs (run_date)
+    WHERE is_manual = false;

@@ -799,6 +799,7 @@ func (r *repository) CreateAmortizationRun(ctx context.Context, run *Amortizatio
 			id,
 			status,
 			run_date,
+			is_manual,
 			started_at,
 			completed_at,
 			total_cis_processed,
@@ -811,13 +812,14 @@ func (r *repository) CreateAmortizationRun(ctx context.Context, run *Amortizatio
 			run_config,
 			created_at,
 			created_by
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 	`
 
 	_, err := r.db.Exec(ctx, query,
 		run.ID,
 		run.Status,
 		run.ProcessingDate,
+		run.IsManual,
 		run.StartedAt,
 		run.CompletedAt,
 		run.ProcessedCIs,
@@ -891,6 +893,7 @@ func (r *repository) GetAmortizationRun(ctx context.Context, runID uuid.UUID) (*
 			id,
 			status,
 			run_date,
+			is_manual,
 			started_at,
 			completed_at,
 			total_cis_processed,
@@ -926,6 +929,7 @@ func (r *repository) GetAmortizationRun(ctx context.Context, runID uuid.UUID) (*
 		&run.ID,
 		&run.Status,
 		&run.ProcessingDate,
+		&run.IsManual,
 		&run.StartedAt,
 		&run.CompletedAt,
 		&totalCisProcessed,
@@ -1047,6 +1051,7 @@ func (r *repository) ListAmortizationRuns(ctx context.Context, filters *Amortiza
 			id,
 			status,
 			run_date,
+			is_manual,
 			started_at,
 			completed_at,
 			total_cis_processed,
@@ -1097,6 +1102,7 @@ func (r *repository) ListAmortizationRuns(ctx context.Context, filters *Amortiza
 			&run.ID,
 			&run.Status,
 			&run.ProcessingDate,
+			&run.IsManual,
 			&run.StartedAt,
 			&run.CompletedAt,
 			&totalCisProcessed,
