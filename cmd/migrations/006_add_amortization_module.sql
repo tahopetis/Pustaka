@@ -80,9 +80,9 @@ CREATE TABLE amortization_ledger (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ci_id UUID NOT NULL REFERENCES configuration_items(id) ON DELETE CASCADE,
     entry_date DATE NOT NULL,
-    entry_type VARCHAR(20) NOT NULL
+    entry_type VARCHAR(30) NOT NULL
     CONSTRAINT valid_entry_type
-    CHECK (entry_type IN ('depreciation', 'write_off', 'adjustment', 'correction')),
+    CHECK (entry_type IN ('depreciation', 'monthly_depreciation', 'catch_up_depreciation', 'write_off', 'adjustment', 'correction')),
 
     -- Financial amounts
     amount DECIMAL(15,2) NOT NULL,
