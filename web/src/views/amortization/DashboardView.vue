@@ -7,6 +7,13 @@
       </p>
     </div>
 
+    <!-- Adjustment Dialog -->
+    <AdjustmentDialog
+      :is-open="showAdjustmentDialog"
+      @close="showAdjustmentDialog = false"
+      @created="handleAdjustmentCreated"
+    />
+
     <!-- Key Metrics -->
     <div class="metrics-grid">
       <div class="metric-card">
@@ -77,6 +84,12 @@
           <h3>Reports</h3>
           <p>Generate amortization reports</p>
         </router-link>
+
+        <button @click="showAdjustmentDialog = true" class="action-card action-button">
+          <i class="fas fa-edit"></i>
+          <h3>Create Adjustment</h3>
+          <p>Record manual adjustment to asset book value</p>
+        </button>
       </div>
     </div>
 
@@ -115,10 +128,12 @@
 import { ref, onMounted } from 'vue'
 import { useAmortizationStore } from '@/stores/amortization'
 import type { AmortizationLedgerEntry, AmortizationMetrics } from '@/types/amortization'
+import AdjustmentDialog from '@/components/amortization/AdjustmentDialog.vue'
 
 const amortizationStore = useAmortizationStore()
 
 const loading = ref(true)
+const showAdjustmentDialog = ref(false)
 const metrics = ref<AmortizationMetrics>({
   total_amortizable_assets: 0,
   total_book_value: 0,
@@ -180,6 +195,11 @@ const getActivityIcon = (entryType: string): string => {
     default:
       return 'fas fa-circle'
   }
+}
+
+const handleAdjustmentCreated = async () => {
+  // Reload dashboard data to show the new adjustment
+  await loadDashboardData()
 }
 </script>
 
@@ -291,6 +311,13 @@ const getActivityIcon = (entryType: string): string => {
   font-size: 0.875rem;
   color: #6b7280;
   margin: 0;
+}
+
+.action-button {
+  cursor: pointer;
+  border: none;
+  background: white;
+  width: 100%;
 }
 
 .recent-activity h2 {
