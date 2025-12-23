@@ -13,6 +13,7 @@ type EventPublisherInterface interface {
 	PublishAmortizationProcessed(ctx context.Context, event *AmortizationProcessedEvent) error
 	PublishAmortizationWrittenOff(ctx context.Context, event *AmortizationWrittenOffEvent) error
 	PublishAmortizationAdjustmentCreated(ctx context.Context, event *AmortizationAdjustmentCreatedEvent) error
+	PublishAmortizationRestructured(ctx context.Context, event *AmortizationRestructuredEvent) error
 	PublishAmortizationRunStarted(ctx context.Context, event *AmortizationRunStartedEvent) error
 	PublishAmortizationRunCompleted(ctx context.Context, event *AmortizationRunCompletedEvent) error
 	PublishAmortizationRunFailed(ctx context.Context, event *AmortizationRunFailedEvent) error
@@ -63,6 +64,17 @@ type AmortizationAdjustmentCreatedEvent struct {
 	Timestamp   string    `json:"timestamp"`
 }
 
+type AmortizationRestructuredEvent struct {
+	CIID                    uuid.UUID `json:"ci_id"`
+	UserID                  uuid.UUID `json:"user_id"`
+	OldUsefulLife          int       `json:"old_useful_life"`
+	NewUsefulLife          int       `json:"new_useful_life"`
+	OldMonthlyDepreciation float64   `json:"old_monthly_depreciation"`
+	NewMonthlyDepreciation float64   `json:"new_monthly_depreciation"`
+	Reason                 string    `json:"reason"`
+	Timestamp              string    `json:"timestamp"`
+}
+
 type AmortizationRunStartedEvent struct {
 	RunID        uuid.UUID `json:"run_id"`
 	TriggeredBy  *uuid.UUID `json:"triggered_by"`
@@ -110,6 +122,12 @@ func (e *eventPublisher) PublishAmortizationWrittenOff(ctx context.Context, even
 func (e *eventPublisher) PublishAmortizationAdjustmentCreated(ctx context.Context, event *AmortizationAdjustmentCreatedEvent) error {
 	// Stub implementation
 	e.logger.Info().Interface("event", event).Msg("Publishing amortization adjustment created event")
+	return nil
+}
+
+func (e *eventPublisher) PublishAmortizationRestructured(ctx context.Context, event *AmortizationRestructuredEvent) error {
+	// Stub implementation
+	e.logger.Info().Interface("event", event).Msg("Publishing amortization restructured event")
 	return nil
 }
 

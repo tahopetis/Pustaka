@@ -12,7 +12,9 @@ import type {
   AmortizationLedgerFilters,
   AssetFinancialsFilters,
   ApiResponse,
-  PaginatedResponse
+  PaginatedResponse,
+  RestructuringCalculation,
+  RestructureResult
 } from '@/types/amortization'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
@@ -147,6 +149,30 @@ class AmortizationApiService {
   // Adjustment Entries
   async createAdjustment(ciId: string, adjustment: AdjustmentEntry): Promise<AmortizationLedgerEntry> {
     const response = await this.api.post('/adjustments', { ...adjustment, ci_id: ciId })
+    return response.data
+  }
+
+  // Restructuring (useful life changes with prospective recalculation)
+  async previewRestructuring(ciId: string, newUsefulLifeMonths: number): Promise<RestructuringCalculation> {
+    const response = await this.api.post('/restructuring/preview', {
+      ci_id: ciId,
+      new_useful_life_months: newUsefulLifeMonths
+    })
+    return response.data
+  }
+
+  async executeRestructuring(
+    ciId: string,
+    newUsefulLifeMonths: number,
+    reason: string,
+    effectiveDate?: Date
+  ): Promise<RestructureResult> {
+    const response = await this.api.post('/restructuring', {
+      ci_id: ciId,
+      new_useful_life_months: newUsefulLifeMonths,
+      reason,
+      effective_date: effectiveDate
+    })
     return response.data
   }
 }

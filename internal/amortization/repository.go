@@ -50,6 +50,11 @@ func (r *repository) GetAmortizableCI(ctx context.Context, ciID uuid.UUID) (*Amo
 				),
 				0
 			) as accumulated_depreciation,
+			CASE
+				WHEN COALESCE(ci.useful_life_months, 0) > 0
+				THEN ROUND((COALESCE(ci.purchase_cost, 0) - COALESCE(ci.salvage_value, 0)) / NULLIF(ci.useful_life_months, 0)::numeric, 2)
+				ELSE NULL
+			END as monthly_depreciation,
 			ci.created_at,
 			ci.updated_at,
 			ci.created_by,
@@ -74,6 +79,7 @@ func (r *repository) GetAmortizableCI(ctx context.Context, ciID uuid.UUID) (*Amo
 	var amortStartDate sql.NullTime
 	var usefulLifeMonths sql.NullInt32
 	var currentBookValue sql.NullFloat64
+	var monthlyDepreciation sql.NullFloat64
 
 	err := r.db.QueryRow(ctx, query, ciID).Scan(
 		&ci.ID,
@@ -89,6 +95,7 @@ func (r *repository) GetAmortizableCI(ctx context.Context, ciID uuid.UUID) (*Amo
 		&usefulLifeMonths,
 		&currentBookValue,
 		&ci.AccumulatedDepreciation,
+		&monthlyDepreciation,
 		&ci.CreatedAt,
 		&ci.UpdatedAt,
 		&ci.CreatedBy,
@@ -137,6 +144,10 @@ func (r *repository) GetAmortizableCI(ctx context.Context, ciID uuid.UUID) (*Amo
 		ci.CurrentBookValue = currentBookValue.Float64
 	} else {
 		ci.CurrentBookValue = 0.0
+	}
+
+	if monthlyDepreciation.Valid {
+		ci.MonthlyDepreciation = &monthlyDepreciation.Float64
 	}
 
 	// Set lifecycle status if available
@@ -287,6 +298,11 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 			COALESCE(ci.useful_life_months, 0) as useful_life_months,
 			COALESCE(ci.current_book_value, 0) as current_book_value,
 			COALESCE(ci.purchase_cost - COALESCE(ci.current_book_value, 0), 0) as accumulated_depreciation,
+			CASE
+				WHEN COALESCE(ci.useful_life_months, 0) > 0
+				THEN ROUND((COALESCE(ci.purchase_cost, 0) - COALESCE(ci.salvage_value, 0)) / NULLIF(ci.useful_life_months, 0)::numeric, 2)
+				ELSE NULL
+			END as monthly_depreciation,
 			ci.created_at,
 			ci.updated_at,
 			ci.created_by,
@@ -320,6 +336,7 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 		var lifecycleStatusName sql.NullString
 		var amortizationBehavior sql.NullString
 		var amortStartDate sql.NullTime
+		var monthlyDepreciation sql.NullFloat64
 
 		err := rows.Scan(
 			&ci.ID,
@@ -335,6 +352,7 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 			&ci.UsefulLifeMonths,
 			&ci.CurrentBookValue,
 			&ci.AccumulatedDepreciation,
+			&monthlyDepreciation,
 			&ci.CreatedAt,
 			&ci.UpdatedAt,
 			&ci.CreatedBy,
@@ -353,6 +371,11 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 		// Handle nullable amortization start date
 		if amortStartDate.Valid {
 			ci.AmortStartDate = &amortStartDate.Time
+		}
+
+		// Handle nullable monthly depreciation
+		if monthlyDepreciation.Valid {
+			ci.MonthlyDepreciation = &monthlyDepreciation.Float64
 		}
 
 		// Set lifecycle status if available

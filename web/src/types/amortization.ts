@@ -22,7 +22,7 @@ export interface AmortizationLedgerEntry {
   id: string
   ci_id: string
   amortization_run_id?: string
-  entry_type: 'depreciation' | 'adjustment' | 'write_off' | 'reversal'
+  entry_type: 'depreciation' | 'adjustment' | 'write_off' | 'reversal' | 'restructuring'
   entry_date: string
   description?: string
   amount: number
@@ -147,4 +147,29 @@ export interface AmortizationState {
   schedulerStatus: SchedulerStatus | null
   loading: boolean
   error: string | null
+}
+
+// Restructuring Types
+export interface RestructuringCalculation {
+  current_useful_life_months: number
+  current_monthly_depreciation: number
+  current_book_value: number
+  accumulated_depreciation: number
+  remaining_months_old: number
+  new_useful_life_months: number
+  remaining_months_new: number
+  new_monthly_depreciation: number
+  monthly_depreciation_change: number
+  percent_change: number
+  remaining_life_extension: number
+  new_end_date?: string
+  is_valid: boolean
+  validation_message?: string
+}
+
+export interface RestructureResult {
+  success: boolean
+  calculation: RestructuringCalculation
+  updated_details?: AssetFinancials
+  message?: string
 }

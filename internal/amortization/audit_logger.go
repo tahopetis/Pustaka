@@ -13,6 +13,7 @@ type AuditLoggerInterface interface {
 	LogAmortizationProcessed(ctx context.Context, ciID uuid.UUID, runID uuid.UUID, amount float64, bookValue float64) error
 	LogAmortizationWriteOff(ctx context.Context, ciID uuid.UUID, userID uuid.UUID, amount float64, reason string) error
 	LogAmortizationAdjustmentCreated(ctx context.Context, ciID uuid.UUID, userID uuid.UUID, amount float64, description string) error
+	LogAmortizationRestructured(ctx context.Context, ciID uuid.UUID, userID uuid.UUID, oldUsefulLife, newUsefulLife int, reason string) error
 	LogAmortizationRunStarted(ctx context.Context, runID uuid.UUID, triggeredBy uuid.UUID, totalCIs int) error
 	LogAmortizationRunCompleted(ctx context.Context, runID uuid.UUID, processed, failed, skipped int) error
 }
@@ -72,6 +73,18 @@ func (a *auditLogger) LogAmortizationAdjustmentCreated(ctx context.Context, ciID
 		Float64("amount", amount).
 		Str("description", description).
 		Msg("Amortization adjustment created")
+	return nil
+}
+
+func (a *auditLogger) LogAmortizationRestructured(ctx context.Context, ciID uuid.UUID, userID uuid.UUID, oldUsefulLife, newUsefulLife int, reason string) error {
+	// Fixed implementation
+	a.logger.Info().
+		Str("ci_id", ciID.String()).
+		Str("user_id", userID.String()).
+		Int("old_useful_life_months", oldUsefulLife).
+		Int("new_useful_life_months", newUsefulLife).
+		Str("reason", reason).
+		Msg("Amortization restructured")
 	return nil
 }
 

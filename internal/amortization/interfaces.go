@@ -35,6 +35,10 @@ type Service interface {
 	// Lifecycle Integration
 	HandleTerminalStatusChange(ctx context.Context, ciID uuid.UUID, oldStatusID, newStatusID uuid.UUID, userID uuid.UUID) error
 	RecalculateAmortization(ctx context.Context, ciID uuid.UUID, userID uuid.UUID) error
+
+	// Restructuring (prospective recalculation)
+	PreviewRestructuring(ctx context.Context, ciID uuid.UUID, newUsefulLifeMonths int) (*RestructuringCalculation, error)
+	RestructureAmortization(ctx context.Context, req *RestructureRequest, userID uuid.UUID) (*RestructureResult, error)
 }
 
 // Repository defines the data access interface for amortization operations
@@ -121,6 +125,9 @@ type CalculatorInterface interface {
 	// Configuration validation
 	ValidateAmortizationConfig(ctx context.Context, config *AmortizationConfig) error
 	ValidateAdjustmentAmount(ci *AmortizableCI, amount float64) error
+
+	// Restructuring calculations (prospective recalculation)
+	CalculateRestructuring(ctx context.Context, ci *AmortizableCI, newUsefulLifeMonths int, asOfDate time.Time) (*RestructuringCalculation, error)
 
 	// Projection calculations
 	ProjectFutureValue(ctx context.Context, ci *AmortizableCI, futureDate time.Time) (*ValueProjection, error)

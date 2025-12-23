@@ -472,3 +472,92 @@ func (c *calculatorSimple) calculateConfidenceLevel(ci *AmortizableCI, projectio
 		return "low"
 	}
 }
+
+// CalculateRestructuring calculates the prospective recalculation when useful life changes
+func (c *calculatorSimple) CalculateRestructuring(ctx context.Context, ci *AmortizableCI, newUsefulLifeMonths int, asOfDate time.Time) (*RestructuringCalculation, error) {
+	// Validation
+	if newUsefulLifeMonths <= 0 {
+		return nil, fmt.Errorf("new useful life months must be positive")
+	}
+
+	if ci.AmortStartDate == nil {
+		return nil, fmt.Errorf("amortization start date is not set")
+	}
+
+	if newUsefulLifeMonths == ci.UsefulLifeMonths {
+		return nil, fmt.Errorf("new useful life is the same as current useful life")
+	}
+
+	// Calculate current state
+	currentMonthlyDepreciation := (ci.PurchaseCost - ci.SalvageValue) / float64(ci.UsefulLifeMonths)
+
+	// Calculate elapsed months and remaining months under OLD useful life
+	elapsedMonths := c.calculateElapsedMonths(*ci.AmortStartDate, asOfDate)
+	remainingMonthsOld := ci.UsefulLifeMonths - elapsedMonths
+	if remainingMonthsOld < 0 {
+		remainingMonthsOld = 0
+	}
+
+	// Calculate remaining months under NEW useful life
+	remainingMonthsNew := newUsefulLifeMonths - elapsedMonths
+	if remainingMonthsNew < 0 {
+		return &RestructuringCalculation{
+			IsValid:           false,
+			ValidationMessage: fmt.Sprintf("New useful life (%d months) is less than already elapsed time (%d months)", newUsefulLifeMonths, elapsedMonths),
+		}, nil
+	}
+
+	// Calculate new monthly depreciation using PROSPECTIVE method
+	// Formula: (current_book_value - salvage_value) / remaining_months
+	var newMonthlyDepreciation float64
+	if remainingMonthsNew > 0 {
+		newMonthlyDepreciation = (ci.CurrentBookValue - ci.SalvageValue) / float64(remainingMonthsNew)
+	} else {
+		newMonthlyDepreciation = 0
+	}
+
+	// Calculate changes
+	monthlyDepreciationChange := newMonthlyDepreciation - currentMonthlyDepreciation
+	percentChange := 0.0
+	if currentMonthlyDepreciation != 0 {
+		percentChange = (monthlyDepreciationChange / currentMonthlyDepreciation) * 100
+	}
+
+	// Calculate remaining life extension
+	remainingLifeExtension := remainingMonthsNew - remainingMonthsOld
+
+	// Calculate new end date
+	var newEndDate *time.Time
+	if remainingMonthsNew > 0 && ci.AmortStartDate != nil {
+		endDate := ci.AmortStartDate.AddDate(0, newUsefulLifeMonths, 0)
+		newEndDate = &endDate
+	}
+
+	calculation := &RestructuringCalculation{
+		CurrentUsefulLifeMonths:  ci.UsefulLifeMonths,
+		CurrentMonthlyDepreciation: currentMonthlyDepreciation,
+		CurrentBookValue:         ci.CurrentBookValue,
+		AccumulatedDepreciation:  ci.AccumulatedDepreciation,
+		RemainingMonthsOld:       remainingMonthsOld,
+		NewUsefulLifeMonths:      newUsefulLifeMonths,
+		RemainingMonthsNew:       remainingMonthsNew,
+		NewMonthlyDepreciation:   newMonthlyDepreciation,
+		MonthlyDepreciationChange: monthlyDepreciationChange,
+		PercentChange:            percentChange,
+		RemainingLifeExtension:   remainingLifeExtension,
+		NewEndDate:                newEndDate,
+		IsValid:                  true,
+	}
+
+	c.logger.Info().
+		Str("ci_id", ci.ID.String()).
+		Int("old_useful_life", ci.UsefulLifeMonths).
+		Int("new_useful_life", newUsefulLifeMonths).
+		Float64("old_monthly_depreciation", currentMonthlyDepreciation).
+		Float64("new_monthly_depreciation", newMonthlyDepreciation).
+		Float64("percent_change", percentChange).
+		Int("remaining_months_new", remainingMonthsNew).
+		Msg("Calculated restructuring")
+
+	return calculation, nil
+}

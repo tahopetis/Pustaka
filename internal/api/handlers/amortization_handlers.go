@@ -51,6 +51,10 @@ func (h *AmortizationHandler) RegisterRoutes(r chi.Router) {
 		// Reports and summaries
 		r.Get("/summaries", h.GetAmortizationSummaries)
 		r.Get("/reports/depreciation-schedule", h.GenerateDepreciationSchedule)
+
+		// Restructuring (useful life changes with prospective recalculation)
+		r.Post("/restructuring/preview", h.PreviewRestructuring)
+		r.Post("/restructuring", h.ExecuteRestructuring)
 	})
 }
 
@@ -566,4 +570,78 @@ func (h *AmortizationHandler) handleError(w http.ResponseWriter, err error) {
 	// For now, handle as a generic error
 	// In a full implementation, you'd handle specific amortization error types
 	h.writeError(w, http.StatusInternalServerError, "Internal server error", err)
+}
+
+// PreviewRestructuring handles POST /amortization/restructuring/preview
+func (h *AmortizationHandler) PreviewRestructuring(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var req struct {
+		CIID                uuid.UUID `json:"ci_id"`
+		NewUsefulLifeMonths int        `json:"new_useful_life_months"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	// Validate request
+	if req.CIID == uuid.Nil {
+		h.writeError(w, http.StatusBadRequest, "CI ID is required", nil)
+		return
+	}
+	if req.NewUsefulLifeMonths <= 0 {
+		h.writeError(w, http.StatusBadRequest, "New useful life months must be positive", nil)
+		return
+	}
+
+	// Call service
+	result, err := h.service.PreviewRestructuring(r.Context(), req.CIID, req.NewUsefulLifeMonths)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	// Write response
+	h.writeJSON(w, http.StatusOK, result)
+}
+
+// ExecuteRestructuring handles POST /amortization/restructuring
+func (h *AmortizationHandler) ExecuteRestructuring(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var req amortization.RestructureRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	// Validate request
+	if req.CIID == uuid.Nil {
+		h.writeError(w, http.StatusBadRequest, "CI ID is required", nil)
+		return
+	}
+	if req.NewUsefulLifeMonths <= 0 {
+		h.writeError(w, http.StatusBadRequest, "New useful life months must be positive", nil)
+		return
+	}
+	if req.Reason == "" {
+		h.writeError(w, http.StatusBadRequest, "Reason is required", nil)
+		return
+	}
+
+	// Get user ID from context
+	userID, err := h.getUserID(r)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Unauthorized", err)
+		return
+	}
+
+	// Call service
+	result, err := h.service.RestructureAmortization(r.Context(), &req, userID)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	// Write response
+	h.writeJSON(w, http.StatusOK, result)
 }

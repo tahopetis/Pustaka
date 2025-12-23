@@ -29,6 +29,7 @@ type AmortizableCI struct {
 	UsefulLifeMonths       int          `json:"useful_life_months"`
 	CurrentBookValue       float64      `json:"current_book_value"`
 	AccumulatedDepreciation float64      `json:"accumulated_depreciation"`
+	MonthlyDepreciation    *float64     `json:"monthly_depreciation,omitempty"` // Calculated field
 
 	// Amortization Configuration
 	DepreciationMethod     string       `json:"depreciation_method"` // "straight_line", "declining_balance"
@@ -44,19 +45,20 @@ type AmortizableCI struct {
 
 // AmortizationEntry represents a single amortization ledger entry
 type AmortizationEntry struct {
-	ID                       uuid.UUID  `json:"id"`
-	CIID                     uuid.UUID  `json:"ci_id"`
-	CIName                   string     `json:"ci_name"`
-	AmortizationRunID        *uuid.UUID `json:"amortization_run_id,omitempty"`
-	EntryType                string     `json:"entry_type"` // "depreciation", "adjustment", "write_off", "reversal"
-	EntryDate                time.Time  `json:"entry_date"`
-	Description              *string    `json:"description,omitempty"`
-	Amount                   float64    `json:"amount"`
-	BookValueBefore          float64    `json:"book_value_before"`
-	BookValueAfter           float64    `json:"book_value_after"`
-	AccumulatedDepreciation float64    `json:"accumulated_depreciation"`
-	CreatedAt                time.Time  `json:"created_at"`
-	CreatedBy                *uuid.UUID `json:"created_by,omitempty"`
+	ID                       uuid.UUID              `json:"id"`
+	CIID                     uuid.UUID              `json:"ci_id"`
+	CIName                   string                 `json:"ci_name"`
+	AmortizationRunID        *uuid.UUID             `json:"amortization_run_id,omitempty"`
+	EntryType                string                 `json:"entry_type"` // "depreciation", "adjustment", "write_off", "reversal", "restructuring"
+	EntryDate                time.Time              `json:"entry_date"`
+	Description              *string                `json:"description,omitempty"`
+	Amount                   float64                `json:"amount"`
+	BookValueBefore          float64                `json:"book_value_before"`
+	BookValueAfter           float64                `json:"book_value_after"`
+	AccumulatedDepreciation float64                `json:"accumulated_depreciation"`
+	CreatedAt                time.Time              `json:"created_at"`
+	CreatedBy                *uuid.UUID             `json:"created_by,omitempty"`
+	Metadata                 map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // AmortizationRun represents a batch amortization processing run
@@ -369,4 +371,46 @@ type DepreciationSchedule struct {
 	ReportID  uuid.UUID                   `json:"report_id"`
 	DateRange  DepreciationScheduleRange    `json:"date_range"`
 	Schedule   []DepreciationScheduleEntry   `json:"schedule"`
+}
+
+// RestructuringCalculation represents a prospective recalculation when useful life changes
+type RestructuringCalculation struct {
+	// Current state
+	CurrentUsefulLifeMonths int       `json:"current_useful_life_months"`
+	CurrentMonthlyDepreciation float64 `json:"current_monthly_depreciation"`
+	CurrentBookValue        float64   `json:"current_book_value"`
+	AccumulatedDepreciation float64   `json:"accumulated_depreciation"`
+	RemainingMonthsOld      int       `json:"remaining_months_old"`
+
+	// New configuration
+	NewUsefulLifeMonths     int       `json:"new_useful_life_months"`
+	RemainingMonthsNew      int       `json:"remaining_months_new"`
+	NewMonthlyDepreciation  float64   `json:"new_monthly_depreciation"`
+
+	// Impact
+	MonthlyDepreciationChange float64  `json:"monthly_depreciation_change"`
+	PercentChange            float64  `json:"percent_change"`
+	RemainingLifeExtension   int      `json:"remaining_life_extension"`
+	NewEndDate               *time.Time `json:"new_end_date,omitempty"`
+
+	// Validation
+	IsValid           bool     `json:"is_valid"`
+	ValidationMessage string   `json:"validation_message,omitempty"`
+}
+
+// RestructureRequest represents a request to restructure amortization
+type RestructureRequest struct {
+	CIID              uuid.UUID `json:"ci_id"`
+	NewUsefulLifeMonths int      `json:"new_useful_life_months"`
+	Reason             string    `json:"reason"`
+	EffectiveDate      *time.Time `json:"effective_date,omitempty"`
+}
+
+// RestructureResult represents the result of a restructuring operation
+type RestructureResult struct {
+	Success           bool                      `json:"success"`
+	Calculation       *RestructuringCalculation `json:"calculation,omitempty"`
+	LedgerEntryID     uuid.UUID                 `json:"ledger_entry_id,omitempty"`
+	UpdatedDetails    *AmortizationDetails      `json:"updated_details,omitempty"`
+	Message           string                    `json:"message,omitempty"`
 }

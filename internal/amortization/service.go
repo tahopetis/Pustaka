@@ -393,6 +393,145 @@ func (s *service) RecalculateAmortization(ctx context.Context, ciID uuid.UUID, u
 	return nil
 }
 
+// PreviewRestructuring previews the impact of restructuring amortization (useful life change)
+func (s *service) PreviewRestructuring(ctx context.Context, ciID uuid.UUID, newUsefulLifeMonths int) (*RestructuringCalculation, error) {
+	// Get current CI
+	ci, err := s.repo.GetAmortizableCI(ctx, ciID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CI: %w", err)
+	}
+
+	// Calculate restructuring preview
+	calculation, err := s.calculator.CalculateRestructuring(ctx, ci, newUsefulLifeMonths, time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate restructuring: %w", err)
+	}
+
+	return calculation, nil
+}
+
+// RestructureAmortization performs the actual restructuring with prospective recalculation
+func (s *service) RestructureAmortization(ctx context.Context, req *RestructureRequest, userID uuid.UUID) (*RestructureResult, error) {
+	// Get current CI
+	ci, err := s.repo.GetAmortizableCI(ctx, req.CIID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CI: %w", err)
+	}
+
+	// Calculate restructuring preview
+	effectiveDate := time.Now()
+	if req.EffectiveDate != nil {
+		effectiveDate = *req.EffectiveDate
+	}
+
+	calculation, err := s.calculator.CalculateRestructuring(ctx, ci, req.NewUsefulLifeMonths, effectiveDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate restructuring: %w", err)
+	}
+
+	// Validate
+	if !calculation.IsValid {
+		return &RestructureResult{
+			Success:     false,
+			Calculation: calculation,
+			Message:     calculation.ValidationMessage,
+		}, nil
+	}
+
+	// Use transaction for consistency
+	err = s.repo.WithTransaction(ctx, func(ctx context.Context, tx interface{}) error {
+		// Update useful life
+		updates := &AmortizationConfigUpdates{
+			UsefulLifeMonths: &req.NewUsefulLifeMonths,
+			UpdatedBy:        &userID,
+			UpdatedAt:        &[]time.Time{time.Now()}[0],
+		}
+
+		if err := s.repo.UpdateAmortizationConfig(ctx, req.CIID, updates); err != nil {
+			return fmt.Errorf("failed to update useful life: %w", err)
+		}
+
+		// Create restructuring ledger entry
+		description := fmt.Sprintf("Restructured useful life from %d to %d months. %s", ci.UsefulLifeMonths, req.NewUsefulLifeMonths, req.Reason)
+		entry := &AmortizationEntry{
+			ID:                 uuid.New(),
+			CIID:               req.CIID,
+			EntryType:          "restructuring",
+			EntryDate:          effectiveDate,
+			Description:        &description,
+			Amount:             0, // Restructuring doesn't change book value directly
+			BookValueBefore:    ci.CurrentBookValue,
+			BookValueAfter:     ci.CurrentBookValue,
+			AccumulatedDepreciation: ci.AccumulatedDepreciation,
+			CreatedAt:          time.Now(),
+			CreatedBy:          &userID,
+			Metadata: map[string]interface{}{
+				"old_useful_life_months":     ci.UsefulLifeMonths,
+				"new_useful_life_months":     req.NewUsefulLifeMonths,
+				"old_monthly_depreciation":  calculation.CurrentMonthlyDepreciation,
+				"new_monthly_depreciation":  calculation.NewMonthlyDepreciation,
+				"monthly_change":            calculation.MonthlyDepreciationChange,
+				"percent_change":            calculation.PercentChange,
+				"remaining_months_old":      calculation.RemainingMonthsOld,
+				"remaining_months_new":      calculation.RemainingMonthsNew,
+				"reason":                    req.Reason,
+			},
+		}
+
+		if err := s.repo.CreateLedgerEntry(ctx, entry); err != nil {
+			return fmt.Errorf("failed to create restructuring ledger entry: %w", err)
+		}
+
+		// Invalidate cache
+		s.cache.InvalidateAmortizableCI(ctx, req.CIID)
+		s.cache.InvalidateCILedgerEntries(ctx, req.CIID)
+
+		// Publish event
+		event := &AmortizationRestructuredEvent{
+			CIID:              req.CIID,
+			UserID:            userID,
+			OldUsefulLife:     ci.UsefulLifeMonths,
+			NewUsefulLife:     req.NewUsefulLifeMonths,
+			OldMonthlyDepreciation: calculation.CurrentMonthlyDepreciation,
+			NewMonthlyDepreciation: calculation.NewMonthlyDepreciation,
+			Reason:            req.Reason,
+			Timestamp:         time.Now().Format(time.RFC3339),
+		}
+		s.eventPublisher.PublishAmortizationRestructured(ctx, event)
+
+		// Log audit
+		s.auditLogger.LogAmortizationRestructured(ctx, req.CIID, userID, ci.UsefulLifeMonths, req.NewUsefulLifeMonths, req.Reason)
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Get updated details
+	updatedDetails, err := s.GetAmortizationDetails(ctx, req.CIID)
+	if err != nil {
+		s.logger.Warn().Str("ci_id", req.CIID.String()).Err(err).Msg("Failed to get updated details after restructuring")
+	}
+
+	s.logger.Info().
+		Str("ci_id", req.CIID.String()).
+		Int("old_useful_life", ci.UsefulLifeMonths).
+		Int("new_useful_life", req.NewUsefulLifeMonths).
+		Float64("old_monthly_depreciation", calculation.CurrentMonthlyDepreciation).
+		Float64("new_monthly_depreciation", calculation.NewMonthlyDepreciation).
+		Str("user_id", userID.String()).
+		Msg("Restructured amortization with prospective recalculation")
+
+	return &RestructureResult{
+		Success:        true,
+		Calculation:    calculation,
+		UpdatedDetails: updatedDetails,
+		Message:        fmt.Sprintf("Successfully restructured useful life from %d to %d months", ci.UsefulLifeMonths, req.NewUsefulLifeMonths),
+	}, nil
+}
+
 // Helper methods
 
 func (s *service) enrichWithCalculatedFields(ctx context.Context, ci *AmortizableCI) *AmortizationDetails {

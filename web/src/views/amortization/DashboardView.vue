@@ -14,6 +14,13 @@
       @created="handleAdjustmentCreated"
     />
 
+    <!-- Restructure Dialog -->
+    <RestructureDialog
+      :show="showRestructureDialog"
+      @close="showRestructureDialog = false"
+      @success="handleRestructureSuccess"
+    />
+
     <!-- Key Metrics -->
     <div class="metrics-grid">
       <div class="metric-card">
@@ -90,6 +97,12 @@
           <h3>Create Adjustment</h3>
           <p>Record manual adjustment to asset book value</p>
         </button>
+
+        <button @click="showRestructureDialog = true" class="action-card action-button">
+          <i class="fas fa-clock"></i>
+          <h3>Restructure Amortization</h3>
+          <p>Change useful life with prospective recalculation</p>
+        </button>
       </div>
     </div>
 
@@ -129,11 +142,13 @@ import { ref, onMounted } from 'vue'
 import { useAmortizationStore } from '@/stores/amortization'
 import type { AmortizationLedgerEntry, AmortizationMetrics } from '@/types/amortization'
 import AdjustmentDialog from '@/components/amortization/AdjustmentDialog.vue'
+import RestructureDialog from '@/components/amortization/RestructureDialog.vue'
 
 const amortizationStore = useAmortizationStore()
 
 const loading = ref(true)
 const showAdjustmentDialog = ref(false)
+const showRestructureDialog = ref(false)
 const metrics = ref<AmortizationMetrics>({
   total_amortizable_assets: 0,
   total_book_value: 0,
@@ -192,6 +207,8 @@ const getActivityIcon = (entryType: string): string => {
       return 'fas fa-times-circle'
     case 'reversal':
       return 'fas fa-undo'
+    case 'restructuring':
+      return 'fas fa-clock'
     default:
       return 'fas fa-circle'
   }
@@ -199,6 +216,11 @@ const getActivityIcon = (entryType: string): string => {
 
 const handleAdjustmentCreated = async () => {
   // Reload dashboard data to show the new adjustment
+  await loadDashboardData()
+}
+
+const handleRestructureSuccess = async () => {
+  // Reload dashboard data to show the restructuring
   await loadDashboardData()
 }
 </script>

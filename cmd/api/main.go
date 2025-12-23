@@ -513,6 +513,10 @@ func setupRouter(
 					r.Use(middleware.RBAC("amortization:configure"))
 					r.Put("/configuration-items/{ciId}", amortizationHandlers.UpdateAmortizationConfig)
 					r.Post("/adjustments", amortizationHandlers.CreateAdjustment)
+
+					// Restructuring routes (require configure permission)
+					r.Post("/restructuring/preview", amortizationHandlers.PreviewRestructuring)
+					r.Post("/restructuring", amortizationHandlers.ExecuteRestructuring)
 				})
 
 				r.Group(func(r chi.Router) {
