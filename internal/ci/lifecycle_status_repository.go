@@ -27,15 +27,15 @@ func (r *LifecycleStatusRepository) Create(ctx context.Context, ls *LifecycleSta
 	query := `
 		INSERT INTO lifecycle_statuses (
 			id, name, display_name, description, color, icon, sort_order,
-			is_active, is_system, created_at, updated_at, created_by, updated_by
+			is_active, is_system, amortization_behavior, created_at, updated_at, created_by, updated_by
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
 		) RETURNING id, created_at, updated_at
 	`
 
 	err := r.db.QueryRow(ctx, query,
 		ls.ID, ls.Name, ls.DisplayName, ls.Description, ls.Color, ls.Icon, ls.SortOrder,
-		ls.IsActive, ls.IsSystem, ls.CreatedAt, ls.UpdatedAt, ls.CreatedBy, ls.UpdatedBy,
+		ls.IsActive, ls.IsSystem, ls.AmortizationBehavior, ls.CreatedAt, ls.UpdatedAt, ls.CreatedBy, ls.UpdatedBy,
 	).Scan(&ls.ID, &ls.CreatedAt, &ls.UpdatedAt)
 
 	if err != nil {
@@ -49,7 +49,7 @@ func (r *LifecycleStatusRepository) Create(ctx context.Context, ls *LifecycleSta
 func (r *LifecycleStatusRepository) GetByID(ctx context.Context, id uuid.UUID) (*LifecycleStatus, error) {
 	query := `
 		SELECT id, name, display_name, description, color, icon, sort_order,
-			   is_active, is_system, created_at, updated_at, created_by, updated_by
+			   is_active, is_system, amortization_behavior, created_at, updated_at, created_by, updated_by
 		FROM lifecycle_statuses
 		WHERE id = $1
 	`
@@ -57,7 +57,7 @@ func (r *LifecycleStatusRepository) GetByID(ctx context.Context, id uuid.UUID) (
 	ls := &LifecycleStatus{}
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&ls.ID, &ls.Name, &ls.DisplayName, &ls.Description, &ls.Color, &ls.Icon, &ls.SortOrder,
-		&ls.IsActive, &ls.IsSystem, &ls.CreatedAt, &ls.UpdatedAt, &ls.CreatedBy, &ls.UpdatedBy,
+		&ls.IsActive, &ls.IsSystem, &ls.AmortizationBehavior, &ls.CreatedAt, &ls.UpdatedAt, &ls.CreatedBy, &ls.UpdatedBy,
 	)
 
 	if err != nil {
@@ -74,7 +74,7 @@ func (r *LifecycleStatusRepository) GetByID(ctx context.Context, id uuid.UUID) (
 func (r *LifecycleStatusRepository) GetByName(ctx context.Context, name string) (*LifecycleStatus, error) {
 	query := `
 		SELECT id, name, display_name, description, color, icon, sort_order,
-			   is_active, is_system, created_at, updated_at, created_by, updated_by
+			   is_active, is_system, amortization_behavior, created_at, updated_at, created_by, updated_by
 		FROM lifecycle_statuses
 		WHERE name = $1
 	`
@@ -82,7 +82,7 @@ func (r *LifecycleStatusRepository) GetByName(ctx context.Context, name string) 
 	ls := &LifecycleStatus{}
 	err := r.db.QueryRow(ctx, query, name).Scan(
 		&ls.ID, &ls.Name, &ls.DisplayName, &ls.Description, &ls.Color, &ls.Icon, &ls.SortOrder,
-		&ls.IsActive, &ls.IsSystem, &ls.CreatedAt, &ls.UpdatedAt, &ls.CreatedBy, &ls.UpdatedBy,
+		&ls.IsActive, &ls.IsSystem, &ls.AmortizationBehavior, &ls.CreatedAt, &ls.UpdatedAt, &ls.CreatedBy, &ls.UpdatedBy,
 	)
 
 	if err != nil {
@@ -149,7 +149,7 @@ func (r *LifecycleStatusRepository) List(ctx context.Context, filters *ListLifec
 	// Get records
 	query := fmt.Sprintf(`
 		SELECT id, name, display_name, description, color, icon, sort_order,
-			   is_active, is_system, created_at, updated_at, created_by, updated_by
+			   is_active, is_system, amortization_behavior, created_at, updated_at, created_by, updated_by
 		FROM lifecycle_statuses
 		%s %s
 		LIMIT $%d OFFSET $%d
@@ -167,7 +167,7 @@ func (r *LifecycleStatusRepository) List(ctx context.Context, filters *ListLifec
 		var ls LifecycleStatus
 		err := rows.Scan(
 			&ls.ID, &ls.Name, &ls.DisplayName, &ls.Description, &ls.Color, &ls.Icon, &ls.SortOrder,
-			&ls.IsActive, &ls.IsSystem, &ls.CreatedAt, &ls.UpdatedAt, &ls.CreatedBy, &ls.UpdatedBy,
+			&ls.IsActive, &ls.IsSystem, &ls.AmortizationBehavior, &ls.CreatedAt, &ls.UpdatedAt, &ls.CreatedBy, &ls.UpdatedBy,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan lifecycle status row: %w", err)
@@ -194,7 +194,7 @@ func (r *LifecycleStatusRepository) List(ctx context.Context, filters *ListLifec
 func (r *LifecycleStatusRepository) GetActive(ctx context.Context) ([]LifecycleStatus, error) {
 	query := `
 		SELECT id, name, display_name, description, color, icon, sort_order,
-			   is_active, is_system, created_at, updated_at, created_by, updated_by
+			   is_active, is_system, amortization_behavior, created_at, updated_at, created_by, updated_by
 		FROM lifecycle_statuses
 		WHERE is_active = true
 		ORDER BY sort_order ASC, display_name ASC
@@ -211,7 +211,7 @@ func (r *LifecycleStatusRepository) GetActive(ctx context.Context) ([]LifecycleS
 		var ls LifecycleStatus
 		err := rows.Scan(
 			&ls.ID, &ls.Name, &ls.DisplayName, &ls.Description, &ls.Color, &ls.Icon, &ls.SortOrder,
-			&ls.IsActive, &ls.IsSystem, &ls.CreatedAt, &ls.UpdatedAt, &ls.CreatedBy, &ls.UpdatedBy,
+			&ls.IsActive, &ls.IsSystem, &ls.AmortizationBehavior, &ls.CreatedAt, &ls.UpdatedAt, &ls.CreatedBy, &ls.UpdatedBy,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan lifecycle status row: %w", err)
@@ -231,14 +231,14 @@ func (r *LifecycleStatusRepository) Update(ctx context.Context, ls *LifecycleSta
 	query := `
 		UPDATE lifecycle_statuses
 		SET display_name = $2, description = $3, color = $4, icon = $5, sort_order = $6,
-			is_active = $7, updated_at = $8, updated_by = $9
+			is_active = $7, amortization_behavior = $8, updated_at = $9, updated_by = $10
 		WHERE id = $1
 		RETURNING updated_at
 	`
 
 	err := r.db.QueryRow(ctx, query,
 		ls.ID, ls.DisplayName, ls.Description, ls.Color, ls.Icon, ls.SortOrder,
-		ls.IsActive, time.Now(), ls.UpdatedBy,
+		ls.IsActive, ls.AmortizationBehavior, time.Now(), ls.UpdatedBy,
 	).Scan(&ls.UpdatedAt)
 
 	if err != nil {
@@ -295,13 +295,14 @@ func (r *LifecycleStatusRepository) GetUsageStats(ctx context.Context) (*Lifecyc
 	// Get usage by status
 	query := `
 		SELECT ls.id, ls.name, ls.display_name, ls.description, ls.color, ls.icon,
-			   ls.sort_order, ls.is_active, ls.is_system, ls.created_at, ls.updated_at,
-			   ls.created_by, ls.updated_by, COUNT(ci.id) as usage_count
+			   ls.sort_order, ls.is_active, ls.is_system, ls.amortization_behavior,
+			   ls.created_at, ls.updated_at, ls.created_by, ls.updated_by,
+			   COUNT(ci.id) as usage_count
 		FROM lifecycle_statuses ls
 		LEFT JOIN configuration_items ci ON ls.id = ci.lifecycle_status_id
 		GROUP BY ls.id, ls.name, ls.display_name, ls.description, ls.color, ls.icon,
-				 ls.sort_order, ls.is_active, ls.is_system, ls.created_at, ls.updated_at,
-				 ls.created_by, ls.updated_by
+				 ls.sort_order, ls.is_active, ls.is_system, ls.amortization_behavior,
+				 ls.created_at, ls.updated_at, ls.created_by, ls.updated_by
 		ORDER BY ls.sort_order ASC, ls.display_name ASC
 	`
 
@@ -319,8 +320,8 @@ func (r *LifecycleStatusRepository) GetUsageStats(ctx context.Context) (*Lifecyc
 		var usageCount int64
 		err := rows.Scan(
 			&ls.ID, &ls.Name, &ls.DisplayName, &ls.Description, &ls.Color, &ls.Icon,
-			&ls.SortOrder, &ls.IsActive, &ls.IsSystem, &ls.CreatedAt, &ls.UpdatedAt,
-			&ls.CreatedBy, &ls.UpdatedBy, &usageCount,
+			&ls.SortOrder, &ls.IsActive, &ls.IsSystem, &ls.AmortizationBehavior,
+			&ls.CreatedAt, &ls.UpdatedAt, &ls.CreatedBy, &ls.UpdatedBy, &usageCount,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan usage row: %w", err)

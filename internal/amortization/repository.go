@@ -116,7 +116,6 @@ func (r *repository) GetAmortizableCI(ctx context.Context, ciID uuid.UUID) (*Amo
 		return nil, fmt.Errorf("failed to get amortizable CI: %w", err)
 	}
 
-	
 	// Convert nullable financial fields to struct fields
 	if purchaseCost.Valid {
 		ci.PurchaseCost = purchaseCost.Float64
@@ -180,11 +179,11 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 		}
 		whereConditions = append(whereConditions, fmt.Sprintf("ci.ci_type = ANY(ARRAY[%s])", strings.Join(placeholders, ",")))
 		// Convert UUIDs to interface{}
-	uuidArgs := make([]interface{}, len(filters.CITypeIDs))
-	for i, id := range filters.CITypeIDs {
-		uuidArgs[i] = id
-	}
-	args = append(args, uuidArgs...)
+		uuidArgs := make([]interface{}, len(filters.CITypeIDs))
+		for i, id := range filters.CITypeIDs {
+			uuidArgs[i] = id
+		}
+		args = append(args, uuidArgs...)
 		argIndex += len(filters.CITypeIDs)
 	}
 
@@ -228,12 +227,12 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 	orderBy := "ci.name ASC"
 	if filters.SortBy != nil {
 		validSorts := map[string]string{
-			"name":                    "ci.name",
-			"ci_type":                 "ci.ci_type",
-			"purchase_cost":           "ci.purchase_cost",
-			"current_book_value":      "ci.current_book_value",
-			"amort_start_date":        "ci.amort_start_date",
-			"created_at":              "ci.created_at",
+			"name":               "ci.name",
+			"ci_type":            "ci.ci_type",
+			"purchase_cost":      "ci.purchase_cost",
+			"current_book_value": "ci.current_book_value",
+			"amort_start_date":   "ci.amort_start_date",
+			"created_at":         "ci.created_at",
 		}
 		if sortField, ok := validSorts[*filters.SortBy]; ok {
 			orderBy = sortField
@@ -397,11 +396,11 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 
 	return &AmortizationCIList{
-		CIs:         cis,
-		TotalCount:  int(total),
-		Page:        page,
-		PageSize:    pageSize,
-		TotalPages:  totalPages,
+		CIs:        cis,
+		TotalCount: int(total),
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
 	}, nil
 }
 
@@ -558,7 +557,7 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 			"entry_date": "entry_date",
 			"amount":     "amount",
 			"created_at": "created_at",
-					}
+		}
 		if sortField, ok := validSorts[*filters.SortBy]; ok {
 			orderBy = sortField
 			if filters.SortOrder != nil && *filters.SortOrder == "asc" {
@@ -1206,12 +1205,12 @@ func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryR
 	}
 
 	return &AmortizationSummary{
-		GroupBy:            "all",
-		Groups:             []AmortizationGroup{},
-		TotalCIs:           int(totalCIs),
-		TotalBookValue:     totalBookValue,
-		TotalDepreciation:  totalDepreciation,
-		GeneratedAt:        time.Now(),
+		GroupBy:           "all",
+		Groups:            []AmortizationGroup{},
+		TotalCIs:          int(totalCIs),
+		TotalBookValue:    totalBookValue,
+		TotalDepreciation: totalDepreciation,
+		GeneratedAt:       time.Now(),
 	}, nil
 }
 
@@ -1248,7 +1247,7 @@ func (r *repository) GetCIsForProcessing(ctx context.Context, processingDate tim
 	if err != nil {
 		r.logger.ErrorService("amortization", "get_cis_for_processing", err, map[string]interface{}{
 			"processing_date": processingDate,
-			"query":          query,
+			"query":           query,
 		})
 		return nil, fmt.Errorf("failed to get CIs for processing: %w", err)
 	}
@@ -1292,6 +1291,99 @@ func (r *repository) WithTransaction(ctx context.Context, fn func(context.Contex
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// GetAmortizationSettings retrieves global amortization settings
+func (r *repository) GetAmortizationSettings(ctx context.Context) (*AmortizationSettings, error) {
+	query := `
+		SELECT
+			id,
+			currency,
+			default_useful_life_months,
+			created_at,
+			updated_at,
+			created_by,
+			updated_by
+		FROM amortization_settings
+		WHERE id = 'global'
+	`
+
+	var settings AmortizationSettings
+	var createdBy sql.NullString
+	var updatedBy sql.NullString
+
+	err := r.db.QueryRow(ctx, query).Scan(
+		&settings.ID,
+		&settings.Currency,
+		&settings.DefaultUsefulLifeMonths,
+		&settings.CreatedAt,
+		&settings.UpdatedAt,
+		&createdBy,
+		&updatedBy,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			// Return default settings if not found
+			return &AmortizationSettings{
+				ID:                      "global",
+				Currency:                "USD",
+				DefaultUsefulLifeMonths: 36,
+				CreatedAt:               time.Now(),
+				UpdatedAt:               time.Now(),
+			}, nil
+		}
+		r.logger.ErrorService("amortization", "get_amortization_settings", err, nil)
+		return nil, fmt.Errorf("failed to get amortization settings: %w", err)
+	}
+
+	if createdBy.Valid {
+		if uuid, err := uuid.Parse(createdBy.String); err == nil {
+			settings.CreatedBy = &uuid
+		}
+	}
+	if updatedBy.Valid {
+		if uuid, err := uuid.Parse(updatedBy.String); err == nil {
+			settings.UpdatedBy = &uuid
+		}
+	}
+
+	return &settings, nil
+}
+
+// UpdateAmortizationSettings updates global amortization settings
+func (r *repository) UpdateAmortizationSettings(ctx context.Context, settings *AmortizationSettings, userID uuid.UUID) error {
+	query := `
+		INSERT INTO amortization_settings (
+			id,
+			currency,
+			default_useful_life_months,
+			updated_at,
+			updated_by
+		) VALUES ('global', $1, $2, $3, $4)
+		ON CONFLICT (id) DO UPDATE SET
+			currency = EXCLUDED.currency,
+			default_useful_life_months = EXCLUDED.default_useful_life_months,
+			updated_at = EXCLUDED.updated_at,
+			updated_by = EXCLUDED.updated_by
+	`
+
+	now := time.Now()
+	_, err := r.db.Exec(ctx, query,
+		settings.Currency,
+		settings.DefaultUsefulLifeMonths,
+		now,
+		userID,
+	)
+	if err != nil {
+		r.logger.ErrorService("amortization", "update_amortization_settings", err, map[string]interface{}{
+			"currency":                   settings.Currency,
+			"default_useful_life_months": settings.DefaultUsefulLifeMonths,
+			"user_id":                    userID,
+		})
+		return fmt.Errorf("failed to update amortization settings: %w", err)
 	}
 
 	return nil

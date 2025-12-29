@@ -10,15 +10,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/pustaka/pustaka/internal/amortization"
 	"github.com/pustaka/pustaka/internal/api"
 	"github.com/pustaka/pustaka/internal/api/handlers"
 	"github.com/pustaka/pustaka/internal/api/middleware"
-	"github.com/pustaka/pustaka/internal/amortization"
 	"github.com/pustaka/pustaka/internal/auth"
 	"github.com/pustaka/pustaka/internal/ci"
 	"github.com/pustaka/pustaka/internal/config"
@@ -507,12 +507,14 @@ func setupRouter(
 				// Reports and summaries
 				r.Get("/summaries", amortizationHandlers.GetAmortizationSummaries)
 				r.Get("/reports/depreciation-schedule", amortizationHandlers.GenerateDepreciationSchedule)
+				r.Get("/settings", amortizationHandlers.GetAmortizationSettings)
 
 				// Routes requiring additional permissions
 				r.Group(func(r chi.Router) {
 					r.Use(middleware.RBAC("amortization:configure"))
 					r.Put("/configuration-items/{ciId}", amortizationHandlers.UpdateAmortizationConfig)
 					r.Post("/adjustments", amortizationHandlers.CreateAdjustment)
+					r.Put("/settings", amortizationHandlers.UpdateAmortizationSettings)
 
 					// Restructuring routes (require configure permission)
 					r.Post("/restructuring/preview", amortizationHandlers.PreviewRestructuring)

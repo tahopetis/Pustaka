@@ -12,6 +12,7 @@ export interface LifecycleStatus {
   sort_order: number
   is_active: boolean
   is_system: boolean
+  amortization_behavior: string
   created_at: string
   updated_at: string
   created_by: string
@@ -54,6 +55,7 @@ export interface CreateLifecycleStatusRequest {
   color?: string
   icon?: string
   sort_order?: number
+  amortization_behavior?: string
 }
 
 export interface UpdateLifecycleStatusRequest {
@@ -63,6 +65,7 @@ export interface UpdateLifecycleStatusRequest {
   icon?: string
   sort_order?: number
   is_active?: boolean
+  amortization_behavior?: string
 }
 
 export const useLifecycleStatusStore = defineStore('lifecycleStatus', () => {

@@ -318,7 +318,7 @@ func (r *Neo4jRepository) GetCIRelationships(ctx context.Context, ciID uuid.UUID
 			RETURN r, target
 			UNION
 			MATCH (source:ConfigurationItem)-[r:RELATES_TO]->(target:ConfigurationItem {id: $ci_id})
-			RETURN r, source
+			RETURN r, source AS target
 		`
 
 		params := map[string]interface{}{

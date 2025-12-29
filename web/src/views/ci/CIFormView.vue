@@ -337,6 +337,7 @@ const loading = ref(false)
 const ciTypes = ref<CIType[]>([])
 const existingCI = ref<CI | null>(null)
 const attributeValidation = ref<Record<string, { isValid: boolean; error?: string }>>({})
+const existingFinancialData = ref<any>(null)
 
 const isEdit = computed(() => !!route.params.id)
 
@@ -374,6 +375,29 @@ const validationErrors = computed(() => {
     })
   }
 
+  // Check financial fields validation for amortizable CI types
+  if (selectedCIType.value && selectedCIType.value.is_amortizable) {
+    const hasAnyFinancialData = (
+      form.financials.purchase_cost !== null && form.financials.purchase_cost > 0 ||
+      form.financials.salvage_value !== null && form.financials.salvage_value > 0 ||
+      form.financials.amort_start_date !== null && form.financials.amort_start_date !== '' ||
+      form.financials.useful_life_months !== null && form.financials.useful_life_months > 0
+    )
+
+    if (hasAnyFinancialData) {
+      // If any financial field is filled, all required fields must be filled
+      if (!form.financials.purchase_cost || form.financials.purchase_cost <= 0) {
+        errors.push('Purchase Cost is required when filling financial information')
+      }
+      if (!form.financials.amort_start_date || form.financials.amort_start_date === '') {
+        errors.push('Amortization Start Date is required when filling financial information')
+      }
+      if (!form.financials.useful_life_months || form.financials.useful_life_months <= 0) {
+        errors.push('Useful Life (months) is required when filling financial information')
+      }
+    }
+  }
+
   return errors
 })
 
@@ -392,15 +416,43 @@ const isFormValid = computed(() => {
     }
   }
 
+  // Check financial fields validation for amortizable CI types
+  if (selectedCIType.value && selectedCIType.value.is_amortizable) {
+    const hasAnyFinancialData = (
+      form.financials.purchase_cost !== null && form.financials.purchase_cost > 0 ||
+      form.financials.salvage_value !== null && form.financials.salvage_value > 0 ||
+      form.financials.amort_start_date !== null && form.financials.amort_start_date !== '' ||
+      form.financials.useful_life_months !== null && form.financials.useful_life_months > 0
+    )
+
+    if (hasAnyFinancialData) {
+      // If any financial field is filled, all required fields must be filled
+      if (!form.financials.purchase_cost || form.financials.purchase_cost <= 0) {
+        return false
+      }
+      if (!form.financials.amort_start_date || form.financials.amort_start_date === '') {
+        return false
+      }
+      if (!form.financials.useful_life_months || form.financials.useful_life_months <= 0) {
+        return false
+      }
+    }
+  }
+
   return true
 })
 
 const hasFinancialData = computed(() => {
+  // Only show as read-only if editing AND existing financial data exists
+  // Check that at least one field has a meaningful value (not null, not 0/empty)
   return (
-    form.financials.purchase_cost !== null ||
-    form.financials.salvage_value !== null ||
-    form.financials.amort_start_date !== '' ||
-    form.financials.useful_life_months !== null
+    isEdit.value &&
+    existingFinancialData.value && (
+      (existingFinancialData.value.purchase_cost != null && existingFinancialData.value.purchase_cost > 0) ||
+      (existingFinancialData.value.salvage_value != null && existingFinancialData.value.salvage_value > 0) ||
+      (existingFinancialData.value.amort_start_date != null && existingFinancialData.value.amort_start_date !== '') ||
+      (existingFinancialData.value.useful_life_months != null && existingFinancialData.value.useful_life_months > 0)
+    )
   )
 })
 
@@ -571,6 +623,9 @@ const loadCI = async () => {
       try {
         const financialResponse = await amortizationStore.loadAssetFinancials(existingCI.value.id)
         if (financialResponse) {
+          // Store existing financial data for read-only check
+          existingFinancialData.value = { ...financialResponse }
+
           form.financials.purchase_cost = financialResponse.purchase_cost || null
           form.financials.salvage_value = financialResponse.salvage_value || null
           // Format date for HTML date input (yyyy-MM-dd)
@@ -587,9 +642,13 @@ const loadCI = async () => {
           if (financialResponse.salvage_value) {
             rawCurrencyInputs.value.salvage_value = formatCurrencyDisplay(financialResponse.salvage_value)
           }
+        } else {
+          // No existing financial data found
+          existingFinancialData.value = null
         }
       } catch (error) {
         console.error('Failed to load financial data:', error)
+        existingFinancialData.value = null
         // Don't fail the entire form load if financial data fails
       }
     }
@@ -712,6 +771,9 @@ watch(() => selectedCIType.value, (newType) => {
     amortizationStore.loadAssetFinancials(existingCI.value.id)
       .then(response => {
         if (response) {
+          // Store existing financial data for read-only check
+          existingFinancialData.value = { ...response }
+
           form.financials.purchase_cost = response.purchase_cost || null
           form.financials.salvage_value = response.salvage_value || null
           // Format date for HTML date input (yyyy-MM-dd)
@@ -728,10 +790,13 @@ watch(() => selectedCIType.value, (newType) => {
           if (response.salvage_value) {
             rawCurrencyInputs.value.salvage_value = formatCurrencyDisplay(response.salvage_value)
           }
+        } else {
+          existingFinancialData.value = null
         }
       })
       .catch(error => {
         console.error('Failed to load financial data:', error)
+        existingFinancialData.value = null
       })
   } else {
     // Clear financial data and raw inputs when switching to non-amortizable CI type
@@ -746,6 +811,8 @@ watch(() => selectedCIType.value, (newType) => {
       purchase_cost: '',
       salvage_value: ''
     }
+    // Also clear existing financial data
+    existingFinancialData.value = null
   }
 }, { immediate: true })
 

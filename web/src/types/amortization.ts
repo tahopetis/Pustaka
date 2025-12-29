@@ -1,9 +1,11 @@
 export interface AmortizationSettings {
-  method: 'straight_line' | 'declining_balance'
+  id: string // always "global"
   currency: string
   default_useful_life_months: number
   created_at: string
   updated_at: string
+  created_by?: string
+  updated_by?: string
 }
 
 export interface AssetFinancials {

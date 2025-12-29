@@ -14,20 +14,7 @@
       </div>
 
       <form v-else @submit.prevent="saveSettings" class="settings-form">
-        <div class="form-section">
-          <h2>Amortization Method</h2>
-          <div class="form-group">
-            <label for="method">Calculation Method</label>
-            <select id="method" v-model="settings.method" class="form-select">
-              <option value="straight_line">Straight Line</option>
-              <option value="declining_balance">Declining Balance</option>
-            </select>
-            <small class="form-help">
-              Straight Line: Equal depreciation amounts each period<br>
-              Declining Balance: Higher depreciation in early periods
-            </small>
-          </div>
-        </div>
+
 
         <div class="form-section">
           <h2>Financial Settings</h2>
@@ -90,9 +77,9 @@ const successMessage = ref('')
 const errorMessage = ref('')
 
 const settings = ref<AmortizationSettings>({
-  method: 'straight_line',
+  id: 'global',
   currency: 'USD',
-  default_useful_life_months: 60,
+  default_useful_life_months: 36,
   created_at: '',
   updated_at: '',
 })
@@ -105,8 +92,8 @@ const loadSettings = async () => {
   loading.value = true
   try {
     const response = await amortizationStore.loadSettings()
-    if (response.data) {
-      settings.value = response.data
+    if (response) {
+      settings.value = response
     }
   } catch (error) {
     console.error('Failed to load settings:', error)
@@ -140,9 +127,9 @@ const saveSettings = async () => {
 
 const resetSettings = () => {
   settings.value = {
-    method: 'straight_line',
+    id: 'global',
     currency: 'USD',
-    default_useful_life_months: 60,
+    default_useful_life_months: 36,
     created_at: '',
     updated_at: '',
   }

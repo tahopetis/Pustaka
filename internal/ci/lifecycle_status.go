@@ -9,41 +9,44 @@ import (
 
 // LifecycleStatus represents a lifecycle status for CIs
 type LifecycleStatus struct {
-	ID          uuid.UUID  `json:"id" db:"id"`
-	Name        string     `json:"name" db:"name"`
-	DisplayName string     `json:"display_name" db:"display_name"`
-	Description *string    `json:"description,omitempty" db:"description"`
-	Color       *string    `json:"color,omitempty" db:"color"`
-	Icon        *string    `json:"icon,omitempty" db:"icon"`
-	SortOrder   int        `json:"sort_order" db:"sort_order"`
-	IsActive    bool       `json:"is_active" db:"is_active"`
-	IsSystem    bool       `json:"is_system" db:"is_system"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   *time.Time `json:"updated_at,omitempty" db:"updated_at"`
-	CreatedBy   uuid.UUID  `json:"created_by" db:"created_by"`
-	UpdatedBy   *uuid.UUID `json:"updated_by,omitempty" db:"updated_by"`
+	ID                   uuid.UUID  `json:"id" db:"id"`
+	Name                 string     `json:"name" db:"name"`
+	DisplayName          string     `json:"display_name" db:"display_name"`
+	Description          *string    `json:"description,omitempty" db:"description"`
+	Color                *string    `json:"color,omitempty" db:"color"`
+	Icon                 *string    `json:"icon,omitempty" db:"icon"`
+	SortOrder            int        `json:"sort_order" db:"sort_order"`
+	IsActive             bool       `json:"is_active" db:"is_active"`
+	IsSystem             bool       `json:"is_system" db:"is_system"`
+	AmortizationBehavior string     `json:"amortization_behavior" db:"amortization_behavior"`
+	CreatedAt            time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt            *time.Time `json:"updated_at,omitempty" db:"updated_at"`
+	CreatedBy            uuid.UUID  `json:"created_by" db:"created_by"`
+	UpdatedBy            *uuid.UUID `json:"updated_by,omitempty" db:"updated_by"`
 }
 
 // Request/Response DTOs for Lifecycle Statuses
 
 // CreateLifecycleStatusRequest represents a request to create a new lifecycle status
 type CreateLifecycleStatusRequest struct {
-	Name        string  `json:"name" binding:"required,min=2,max=100"`
-	DisplayName string  `json:"display_name" binding:"required,min=2,max=100"`
-	Description *string `json:"description,omitempty" binding:"omitempty,max=500"`
-	Color       *string `json:"color,omitempty" binding:"omitempty,len=7"`
-	Icon        *string `json:"icon,omitempty" binding:"omitempty,max=50"`
-	SortOrder   *int    `json:"sort_order,omitempty" binding:"omitempty,min=0"`
+	Name                 string  `json:"name" binding:"required,min=2,max=100"`
+	DisplayName          string  `json:"display_name" binding:"required,min=2,max=100"`
+	Description          *string `json:"description,omitempty" binding:"omitempty,max=500"`
+	Color                *string `json:"color,omitempty" binding:"omitempty,len=7"`
+	Icon                 *string `json:"icon,omitempty" binding:"omitempty,max=50"`
+	SortOrder            *int    `json:"sort_order,omitempty" binding:"omitempty,min=0"`
+	AmortizationBehavior *string `json:"amortization_behavior,omitempty" binding:"omitempty,oneof=pending active terminal"`
 }
 
 // UpdateLifecycleStatusRequest represents a request to update an existing lifecycle status
 type UpdateLifecycleStatusRequest struct {
-	DisplayName *string `json:"display_name,omitempty" binding:"omitempty,min=2,max=100"`
-	Description *string `json:"description,omitempty" binding:"omitempty,max=500"`
-	Color       *string `json:"color,omitempty" binding:"omitempty,len=7"`
-	Icon        *string `json:"icon,omitempty" binding:"omitempty,max=50"`
-	SortOrder   *int    `json:"sort_order,omitempty" binding:"omitempty,min=0"`
-	IsActive    *bool   `json:"is_active,omitempty"`
+	DisplayName          *string `json:"display_name,omitempty" binding:"omitempty,min=2,max=100"`
+	Description          *string `json:"description,omitempty" binding:"omitempty,max=500"`
+	Color                *string `json:"color,omitempty" binding:"omitempty,len=7"`
+	Icon                 *string `json:"icon,omitempty" binding:"omitempty,max=50"`
+	SortOrder            *int    `json:"sort_order,omitempty" binding:"omitempty,min=0"`
+	IsActive             *bool   `json:"is_active,omitempty"`
+	AmortizationBehavior *string `json:"amortization_behavior,omitempty" binding:"omitempty,oneof=pending active terminal"`
 }
 
 // LifecycleStatusListResponse represents a paginated list of lifecycle statuses
@@ -106,18 +109,25 @@ func NewLifecycleStatusFromRequest(req *CreateLifecycleStatusRequest, createdBy 
 		sortOrder = *req.SortOrder
 	}
 
+	// Default amortization behavior to "pending" if not specified
+	amortizationBehavior := "pending"
+	if req.AmortizationBehavior != nil {
+		amortizationBehavior = *req.AmortizationBehavior
+	}
+
 	return &LifecycleStatus{
-		ID:          uuid.New(),
-		Name:        req.Name,
-		DisplayName: req.DisplayName,
-		Description: req.Description,
-		Color:       req.Color,
-		Icon:        req.Icon,
-		SortOrder:   sortOrder,
-		IsActive:    true,
-		IsSystem:    false,
-		CreatedBy:   createdBy,
-		CreatedAt:   now,
+		ID:                   uuid.New(),
+		Name:                 req.Name,
+		DisplayName:          req.DisplayName,
+		Description:          req.Description,
+		Color:                req.Color,
+		Icon:                 req.Icon,
+		SortOrder:            sortOrder,
+		IsActive:             true,
+		IsSystem:             false,
+		AmortizationBehavior: amortizationBehavior,
+		CreatedBy:            createdBy,
+		CreatedAt:            now,
 	}
 }
 
@@ -140,6 +150,9 @@ func (ls *LifecycleStatus) UpdateFromRequest(req *UpdateLifecycleStatusRequest, 
 	}
 	if req.IsActive != nil {
 		ls.IsActive = *req.IsActive
+	}
+	if req.AmortizationBehavior != nil {
+		ls.AmortizationBehavior = *req.AmortizationBehavior
 	}
 
 	ls.UpdatedBy = &updatedBy

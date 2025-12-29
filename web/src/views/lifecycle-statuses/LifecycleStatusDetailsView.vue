@@ -100,6 +100,14 @@
                   <span v-else class="badge badge-blue">Custom</span>
                 </dd>
               </div>
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Amortization Behavior</dt>
+                <dd class="mt-1">
+                  <span :class="getAmortizationBehaviorBadgeClass(lifecycleStatus.amortization_behavior)">
+                    {{ formatAmortizationBehavior(lifecycleStatus.amortization_behavior) }}
+                  </span>
+                </dd>
+              </div>
               <div v-if="lifecycleStatus.icon">
                 <dt class="text-sm font-medium text-gray-500">Icon</dt>
                 <dd class="mt-1 text-sm text-gray-900">{{ lifecycleStatus.icon }}</dd>
@@ -181,6 +189,24 @@ const hasPermission = (permission: string) => {
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString()
+}
+
+const formatAmortizationBehavior = (behavior: string) => {
+  const behaviors: Record<string, string> = {
+    'pending': 'Pending',
+    'active': 'Active',
+    'terminal': 'Terminal'
+  }
+  return behaviors[behavior] || behavior
+}
+
+const getAmortizationBehaviorBadgeClass = (behavior: string) => {
+  const classes: Record<string, string> = {
+    'pending': 'badge badge-warning',
+    'active': 'badge badge-success',
+    'terminal': 'badge badge-gray'
+  }
+  return classes[behavior] || 'badge badge-gray'
 }
 
 const loadLifecycleStatus = async () => {

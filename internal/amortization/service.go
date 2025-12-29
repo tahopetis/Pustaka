@@ -9,7 +9,6 @@ import (
 	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
 )
 
-
 // service implements the Service interface
 type service struct {
 	repo             Repository
@@ -77,12 +76,12 @@ func (s *service) UpdateAmortizationConfig(ctx context.Context, ciID uuid.UUID, 
 
 	// Prepare updates
 	updates := &AmortizationConfigUpdates{
-		PurchaseCost:        req.PurchaseCost,
-		SalvageValue:        req.SalvageValue,
-		AmortStartDate:      req.AmortStartDate,
-		UsefulLifeMonths:    req.UsefulLifeMonths,
-		UpdatedBy:           &userID,
-		UpdatedAt:           &[]time.Time{time.Now()}[0],
+		PurchaseCost:     req.PurchaseCost,
+		SalvageValue:     req.SalvageValue,
+		AmortStartDate:   req.AmortStartDate,
+		UsefulLifeMonths: req.UsefulLifeMonths,
+		UpdatedBy:        &userID,
+		UpdatedAt:        &[]time.Time{time.Now()}[0],
 	}
 
 	// Calculate new book value if purchase cost changed
@@ -167,17 +166,17 @@ func (s *service) CreateAdjustment(ctx context.Context, req *CreateAdjustmentReq
 
 	// Create adjustment entry
 	entry := &LedgerEntry{
-		ID:                         uuid.New(),
-		CIID:                       req.CIID,
-		EntryType:                  "adjustment",
-		EntryDate:                  effectiveDate,
-		Amount:                     req.Amount,
-		BookValueBefore:            ci.CurrentBookValue,
-		BookValueAfter:             ci.CurrentBookValue + req.Amount,
+		ID:                      uuid.New(),
+		CIID:                    req.CIID,
+		EntryType:               "adjustment",
+		EntryDate:               effectiveDate,
+		Amount:                  req.Amount,
+		BookValueBefore:         ci.CurrentBookValue,
+		BookValueAfter:          ci.CurrentBookValue + req.Amount,
 		AccumulatedDepreciation: ci.AccumulatedDepreciation,
-		Description:                &req.Description,
-		CreatedAt:                  time.Now(),
-		CreatedBy:                  &userID,
+		Description:             &req.Description,
+		CreatedAt:               time.Now(),
+		CreatedBy:               &userID,
 	}
 
 	// Save entry
@@ -315,17 +314,17 @@ func (s *service) HandleTerminalStatusChange(ctx context.Context, ciID uuid.UUID
 
 	// Create write-off ledger entry
 	writeOffEntry := &LedgerEntry{
-		ID:                         uuid.New(),
-		CIID:                       ciID,
-		EntryType:                  "write_off",
-		EntryDate:                  writeOffCalc.WriteOffDate,
-		Amount:                     writeOffCalc.WriteOffAmount,
-		BookValueBefore:            writeOffCalc.BookValueBefore,
-		BookValueAfter:             writeOffCalc.BookValueAfter,
+		ID:                      uuid.New(),
+		CIID:                    ciID,
+		EntryType:               "write_off",
+		EntryDate:               writeOffCalc.WriteOffDate,
+		Amount:                  writeOffCalc.WriteOffAmount,
+		BookValueBefore:         writeOffCalc.BookValueBefore,
+		BookValueAfter:          writeOffCalc.BookValueAfter,
 		AccumulatedDepreciation: writeOffCalc.AccumulatedDepreciationAfter,
-		Description:                stringPtr(fmt.Sprintf("Automatic write-off due to terminal status: %s", newStatus.Name)),
-		CreatedAt:                  time.Now(),
-		CreatedBy:                  &userID,
+		Description:             stringPtr(fmt.Sprintf("Automatic write-off due to terminal status: %s", newStatus.Name)),
+		CreatedAt:               time.Now(),
+		CreatedBy:               &userID,
 	}
 
 	// Save write-off entry
@@ -349,11 +348,11 @@ func (s *service) HandleTerminalStatusChange(ctx context.Context, ciID uuid.UUID
 
 	// Publish event
 	event := &AmortizationWrittenOffEvent{
-		CIID:          ciID,
-		UserID:        userID,
+		CIID:           ciID,
+		UserID:         userID,
 		WriteOffAmount: writeOffCalc.WriteOffAmount,
-		Reason:        writeOffCalc.Reason,
-		Timestamp:     time.Now().Format(time.RFC3339),
+		Reason:         writeOffCalc.Reason,
+		Timestamp:      time.Now().Format(time.RFC3339),
 	}
 	s.eventPublisher.PublishAmortizationWrittenOff(ctx, event)
 
@@ -454,27 +453,27 @@ func (s *service) RestructureAmortization(ctx context.Context, req *RestructureR
 		// Create restructuring ledger entry
 		description := fmt.Sprintf("Restructured useful life from %d to %d months. %s", ci.UsefulLifeMonths, req.NewUsefulLifeMonths, req.Reason)
 		entry := &AmortizationEntry{
-			ID:                 uuid.New(),
-			CIID:               req.CIID,
-			EntryType:          "restructuring",
-			EntryDate:          effectiveDate,
-			Description:        &description,
-			Amount:             0, // Restructuring doesn't change book value directly
-			BookValueBefore:    ci.CurrentBookValue,
-			BookValueAfter:     ci.CurrentBookValue,
+			ID:                      uuid.New(),
+			CIID:                    req.CIID,
+			EntryType:               "restructuring",
+			EntryDate:               effectiveDate,
+			Description:             &description,
+			Amount:                  0, // Restructuring doesn't change book value directly
+			BookValueBefore:         ci.CurrentBookValue,
+			BookValueAfter:          ci.CurrentBookValue,
 			AccumulatedDepreciation: ci.AccumulatedDepreciation,
-			CreatedAt:          time.Now(),
-			CreatedBy:          &userID,
+			CreatedAt:               time.Now(),
+			CreatedBy:               &userID,
 			Metadata: map[string]interface{}{
-				"old_useful_life_months":     ci.UsefulLifeMonths,
-				"new_useful_life_months":     req.NewUsefulLifeMonths,
-				"old_monthly_depreciation":  calculation.CurrentMonthlyDepreciation,
-				"new_monthly_depreciation":  calculation.NewMonthlyDepreciation,
-				"monthly_change":            calculation.MonthlyDepreciationChange,
-				"percent_change":            calculation.PercentChange,
-				"remaining_months_old":      calculation.RemainingMonthsOld,
-				"remaining_months_new":      calculation.RemainingMonthsNew,
-				"reason":                    req.Reason,
+				"old_useful_life_months":   ci.UsefulLifeMonths,
+				"new_useful_life_months":   req.NewUsefulLifeMonths,
+				"old_monthly_depreciation": calculation.CurrentMonthlyDepreciation,
+				"new_monthly_depreciation": calculation.NewMonthlyDepreciation,
+				"monthly_change":           calculation.MonthlyDepreciationChange,
+				"percent_change":           calculation.PercentChange,
+				"remaining_months_old":     calculation.RemainingMonthsOld,
+				"remaining_months_new":     calculation.RemainingMonthsNew,
+				"reason":                   req.Reason,
 			},
 		}
 
@@ -488,14 +487,14 @@ func (s *service) RestructureAmortization(ctx context.Context, req *RestructureR
 
 		// Publish event
 		event := &AmortizationRestructuredEvent{
-			CIID:              req.CIID,
-			UserID:            userID,
-			OldUsefulLife:     ci.UsefulLifeMonths,
-			NewUsefulLife:     req.NewUsefulLifeMonths,
+			CIID:                   req.CIID,
+			UserID:                 userID,
+			OldUsefulLife:          ci.UsefulLifeMonths,
+			NewUsefulLife:          req.NewUsefulLifeMonths,
 			OldMonthlyDepreciation: calculation.CurrentMonthlyDepreciation,
 			NewMonthlyDepreciation: calculation.NewMonthlyDepreciation,
-			Reason:            req.Reason,
-			Timestamp:         time.Now().Format(time.RFC3339),
+			Reason:                 req.Reason,
+			Timestamp:              time.Now().Format(time.RFC3339),
 		}
 		s.eventPublisher.PublishAmortizationRestructured(ctx, event)
 
@@ -530,6 +529,38 @@ func (s *service) RestructureAmortization(ctx context.Context, req *RestructureR
 		UpdatedDetails: updatedDetails,
 		Message:        fmt.Sprintf("Successfully restructured useful life from %d to %d months", ci.UsefulLifeMonths, req.NewUsefulLifeMonths),
 	}, nil
+}
+
+// GetAmortizationSettings retrieves global amortization settings
+func (s *service) GetAmortizationSettings(ctx context.Context) (*AmortizationSettings, error) {
+	settings, err := s.repo.GetAmortizationSettings(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get amortization settings: %w", err)
+	}
+	return settings, nil
+}
+
+// UpdateAmortizationSettings updates global amortization settings
+func (s *service) UpdateAmortizationSettings(ctx context.Context, req *UpdateAmortizationSettings, userID uuid.UUID) (*AmortizationSettings, error) {
+	// Create settings object from request
+	settings := &AmortizationSettings{
+		ID:                      "global",
+		Currency:                "USD",
+		DefaultUsefulLifeMonths: 36,
+	}
+	if req.Currency != nil {
+		settings.Currency = *req.Currency
+	}
+	if req.DefaultUsefulLifeMonths != nil {
+		settings.DefaultUsefulLifeMonths = *req.DefaultUsefulLifeMonths
+	}
+	// Update in repository
+	err := s.repo.UpdateAmortizationSettings(ctx, settings, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update amortization settings: %w", err)
+	}
+	// Return updated settings
+	return s.repo.GetAmortizationSettings(ctx)
 }
 
 // Helper methods
@@ -579,4 +610,3 @@ func (s *service) buildChangesMap(currentCI *AmortizableCI, req *UpdateAmortizat
 
 	return changes
 }
-

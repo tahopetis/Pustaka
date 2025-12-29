@@ -12,7 +12,7 @@
 
     <!-- String Input -->
     <BaseInput
-      v-if="attribute.type === 'string'"
+      v-if="attribute.type === 'string' && !hasEnum"
       :model-value="modelValue"
       @update:model-value="updateValue"
       :placeholder="getPlaceholder()"
@@ -23,7 +23,7 @@
 
     <!-- Integer Input -->
     <BaseInput
-      v-else-if="attribute.type === 'integer'"
+      v-else-if="attribute.type === 'integer' && !hasEnum"
       :model-value="modelValue"
       @update:model-value="updateValue"
       type="number"
@@ -33,6 +33,21 @@
       :error="!!error"
       @blur="validateInteger"
     />
+
+    <!-- Integer Enum Select -->
+    <BaseSelect
+      v-else-if="attribute.type === 'integer' && hasEnum"
+      :model-value="modelValue?.toString()"
+      @update:model-value="updateIntegerValue"
+      :disabled="disabled"
+      :required="required"
+      :error="!!error"
+    >
+      <option value="">Select {{ attribute.name }}</option>
+      <option v-for="option in attribute.validation?.enum" :key="option" :value="option">
+        {{ option }}
+      </option>
+    </BaseSelect>
 
     <!-- Boolean Select -->
     <BaseSelect
@@ -48,7 +63,7 @@
       <option value="false">False</option>
     </BaseSelect>
 
-    <!-- Enum Select -->
+    <!-- String Enum Select -->
     <BaseSelect
       v-else-if="attribute.type === 'string' && hasEnum"
       :model-value="modelValue"
@@ -64,17 +79,21 @@
     </BaseSelect>
 
     <!-- Array Input (JSON format) -->
-    <BaseTextarea
-      v-else-if="attribute.type === 'array'"
-      :model-value="modelValue"
-      @update:model-value="updateArrayValue"
-      :placeholder="getPlaceholder()"
-      :rows="4"
-      :disabled="disabled"
-      :required="required"
-      :error="!!error"
-      @blur="validateArray"
-    />
+    <div v-else-if="attribute.type === 'array'">
+      <BaseTextarea
+        :model-value="modelValue"
+        @update:model-value="updateArrayValue"
+        :placeholder="hasEnum ? `Enter JSON array with allowed values, e.g., ${getExampleEnumArray()}` : getPlaceholder()"
+        :rows="4"
+        :disabled="disabled"
+        :required="required"
+        :error="!!error"
+        @blur="validateArray"
+      />
+      <p v-if="hasEnum" class="text-xs text-green-600 mt-1">
+        Allowed values: {{ attribute.validation?.enum?.join(', ') }}
+      </p>
+    </div>
 
     <!-- Object Input (JSON format) -->
     <BaseTextarea
@@ -201,6 +220,16 @@ const getPlaceholder = () => {
   return `Enter ${props.attribute.name}`
 }
 
+const getExampleEnumArray = () => {
+  const enumValues = props.attribute.validation?.enum
+  if (!enumValues || enumValues.length === 0) return '["value1", "value2"]'
+
+  // Show up to 3 example values
+  const examples = enumValues.slice(0, 3).map(v => `"${v}"`).join(', ')
+  const suffix = enumValues.length > 3 ? ', ...' : ''
+  return `[${examples}${suffix}]`
+}
+
 const updateValue = (value: any) => {
   error.value = ''
   emit('update:modelValue', value)
@@ -212,6 +241,13 @@ const updateBooleanValue = (value: string) => {
   error.value = ''
   emit('update:modelValue', boolValue)
   emit('validation', boolValue !== null)
+}
+
+const updateIntegerValue = (value: string) => {
+  const intValue = value !== '' ? Number(value) : null
+  error.value = ''
+  emit('update:modelValue', intValue)
+  validateInteger()
 }
 
 const updateArrayValue = (value: string) => {
@@ -257,6 +293,15 @@ const validateInteger = () => {
       emit('validation', false, error.value)
       return
     }
+
+    // Check enum values
+    if (validation.enum && validation.enum.length > 0) {
+      if (!validation.enum.includes(numValue)) {
+        error.value = `${props.attribute.name} must be one of: ${validation.enum.join(', ')}`
+        emit('validation', false, error.value)
+        return
+      }
+    }
   }
 
   emit('validation', true)
@@ -293,6 +338,16 @@ const validateArray = () => {
         error.value = `${props.attribute.name} must have at most ${validation.max_length} items`
         emit('validation', false, error.value)
         return
+      }
+
+      // Check enum values
+      if (validation.enum && validation.enum.length > 0) {
+        const invalidValues = parsed.filter(v => !validation.enum!.includes(v))
+        if (invalidValues.length > 0) {
+          error.value = `${props.attribute.name} contains invalid values: ${invalidValues.join(', ')}. Allowed values: ${validation.enum.join(', ')}`
+          emit('validation', false, error.value)
+          return
+        }
       }
     }
 

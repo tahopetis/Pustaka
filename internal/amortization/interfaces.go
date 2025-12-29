@@ -17,6 +17,10 @@ type Service interface {
 	UpdateAmortizationConfig(ctx context.Context, ciID uuid.UUID, req *UpdateAmortizationConfig, userID uuid.UUID) (*AmortizationDetails, error)
 	ListAmortizableCIs(ctx context.Context, filters *AmortizableCIFilters) (*AmortizationCIList, error)
 
+	// Settings Management
+	GetAmortizationSettings(ctx context.Context) (*AmortizationSettings, error)
+	UpdateAmortizationSettings(ctx context.Context, req *UpdateAmortizationSettings, userID uuid.UUID) (*AmortizationSettings, error)
+
 	// Ledger Management
 	GetLedgerEntries(ctx context.Context, filters *LedgerFilters) (*LedgerEntryList, error)
 	GetLedgerEntry(ctx context.Context, entryID uuid.UUID) (*LedgerEntry, error)
@@ -71,6 +75,10 @@ type Repository interface {
 
 	// Transaction support
 	WithTransaction(ctx context.Context, fn func(ctx context.Context, tx interface{}) error) error
+
+	// Settings management
+	GetAmortizationSettings(ctx context.Context) (*AmortizationSettings, error)
+	UpdateAmortizationSettings(ctx context.Context, settings *AmortizationSettings, userID uuid.UUID) error
 }
 
 // CacheRepositoryInterface defines caching operations for amortization
@@ -174,30 +182,30 @@ func (a *CIServiceAdapter) GetCI(ctx context.Context, id uuid.UUID) (*Configurat
 
 	// Create a minimal amortization.ConfigurationItem from the ci.ConfigurationItem
 	result := &ConfigurationItem{
-		ID:                   ci.ID,
-		Name:                 ci.Name,
-		CIType:               ci.CIType,
-		Attributes:           ci.Attributes,
-		Tags:                 ci.Tags,
-		LifecycleStatusID:    ci.LifecycleStatusID,
-		CreatedAt:            ci.CreatedAt,
-		UpdatedAt:            &ci.UpdatedAt,
-		CreatedBy:            ci.CreatedBy,
-		UpdatedBy:            ci.UpdatedBy,
+		ID:                ci.ID,
+		Name:              ci.Name,
+		CIType:            ci.CIType,
+		Attributes:        ci.Attributes,
+		Tags:              ci.Tags,
+		LifecycleStatusID: ci.LifecycleStatusID,
+		CreatedAt:         ci.CreatedAt,
+		UpdatedAt:         &ci.UpdatedAt,
+		CreatedBy:         ci.CreatedBy,
+		UpdatedBy:         ci.UpdatedBy,
 	}
 
 	// Copy lifecycle status if present
 	if ci.LifecycleStatus != nil {
 		result.LifecycleStatus = &LifecycleStatus{
-			ID:                    ci.LifecycleStatus.ID,
-			Name:                  ci.LifecycleStatus.Name,
-			DisplayName:           ci.LifecycleStatus.DisplayName,
-			Description:           ci.LifecycleStatus.Description,
-			Color:                 ci.LifecycleStatus.Color,
-			Icon:                  ci.LifecycleStatus.Icon,
-			AmortizationBehavior:  "pending", // Default value
-			CreatedAt:             ci.LifecycleStatus.CreatedAt,
-			UpdatedAt:             ci.LifecycleStatus.UpdatedAt,
+			ID:                   ci.LifecycleStatus.ID,
+			Name:                 ci.LifecycleStatus.Name,
+			DisplayName:          ci.LifecycleStatus.DisplayName,
+			Description:          ci.LifecycleStatus.Description,
+			Color:                ci.LifecycleStatus.Color,
+			Icon:                 ci.LifecycleStatus.Icon,
+			AmortizationBehavior: "pending", // Default value
+			CreatedAt:            ci.LifecycleStatus.CreatedAt,
+			UpdatedAt:            ci.LifecycleStatus.UpdatedAt,
 		}
 	}
 
@@ -213,15 +221,15 @@ func (a *CIServiceAdapter) GetCIType(ctx context.Context, id uuid.UUID) (*CIType
 	// Convert ci.CITypeDefinition to amortization.CITypeDefinition
 	// Note: ci.CITypeDefinition doesn't have IsAmortizable field in the existing model
 	result := &CITypeDefinition{
-		ID:                  ciType.ID,
-		Name:                ciType.Name,
-		Description:         ciType.Description,
-		RequiredAttributes:  convertAttributes(ciType.RequiredAttributes),
-		OptionalAttributes:  convertAttributes(ciType.OptionalAttributes),
-		IsAmortizable:       false, // Default value, would need to be determined separately
-		CreatedAt:           ciType.CreatedAt,
-		UpdatedAt:           &ciType.UpdatedAt,
-		CreatedBy:           ciType.CreatedBy,
+		ID:                 ciType.ID,
+		Name:               ciType.Name,
+		Description:        ciType.Description,
+		RequiredAttributes: convertAttributes(ciType.RequiredAttributes),
+		OptionalAttributes: convertAttributes(ciType.OptionalAttributes),
+		IsAmortizable:      false, // Default value, would need to be determined separately
+		CreatedAt:          ciType.CreatedAt,
+		UpdatedAt:          &ciType.UpdatedAt,
+		CreatedBy:          ciType.CreatedBy,
 	}
 
 	return result, nil
@@ -267,15 +275,15 @@ func (a *LifecycleServiceAdapter) GetLifecycleStatus(ctx context.Context, id uui
 	// Convert ci.LifecycleStatus to amortization.LifecycleStatus
 	// Note: ci.LifecycleStatus doesn't have AmortizationBehavior field
 	result := &LifecycleStatus{
-		ID:                    status.ID,
-		Name:                  status.Name,
-		DisplayName:           status.DisplayName,
-		Description:           status.Description,
-		Color:                 status.Color,
-		Icon:                  status.Icon,
-		AmortizationBehavior:  "pending", // Default value
-		CreatedAt:             status.CreatedAt,
-		UpdatedAt:             status.UpdatedAt,
+		ID:                   status.ID,
+		Name:                 status.Name,
+		DisplayName:          status.DisplayName,
+		Description:          status.Description,
+		Color:                status.Color,
+		Icon:                 status.Icon,
+		AmortizationBehavior: "pending", // Default value
+		CreatedAt:            status.CreatedAt,
+		UpdatedAt:            status.UpdatedAt,
 	}
 
 	return result, nil
@@ -283,49 +291,49 @@ func (a *LifecycleServiceAdapter) GetLifecycleStatus(ctx context.Context, id uui
 
 // AmortizationConfig represents amortization configuration
 type AmortizationConfig struct {
-	PurchaseCost        *float64   `json:"purchase_cost,omitempty"`
-	SalvageValue        *float64   `json:"salvage_value,omitempty"`
-	AmortStartDate      *time.Time `json:"amort_start_date,omitempty"`
-	UsefulLifeMonths    *int       `json:"useful_life_months,omitempty"`
-	DepreciationMethod  *string    `json:"depreciation_method,omitempty"`
+	PurchaseCost       *float64   `json:"purchase_cost,omitempty"`
+	SalvageValue       *float64   `json:"salvage_value,omitempty"`
+	AmortStartDate     *time.Time `json:"amort_start_date,omitempty"`
+	UsefulLifeMonths   *int       `json:"useful_life_months,omitempty"`
+	DepreciationMethod *string    `json:"depreciation_method,omitempty"`
 }
 
 // ProcessingResult represents the result of processing a single CI
 type ProcessingResult struct {
-	CIID              uuid.UUID  `json:"ci_id"`
-	Status            string     `json:"status"` // "processed", "skipped", "failed"
+	CIID               uuid.UUID `json:"ci_id"`
+	Status             string    `json:"status"` // "processed", "skipped", "failed"
 	DepreciationAmount float64   `json:"depreciation_amount,omitempty"`
-	ErrorMessage      *string    `json:"error_message,omitempty"`
-	ProcessedAt       time.Time  `json:"processed_at"`
+	ErrorMessage       *string   `json:"error_message,omitempty"`
+	ProcessedAt        time.Time `json:"processed_at"`
 }
 
 // ConfigurationItem represents basic CI information
 type ConfigurationItem struct {
-	ID                   uuid.UUID                 `json:"id"`
-	Name                 string                    `json:"name"`
-	CIType               string                    `json:"ci_type"`
-	Attributes           map[string]interface{}    `json:"attributes"`
-	Tags                 []string                  `json:"tags"`
-	LifecycleStatusID    *uuid.UUID                `json:"lifecycle_status_id,omitempty"`
-	LifecycleStatus      *LifecycleStatus          `json:"lifecycle_status,omitempty"`
-	CreatedAt            time.Time                 `json:"created_at"`
-	UpdatedAt            *time.Time                `json:"updated_at,omitempty"`
-	CreatedBy            uuid.UUID                 `json:"created_by"`
-	UpdatedBy            *uuid.UUID                `json:"updated_by,omitempty"`
+	ID                uuid.UUID              `json:"id"`
+	Name              string                 `json:"name"`
+	CIType            string                 `json:"ci_type"`
+	Attributes        map[string]interface{} `json:"attributes"`
+	Tags              []string               `json:"tags"`
+	LifecycleStatusID *uuid.UUID             `json:"lifecycle_status_id,omitempty"`
+	LifecycleStatus   *LifecycleStatus       `json:"lifecycle_status,omitempty"`
+	CreatedAt         time.Time              `json:"created_at"`
+	UpdatedAt         *time.Time             `json:"updated_at,omitempty"`
+	CreatedBy         uuid.UUID              `json:"created_by"`
+	UpdatedBy         *uuid.UUID             `json:"updated_by,omitempty"`
 }
 
 // CITypeDefinition represents CI type information
 type CITypeDefinition struct {
-	ID                  uuid.UUID                 `json:"id"`
-	Name                string                    `json:"name"`
-	Description         *string                   `json:"description,omitempty"`
-	RequiredAttributes  []AttributeDefinition     `json:"required_attributes"`
-	OptionalAttributes  []AttributeDefinition     `json:"optional_attributes"`
-	IsAmortizable       bool                      `json:"is_amortizable"`
-	CreatedAt           time.Time                 `json:"created_at"`
-	UpdatedAt           *time.Time                `json:"updated_at,omitempty"`
-	CreatedBy           uuid.UUID                 `json:"created_by"`
-	UpdatedBy           *uuid.UUID                `json:"updated_by,omitempty"`
+	ID                 uuid.UUID             `json:"id"`
+	Name               string                `json:"name"`
+	Description        *string               `json:"description,omitempty"`
+	RequiredAttributes []AttributeDefinition `json:"required_attributes"`
+	OptionalAttributes []AttributeDefinition `json:"optional_attributes"`
+	IsAmortizable      bool                  `json:"is_amortizable"`
+	CreatedAt          time.Time             `json:"created_at"`
+	UpdatedAt          *time.Time            `json:"updated_at,omitempty"`
+	CreatedBy          uuid.UUID             `json:"created_by"`
+	UpdatedBy          *uuid.UUID            `json:"updated_by,omitempty"`
 }
 
 // AttributeDefinition represents CI attribute schema

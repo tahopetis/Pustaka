@@ -55,6 +55,10 @@ func (h *AmortizationHandler) RegisterRoutes(r chi.Router) {
 		// Restructuring (useful life changes with prospective recalculation)
 		r.Post("/restructuring/preview", h.PreviewRestructuring)
 		r.Post("/restructuring", h.ExecuteRestructuring)
+
+		// Settings management
+		r.Get("/settings", h.GetAmortizationSettings)
+		r.Put("/settings", h.UpdateAmortizationSettings)
 	})
 }
 
@@ -264,8 +268,8 @@ func (h *AmortizationHandler) TriggerManualRun(w http.ResponseWriter, r *http.Re
 
 	// Write response
 	h.writeJSON(w, http.StatusAccepted, map[string]interface{}{
-		"run_id": result.ID,
-		"status": "started",
+		"run_id":  result.ID,
+		"status":  "started",
 		"message": "Amortization run initiated",
 	})
 }
@@ -577,7 +581,7 @@ func (h *AmortizationHandler) PreviewRestructuring(w http.ResponseWriter, r *htt
 	// Parse request body
 	var req struct {
 		CIID                uuid.UUID `json:"ci_id"`
-		NewUsefulLifeMonths int        `json:"new_useful_life_months"`
+		NewUsefulLifeMonths int       `json:"new_useful_life_months"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.writeError(w, http.StatusBadRequest, "Invalid request body", err)
@@ -644,4 +648,44 @@ func (h *AmortizationHandler) ExecuteRestructuring(w http.ResponseWriter, r *htt
 
 	// Write response
 	h.writeJSON(w, http.StatusOK, result)
+}
+
+// GetAmortizationSettings handles GET /amortization/settings
+func (h *AmortizationHandler) GetAmortizationSettings(w http.ResponseWriter, r *http.Request) {
+	// Call service
+	settings, err := h.service.GetAmortizationSettings(r.Context())
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	// Write response
+	h.writeJSON(w, http.StatusOK, settings)
+}
+
+// UpdateAmortizationSettings handles PUT /amortization/settings
+func (h *AmortizationHandler) UpdateAmortizationSettings(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var req amortization.UpdateAmortizationSettings
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	// Get user ID from context
+	userID, err := h.getUserID(r)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Unauthorized", err)
+		return
+	}
+
+	// Call service
+	updatedSettings, err := h.service.UpdateAmortizationSettings(r.Context(), &req, userID)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	// Write response
+	h.writeJSON(w, http.StatusOK, updatedSettings)
 }

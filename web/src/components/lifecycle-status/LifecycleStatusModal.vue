@@ -58,18 +58,6 @@
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                v-model="form.description"
-                placeholder="Describe when this status applies to a CI"
-                rows="3"
-                class="form-input"
-              ></textarea>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
                 Sort Order
               </label>
               <input
@@ -85,8 +73,19 @@
             </div>
           </div>
 
-          <!-- Right Column - Visual Settings -->
+          <!-- Right Column - Visual Settings & Behavior -->
           <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea
+                v-model="form.description"
+                placeholder="Describe when this status applies to a CI"
+                rows="2"
+                class="form-input"
+              ></textarea>
+            </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Color
@@ -129,6 +128,20 @@
               </select>
               <p class="text-xs text-gray-500 mt-1">
                 Icon to represent this status
+              </p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Amortization Behavior
+              </label>
+              <select v-model="form.amortization_behavior" class="form-input">
+                <option value="pending">Pending (not yet amortizing)</option>
+                <option value="active">Active (currently amortizing)</option>
+                <option value="terminal">Terminal (amortization stops)</option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">
+                How amortization should behave for assets with this status
               </p>
             </div>
 
@@ -235,6 +248,7 @@ const form = ref({
   color: '#22c55e',
   icon: '',
   sort_order: 10,
+  amortization_behavior: 'pending',
   is_active: true
 })
 
@@ -265,6 +279,7 @@ watch(() => props.lifecycleStatus, (newStatus) => {
       color: newStatus.color || '#22c55e',
       icon: newStatus.icon || '',
       sort_order: newStatus.sort_order,
+      amortization_behavior: newStatus.amortization_behavior || 'pending',
       is_active: newStatus.is_active
     }
   } else {
@@ -276,6 +291,7 @@ watch(() => props.lifecycleStatus, (newStatus) => {
       color: '#22c55e',
       icon: '',
       sort_order: 10,
+      amortization_behavior: 'pending',
       is_active: true
     }
   }
@@ -317,6 +333,7 @@ const handleSubmit = async () => {
         color: form.value.color,
         icon: form.value.icon,
         sort_order: form.value.sort_order,
+        amortization_behavior: form.value.amortization_behavior,
         is_active: form.value.is_active
       }
       savedLifecycleStatus = await lifecycleStatusStore.updateLifecycleStatus(
@@ -332,7 +349,8 @@ const handleSubmit = async () => {
         description: form.value.description,
         color: form.value.color,
         icon: form.value.icon,
-        sort_order: form.value.sort_order
+        sort_order: form.value.sort_order,
+        amortization_behavior: form.value.amortization_behavior
       }
       savedLifecycleStatus = await lifecycleStatusStore.createLifecycleStatus(createData)
       showSuccessToast('Lifecycle status created successfully')
