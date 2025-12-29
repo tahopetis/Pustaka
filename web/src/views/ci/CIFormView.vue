@@ -185,6 +185,9 @@
             <h3 class="text-lg leading-6 font-medium text-gray-900">Financial Information</h3>
             <p class="mt-1 text-sm text-gray-500">
               Configure amortization and depreciation settings for this {{ selectedCIType.name }}
+              <span v-if="hasFinancialData" class="ml-2 text-amber-600 font-medium">
+                (Read-only - use /amortization page for adjustments)
+              </span>
             </p>
           </div>
           <div class="card-body">
@@ -198,51 +201,75 @@
                     @input="handleCurrencyInput('purchase_cost', $event)"
                     @blur="handleCurrencyBlur('purchase_cost')"
                     type="text"
-                    class="form-input pl-8"
+                    :class="['form-input pl-8', hasFinancialData ? 'bg-gray-50' : '']"
                     placeholder="1,000.00"
-                    :disabled="loading"
+                    :disabled="loading || hasFinancialData"
+                    :title="hasFinancialData ? 'Financial data already exists. Use /amortization page for adjustments.' : ''"
                   >
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Initial purchase cost of the asset</p>
+                 <p class="text-xs text-gray-500 mt-1">
+                   Initial purchase cost of the asset
+                   <span v-if="hasFinancialData" class="text-amber-600">
+                     - Cannot edit directly (amortization in progress)
+                   </span>
+                 </p>
               </div>
               <div>
                 <label class="form-label">Salvage Value</label>
                 <div class="relative">
                   <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
-                  <input
+                   <input
                     v-model="rawCurrencyInputs.salvage_value"
                     @input="handleCurrencyInput('salvage_value', $event)"
                     @blur="handleCurrencyBlur('salvage_value')"
                     type="text"
-                    class="form-input pl-8"
+                    :class="['form-input pl-8', hasFinancialData ? 'bg-gray-50' : '']"
                     placeholder="100.00"
-                    :disabled="loading"
+                    :disabled="loading || hasFinancialData"
+                    :title="hasFinancialData ? 'Financial data already exists. Use /amortization page for adjustments.' : ''"
                   >
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Expected value at end of useful life</p>
+                 <p class="text-xs text-gray-500 mt-1">
+                   Expected value at end of useful life
+                   <span v-if="hasFinancialData" class="text-amber-600">
+                     - Cannot edit directly (amortization in progress)
+                   </span>
+                 </p>
               </div>
               <div>
                 <label class="form-label">Amortization Start Date</label>
-                <input
+                 <input
                   v-model="form.financials.amort_start_date"
                   type="date"
-                  class="form-input"
-                  :disabled="loading"
+                  :class="['form-input', hasFinancialData ? 'bg-gray-50' : '']"
+                  :disabled="loading || hasFinancialData"
+                  :title="hasFinancialData ? 'Financial data already exists. Use /amortization page for adjustments.' : ''"
                 >
-                <p class="text-xs text-gray-500 mt-1">Date when depreciation calculation begins</p>
+                 <p class="text-xs text-gray-500 mt-1">
+                   Date when depreciation calculation begins
+                   <span v-if="hasFinancialData" class="text-amber-600">
+                     - Cannot edit directly (amortization in progress)
+                   </span>
+                 </p>
               </div>
               <div>
                 <label class="form-label">Useful Life (months)</label>
-                <input
+                 <input
                   v-model.number="form.financials.useful_life_months"
                   type="number"
                   min="1"
                   max="600"
-                  class="form-input"
+                  :class="['form-input', hasFinancialData ? 'bg-gray-50' : '']"
                   placeholder="60"
-                  :disabled="loading"
+                  :disabled="loading || hasFinancialData"
+                  :title="hasFinancialData ? 'Financial data already exists. Use /amortization page for adjustments.' : ''"
                 >
-                <p class="text-xs text-gray-500 mt-1">Expected useful life in months (1-600)</p>
+                 <p class="text-xs text-gray-500 mt-1">
+                   Expected useful life in months (1-600)
+                   <span v-if="hasFinancialData" class="text-amber-600">
+                     - Cannot edit directly (amortization in progress)
+                   </span>
+                 </p>
               </div>
             </div>
 
@@ -366,6 +393,15 @@ const isFormValid = computed(() => {
   }
 
   return true
+})
+
+const hasFinancialData = computed(() => {
+  return (
+    form.financials.purchase_cost !== null ||
+    form.financials.salvage_value !== null ||
+    form.financials.amort_start_date !== '' ||
+    form.financials.useful_life_months !== null
+  )
 })
 
 const hasPermission = (permission: string) => {
