@@ -93,12 +93,13 @@ type AmortizationRun struct {
 
 // AmortizationSummary represents summarized amortization data
 type AmortizationSummary struct {
-	GroupBy           string              `json:"group_by"` // "ci_type", "lifecycle_status", "department", etc.
-	Groups            []AmortizationGroup `json:"groups"`
-	TotalCIs          int                 `json:"total_cis"`
-	TotalBookValue    float64             `json:"total_book_value"`
-	TotalDepreciation float64             `json:"total_depreciation"`
-	GeneratedAt       time.Time           `json:"generated_at"`
+	GroupBy                 string              `json:"group_by"` // "ci_type", "lifecycle_status", "department", etc.
+	Groups                  []AmortizationGroup `json:"groups"`
+	TotalCIs                int                 `json:"total_cis"`
+	TotalBookValue          float64             `json:"total_book_value"`
+	TotalDepreciation       float64             `json:"total_depreciation"`        // Accumulated depreciation to date
+	TotalMonthlyDepreciation float64             `json:"total_monthly_depreciation"` // Sum of monthly depreciation rates
+	GeneratedAt             time.Time           `json:"generated_at"`
 }
 
 // AmortizationGroup represents a grouped summary

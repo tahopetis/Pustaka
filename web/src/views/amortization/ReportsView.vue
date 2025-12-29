@@ -140,7 +140,11 @@
             <tbody>
               <tr v-for="entry in journalEntries" :key="entry.id">
                 <td>{{ formatDate(entry.entry_date) }}</td>
-                <td>{{ formatEntryType(entry.entry_type) }}</td>
+                <td>
+              <span :class="getBadgeClasses(entry.entry_type)">
+                {{ getBadgeLabel(entry.entry_type) }}
+              </span>
+            </td>
                 <td>{{ entry.ci_name || 'N/A' }}</td>
                 <td>{{ entry.description || '-' }}</td>
                 <td class="amount">{{ formatCurrency(entry.amount) }}</td>
@@ -246,9 +250,17 @@ const loadAssets = async () => {
 
 const loadJournalReport = async () => {
   try {
-    const response = await amortizationStore.loadJournalReport(journalFilters.value)
-    if (response.data) {
-      journalEntries.value = response.data.data
+    // Use the ledger endpoint instead of reports/journal (which doesn't exist)
+    const filters = {
+      date_from: journalFilters.value.date_from,
+      date_to: journalFilters.value.date_to,
+      sort_by: 'entry_date',
+      sort_order: 'desc' as const,
+      limit: 100
+    }
+    const response = await amortizationStore.loadLedgerEntries(filters)
+    if (response && response.entries) {
+      journalEntries.value = response.entries
     }
   } catch (error) {
     console.error('Failed to load journal report:', error)
@@ -330,6 +342,32 @@ const formatCurrency = (amount: number): string => {
 
 const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString()
+}
+
+const getBadgeLabel = (entryType: string): string => {
+  const labels = {
+    'depreciation': 'Monthly',
+    'monthly_depreciation': 'Monthly',
+    'catch_up_depreciation': 'Catch-up',
+    'adjustment': 'Adjustment',
+    'write_off': 'Write-off',
+    'reversal': '↩️ Reversal',
+    'restructuring': '📊 Restructuring'
+  }
+  return labels[entryType] || formatEntryType(entryType)
+}
+
+const getBadgeClasses = (entryType: string): string => {
+  const classes = {
+    'depreciation': 'badge badge-gray',
+    'monthly_depreciation': 'badge badge-gray',
+    'catch_up_depreciation': 'badge badge-blue',
+    'adjustment': 'badge badge-purple',
+    'write_off': 'badge badge-red',
+    'reversal': 'badge badge-gray badge-faded',
+    'restructuring': 'badge badge-gray badge-faded'
+  }
+  return classes[entryType] || 'badge badge-gray'
 }
 
 const formatEntryType = (entryType: string): string => {
@@ -572,6 +610,39 @@ const formatEntryType = (entryType: string): string => {
 
 .btn-outline:hover {
   background: #f9fafb;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.badge-gray {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.badge-blue {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge-purple {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+.badge-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-faded {
+  opacity: 0.7;
 }
 
 @media (max-width: 768px) {

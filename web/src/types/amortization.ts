@@ -70,6 +70,7 @@ export interface AmortizationMetrics {
   total_amortizable_assets: number
   total_book_value: number
   monthly_depreciation: number
+  total_monthly_depreciation: number
   active_amortizations: number
 }
 

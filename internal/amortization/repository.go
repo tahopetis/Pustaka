@@ -1184,7 +1184,14 @@ func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryR
 				WHEN ci.purchase_cost > 0 AND ci.current_book_value IS NOT NULL
 				THEN ci.purchase_cost - COALESCE(ci.current_book_value, 0)
 				ELSE 0
-			END), 0) as total_depreciation
+			END), 0) as total_depreciation,
+			COALESCE(SUM(
+				CASE
+					WHEN COALESCE(ci.useful_life_months, 0) > 0
+					THEN ROUND((COALESCE(ci.purchase_cost, 0) - COALESCE(ci.salvage_value, 0)) / NULLIF(ci.useful_life_months, 0)::numeric, 2)
+					ELSE 0
+				END
+			), 0) as total_monthly_depreciation
 		FROM configuration_items ci
 		JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
 		LEFT JOIN lifecycle_statuses ls ON ci.lifecycle_status_id = ls.id
@@ -1195,8 +1202,9 @@ func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryR
 	var totalCIs int64
 	var totalBookValue float64
 	var totalDepreciation float64
+	var totalMonthlyDepreciation float64
 
-	err := r.db.QueryRow(ctx, query).Scan(&totalCIs, &totalBookValue, &totalDepreciation)
+	err := r.db.QueryRow(ctx, query).Scan(&totalCIs, &totalBookValue, &totalDepreciation, &totalMonthlyDepreciation)
 	if err != nil {
 		r.logger.ErrorService("amortization", "get_amortization_summaries", err, map[string]interface{}{
 			"request": req,
@@ -1205,12 +1213,13 @@ func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryR
 	}
 
 	return &AmortizationSummary{
-		GroupBy:           "all",
-		Groups:            []AmortizationGroup{},
-		TotalCIs:          int(totalCIs),
-		TotalBookValue:    totalBookValue,
-		TotalDepreciation: totalDepreciation,
-		GeneratedAt:       time.Now(),
+		GroupBy:                 "all",
+		Groups:                  []AmortizationGroup{},
+		TotalCIs:                int(totalCIs),
+		TotalBookValue:          totalBookValue,
+		TotalDepreciation:       totalDepreciation,
+		TotalMonthlyDepreciation: totalMonthlyDepreciation,
+		GeneratedAt:             time.Now(),
 	}, nil
 }
 

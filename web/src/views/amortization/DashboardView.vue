@@ -122,8 +122,10 @@
           :key="activity.id"
           class="activity-item"
         >
-          <div class="activity-icon">
-            <i :class="getActivityIcon(activity.entry_type)"></i>
+          <div class="activity-badge">
+            <span :class="getBadgeClasses(activity.entry_type)">
+              {{ getBadgeLabel(activity.entry_type) }}
+            </span>
           </div>
           <div class="activity-content">
             <h4>{{ activity.description }}</h4>
@@ -195,23 +197,34 @@ const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString()
 }
 
-const getActivityIcon = (entryType: string): string => {
-  switch (entryType) {
-    case 'monthly_depreciation':
-    case 'catch_up_depreciation':
-    case 'depreciation':
-      return 'fas fa-chart-line'
-    case 'adjustment':
-      return 'fas fa-edit'
-    case 'write_off':
-      return 'fas fa-times-circle'
-    case 'reversal':
-      return 'fas fa-undo'
-    case 'restructuring':
-      return 'fas fa-clock'
-    default:
-      return 'fas fa-circle'
+const getBadgeLabel = (entryType: string): string => {
+  const labels = {
+    'depreciation': 'Monthly',
+    'monthly_depreciation': 'Monthly',
+    'catch_up_depreciation': 'Catch-up',
+    'adjustment': 'Adjustment',
+    'write_off': 'Write-off',
+    'reversal': '↩️ Reversal',
+    'restructuring': '📊 Restructuring'
   }
+  return labels[entryType] || formatEntryType(entryType)
+}
+
+const getBadgeClasses = (entryType: string): string => {
+  const classes = {
+    'depreciation': 'badge badge-gray',
+    'monthly_depreciation': 'badge badge-gray',
+    'catch_up_depreciation': 'badge badge-blue',
+    'adjustment': 'badge badge-purple',
+    'write_off': 'badge badge-red',
+    'reversal': 'badge badge-gray badge-faded',
+    'restructuring': 'badge badge-gray badge-faded'
+  }
+  return classes[entryType] || 'badge badge-gray'
+}
+
+const formatEntryType = (entryType: string): string => {
+  return entryType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
 
 const handleAdjustmentCreated = async () => {
@@ -381,15 +394,8 @@ const handleRestructureSuccess = async () => {
   border-bottom: none;
 }
 
-.activity-icon {
-  width: 2rem;
-  height: 2rem;
-  background: #f3f4f6;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4f46e5;
+.activity-badge {
+  flex-shrink: 0;
 }
 
 .activity-content h4 {
@@ -403,6 +409,39 @@ const handleRestructureSuccess = async () => {
   font-size: 0.75rem;
   color: #6b7280;
   margin: 0;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.badge-gray {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.badge-blue {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge-purple {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+.badge-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-faded {
+  opacity: 0.7;
 }
 
 @media (max-width: 768px) {

@@ -123,8 +123,8 @@
               <span v-else>N/A</span>
             </td>
             <td>
-              <span :class="`entry-type-badge ${entry.entry_type}`">
-                {{ formatEntryType(entry.entry_type) }}
+              <span :class="getBadgeClasses(entry.entry_type)">
+                {{ getBadgeLabel(entry.entry_type) }}
               </span>
             </td>
             <td>{{ entry.description || '-' }}</td>
@@ -295,6 +295,32 @@ const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString()
 }
 
+const getBadgeLabel = (entryType: string): string => {
+  const labels = {
+    'depreciation': 'Monthly',
+    'monthly_depreciation': 'Monthly',
+    'catch_up_depreciation': 'Catch-up',
+    'adjustment': 'Adjustment',
+    'write_off': 'Write-off',
+    'reversal': '↩️ Reversal',
+    'restructuring': '📊 Restructuring'
+  }
+  return labels[entryType] || formatEntryType(entryType)
+}
+
+const getBadgeClasses = (entryType: string): string => {
+  const classes = {
+    'depreciation': 'badge badge-gray',
+    'monthly_depreciation': 'badge badge-gray',
+    'catch_up_depreciation': 'badge badge-blue',
+    'adjustment': 'badge badge-purple',
+    'write_off': 'badge badge-red',
+    'reversal': 'badge badge-gray badge-faded',
+    'restructuring': 'badge badge-gray badge-faded'
+  }
+  return classes[entryType] || 'badge badge-gray'
+}
+
 const formatEntryType = (entryType: string): string => {
   return entryType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
@@ -414,32 +440,37 @@ const formatEntryType = (entryType: string): string => {
   text-decoration: underline;
 }
 
-.entry-type-badge {
+.badge {
+  display: inline-block;
   padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
   font-size: 0.75rem;
   font-weight: 500;
-  text-transform: capitalize;
+  border-radius: 9999px;
+  white-space: nowrap;
 }
 
-.entry-type-badge.depreciation {
+.badge-gray {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.badge-blue {
   background: #dbeafe;
   color: #1e40af;
 }
 
-.entry-type-badge.adjustment {
-  background: #fef3c7;
-  color: #92400e;
+.badge-purple {
+  background: #f3e8ff;
+  color: #7c3aed;
 }
 
-.entry-type-badge.write_off {
+.badge-red {
   background: #fee2e2;
   color: #991b1b;
 }
 
-.entry-type-badge.reversal {
-  background: #e0e7ff;
-  color: #3730a3;
+.badge-faded {
+  opacity: 0.7;
 }
 
 .amount {

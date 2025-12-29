@@ -161,7 +161,8 @@ export const useAmortizationStore = defineStore('amortization', () => {
       metrics.value = {
         total_amortizable_assets: response.total_cis || 0,
         total_book_value: response.total_book_value || 0,
-        monthly_depreciation: response.total_depreciation || 0, // Use actual depreciation data
+        monthly_depreciation: response.total_monthly_depreciation || 0, // Sum of monthly rates (stable, excludes catch-up)
+        total_monthly_depreciation: response.total_monthly_depreciation || 0,
         active_amortizations: response.total_cis || 0 // Assuming all CIs with amortization are active
       }
       return metrics.value
