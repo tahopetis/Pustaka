@@ -54,10 +54,10 @@ func (suite *AmortizationContractTestSuite) SetupSuite() {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Mock authenticated user
 			user := &middleware.AuthenticatedUser{
-				UserID:    suite.adminUserID,
-				Username:  "admin",
-				Email:     "admin@example.com",
-				Role:      "admin",
+				UserID:      suite.adminUserID,
+				Username:    "admin",
+				Email:       "admin@example.com",
+				Role:        "admin",
 				Permissions: []string{"amortization:read", "amortization:write", "amortization:adjust", "amortization:admin"},
 			}
 			ctx := context.WithValue(r.Context(), middleware.UserContextKey, user)
@@ -222,17 +222,17 @@ func (suite *AmortizationContractTestSuite) TestGetAmortizationDetails_Contract(
 				// Setup mock data
 				ciID := uuid.MustParse(tt.ciID)
 				suite.mockService.AddAmortizableCI(&AmortizableCI{
-					ID:                     ciID,
-					Name:                   "Test Server",
-					CIType:                 "Server",
-					PurchaseCost:           10000.0,
-					SalvageValue:           500.0,
-					UsefulLifeMonths:       60,
-					CurrentBookValue:       8000.0,
+					ID:                      ciID,
+					Name:                    "Test Server",
+					CIType:                  "Server",
+					PurchaseCost:            10000.0,
+					SalvageValue:            500.0,
+					UsefulLifeMonths:        60,
+					CurrentBookValue:        8000.0,
 					AccumulatedDepreciation: 2000.0,
-					DepreciationMethod:     "straight_line",
-					AmortizationBehavior:   "active",
-					IsAmortizable:          true,
+					DepreciationMethod:      "straight_line",
+					AmortizationBehavior:    "active",
+					IsAmortizable:           true,
 				})
 			}
 
@@ -273,55 +273,55 @@ func (suite *AmortizationContractTestSuite) TestUpdateAmortizationConfig_Contrac
 		validateFields bool
 	}{
 		{
-			name:   "Valid full update",
-			ciID:   uuid.New().String(),
+			name: "Valid full update",
+			ciID: uuid.New().String(),
 			requestBody: map[string]interface{}{
-				"purchase_cost":        12000.0,
-				"salvage_value":        600.0,
-				"amort_start_date":     "2024-01-01",
-				"useful_life_months":   72,
-				"depreciation_method":  "straight_line",
+				"purchase_cost":       12000.0,
+				"salvage_value":       600.0,
+				"amort_start_date":    "2024-01-01",
+				"useful_life_months":  72,
+				"depreciation_method": "straight_line",
 			},
 			expectedStatus: http.StatusOK,
 			validateFields: true,
 		},
 		{
-			name:   "Partial update",
-			ciID:   uuid.New().String(),
+			name: "Partial update",
+			ciID: uuid.New().String(),
 			requestBody: map[string]interface{}{
-				"purchase_cost":       15000.0,
-				"useful_life_months":  84,
+				"purchase_cost":      15000.0,
+				"useful_life_months": 84,
 			},
 			expectedStatus: http.StatusOK,
 			validateFields: true,
 		},
 		{
-			name:   "Invalid purchase cost (negative)",
-			ciID:   uuid.New().String(),
+			name: "Invalid purchase cost (negative)",
+			ciID: uuid.New().String(),
 			requestBody: map[string]interface{}{
 				"purchase_cost": -1000.0,
 			},
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
-			name:   "Invalid useful life (zero)",
-			ciID:   uuid.New().String(),
+			name: "Invalid useful life (zero)",
+			ciID: uuid.New().String(),
 			requestBody: map[string]interface{}{
 				"useful_life_months": 0,
 			},
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
-			name:   "Invalid depreciation method",
-			ciID:   uuid.New().String(),
+			name: "Invalid depreciation method",
+			ciID: uuid.New().String(),
 			requestBody: map[string]interface{}{
 				"depreciation_method": "invalid_method",
 			},
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
-			name:   "Invalid date format",
-			ciID:   uuid.New().String(),
+			name: "Invalid date format",
+			ciID: uuid.New().String(),
 			requestBody: map[string]interface{}{
 				"amort_start_date": "2024-13-45",
 			},
@@ -346,8 +346,8 @@ func (suite *AmortizationContractTestSuite) TestUpdateAmortizationConfig_Contrac
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
-			name:   "Non-existent CI",
-			ciID:   uuid.New().String(),
+			name: "Non-existent CI",
+			ciID: uuid.New().String(),
 			requestBody: map[string]interface{}{
 				"purchase_cost": 10000.0,
 			},
@@ -361,15 +361,15 @@ func (suite *AmortizationContractTestSuite) TestUpdateAmortizationConfig_Contrac
 				ciID := uuid.MustParse(tt.ciID)
 				if tt.name != "Non-existent CI" {
 					suite.mockService.AddAmortizableCI(&AmortizableCI{
-						ID:                     ciID,
-						Name:                   "Test Server",
-						CIType:                 "Server",
-						PurchaseCost:           10000.0,
-						SalvageValue:           500.0,
-						UsefulLifeMonths:       60,
-						CurrentBookValue:       8000.0,
+						ID:                      ciID,
+						Name:                    "Test Server",
+						CIType:                  "Server",
+						PurchaseCost:            10000.0,
+						SalvageValue:            500.0,
+						UsefulLifeMonths:        60,
+						CurrentBookValue:        8000.0,
 						AccumulatedDepreciation: 2000.0,
-						IsAmortizable:          true,
+						IsAmortizable:           true,
 					})
 				}
 			}
@@ -456,6 +456,29 @@ func (suite *AmortizationContractTestSuite) TestGetLedgerEntries_Contract() {
 			queryParams:    "entry_type=invalid_type",
 			expectedStatus: http.StatusBadRequest,
 		},
+		{
+			name:           "With CI type filter",
+			queryParams:    fmt.Sprintf("ci_type_id=%s", uuid.New().String()),
+			expectedStatus: http.StatusOK,
+			expectedFields: []string{"entries", "page", "limit", "total", "total_pages"},
+		},
+		{
+			name:           "With CI name search",
+			queryParams:    "ci_name_search=test",
+			expectedStatus: http.StatusOK,
+			expectedFields: []string{"entries", "page", "limit", "total", "total_pages"},
+		},
+		{
+			name:           "Invalid CI type ID format",
+			queryParams:    "ci_type_id=invalid-uuid",
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "Combined filters",
+			queryParams:    fmt.Sprintf("ci_type_id=%s&ci_name_search=test&date_from=2024-01-01", uuid.New().String()),
+			expectedStatus: http.StatusOK,
+			expectedFields: []string{"entries", "page", "limit", "total", "total_pages"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -464,13 +487,13 @@ func (suite *AmortizationContractTestSuite) TestGetLedgerEntries_Contract() {
 			if tt.expectedStatus == http.StatusOK {
 				ciID := uuid.New()
 				suite.mockService.AddLedgerEntry(&AmortizationEntry{
-					ID:                         uuid.New(),
-					CIID:                       ciID,
-					EntryType:                  "monthly_depreciation",
-					EntryDate:                  time.Now(),
-					Amount:                     100.0,
-					BookValueBefore:            5000.0,
-					BookValueAfter:             4900.0,
+					ID:                            uuid.New(),
+					CIID:                          ciID,
+					EntryType:                     "monthly_depreciation",
+					EntryDate:                     time.Now(),
+					Amount:                        100.0,
+					BookValueBefore:               5000.0,
+					BookValueAfter:                4900.0,
 					AccumulatedDepreciationBefore: 1000.0,
 					AccumulatedDepreciationAfter:  1100.0,
 				})
@@ -546,20 +569,20 @@ func (suite *AmortizationContractTestSuite) TestGetLedgerEntry_Contract() {
 				entryID := uuid.MustParse(tt.entryID)
 				ciID := uuid.New()
 				suite.mockService.AddLedgerEntry(&AmortizationEntry{
-					ID:                         entryID,
-					CIID:                       ciID,
-					EntryType:                  "monthly_depreciation",
-					EntryDate:                  time.Now(),
-					Amount:                     100.0,
-					BookValueBefore:            5000.0,
-					BookValueAfter:             4900.0,
+					ID:                            entryID,
+					CIID:                          ciID,
+					EntryType:                     "monthly_depreciation",
+					EntryDate:                     time.Now(),
+					Amount:                        100.0,
+					BookValueBefore:               5000.0,
+					BookValueAfter:                4900.0,
 					AccumulatedDepreciationBefore: 1000.0,
 					AccumulatedDepreciationAfter:  1100.0,
 				})
 				suite.mockService.AddAmortizableCI(&AmortizableCI{
-					ID:       ciID,
-					Name:     "Test Server",
-					CIType:   "Server",
+					ID:            ciID,
+					Name:          "Test Server",
+					CIType:        "Server",
 					IsAmortizable: true,
 				})
 			}
@@ -602,9 +625,9 @@ func (suite *AmortizationContractTestSuite) TestCreateAdjustment_Contract() {
 		{
 			name: "Valid adjustment",
 			requestBody: map[string]interface{}{
-				"ci_id":        uuid.New().String(),
-				"amount":       500.0,
-				"description":  "Correction for calculation error",
+				"ci_id":          uuid.New().String(),
+				"amount":         500.0,
+				"description":    "Correction for calculation error",
 				"effective_date": "2024-01-15",
 			},
 			expectedStatus: http.StatusCreated,
@@ -665,9 +688,9 @@ func (suite *AmortizationContractTestSuite) TestCreateAdjustment_Contract() {
 		{
 			name: "Invalid date format",
 			requestBody: map[string]interface{}{
-				"ci_id":         uuid.New().String(),
-				"amount":        500.0,
-				"description":   "Invalid date",
+				"ci_id":          uuid.New().String(),
+				"amount":         500.0,
+				"description":    "Invalid date",
 				"effective_date": "2024-13-45",
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -691,9 +714,9 @@ func (suite *AmortizationContractTestSuite) TestCreateAdjustment_Contract() {
 				if ciIDStr, ok := tt.requestBody["ci_id"].(string); ok {
 					if ciID, err := uuid.Parse(ciIDStr); err == nil {
 						suite.mockService.AddAmortizableCI(&AmortizableCI{
-							ID:       ciID,
-							Name:     "Test Server",
-							CIType:   "Server",
+							ID:            ciID,
+							Name:          "Test Server",
+							CIType:        "Server",
 							IsAmortizable: true,
 						})
 					}
@@ -779,16 +802,16 @@ func (suite *AmortizationContractTestSuite) TestListAmortizationRuns_Contract() 
 			// Setup mock data for successful cases
 			if tt.expectedStatus == http.StatusOK {
 				suite.mockService.AddAmortizationRun(&AmortizationRun{
-					ID:                 uuid.New(),
-					Status:             "completed",
-					ProcessingDate:     time.Now(),
+					ID:                  uuid.New(),
+					Status:              "completed",
+					ProcessingDate:      time.Now(),
 					TotalAmortizableCIs: 100,
-					ProcessedCIs:       intPtr(95),
-					FailedCIs:          intPtr(5),
-					SkippedCIs:         intPtr(0),
-					TotalDepreciation:  floatPtr(5000.0),
-					IsManual:           false,
-					CreatedAt:          time.Now(),
+					ProcessedCIs:        intPtr(95),
+					FailedCIs:           intPtr(5),
+					SkippedCIs:          intPtr(0),
+					TotalDepreciation:   floatPtr(5000.0),
+					IsManual:            false,
+					CreatedAt:           time.Now(),
 				})
 			}
 
@@ -862,20 +885,20 @@ func (suite *AmortizationContractTestSuite) TestGetAmortizationRun_Contract() {
 			if tt.name == "Valid run ID" {
 				runID := uuid.MustParse(tt.runID)
 				suite.mockService.AddAmortizationRun(&AmortizationRun{
-					ID:                 runID,
-					Status:             "completed",
-					ProcessingDate:     time.Now(),
-					StartedAt:          timePtr(time.Now().Add(-1 * time.Hour)),
-					CompletedAt:        timePtr(time.Now()),
+					ID:                  runID,
+					Status:              "completed",
+					ProcessingDate:      time.Now(),
+					StartedAt:           timePtr(time.Now().Add(-1 * time.Hour)),
+					CompletedAt:         timePtr(time.Now()),
 					TotalAmortizableCIs: 100,
-					ProcessedCIs:       intPtr(95),
-					FailedCIs:          intPtr(5),
-					SkippedCIs:         intPtr(0),
-					TotalDepreciation:  floatPtr(5000.0),
-					IsManual:           true,
-					DryRun:             false,
-					ErrorSummary:       stringPtr(""),
-					CreatedAt:          time.Now(),
+					ProcessedCIs:        intPtr(95),
+					FailedCIs:           intPtr(5),
+					SkippedCIs:          intPtr(0),
+					TotalDepreciation:   floatPtr(5000.0),
+					IsManual:            true,
+					DryRun:              false,
+					ErrorSummary:        stringPtr(""),
+					CreatedAt:           time.Now(),
 				})
 			}
 
@@ -985,9 +1008,9 @@ func (suite *AmortizationContractTestSuite) TestTriggerManualRun_Contract() {
 					if ciIDStr, ok := ciID.(string); ok {
 						if ciID, err := uuid.Parse(ciIDStr); err == nil {
 							suite.mockService.AddAmortizableCI(&AmortizableCI{
-								ID:       ciID,
-								Name:     "Test Server",
-								CIType:   "Server",
+								ID:            ciID,
+								Name:          "Test Server",
+								CIType:        "Server",
 								IsAmortizable: true,
 							})
 						}
@@ -1096,16 +1119,16 @@ func (suite *AmortizationContractTestSuite) TestGetAmortizationSummaries_Contrac
 			// Setup mock data for successful cases
 			if tt.expectedStatus == http.StatusOK {
 				suite.mockService.AddAmortizationSummary(&AmortizationSummary{
-					GroupBy:    "ci_type",
-					TotalCIs:   50,
+					GroupBy:     "ci_type",
+					TotalCIs:    50,
 					GeneratedAt: time.Now(),
 					Groups: []AmortizationGroup{
 						{
-							GroupName:          "Server",
-							CICount:            25,
-							TotalBookValue:     250000.0,
-							TotalDepreciation:  50000.0,
-							AverageAge:         24.5,
+							GroupName:         "Server",
+							CICount:           25,
+							TotalBookValue:    250000.0,
+							TotalDepreciation: 50000.0,
+							AverageAge:        24.5,
 						},
 					},
 				})
@@ -1216,9 +1239,9 @@ func (suite *AmortizationContractTestSuite) TestGenerateDepreciationSchedule_Con
 			if tt.expectedStatus == http.StatusOK {
 				ciID := uuid.New()
 				suite.mockService.AddAmortizableCI(&AmortizableCI{
-					ID:       ciID,
-					Name:     "Test Server",
-					CIType:   "Server",
+					ID:            ciID,
+					Name:          "Test Server",
+					CIType:        "Server",
 					IsAmortizable: true,
 				})
 
@@ -1336,9 +1359,9 @@ func (suite *AmortizationContractTestSuite) TestAuthentication_Contract() {
 			// Setup mock data
 			ciID := uuid.New()
 			suite.mockService.AddAmortizableCI(&AmortizableCI{
-				ID:       ciID,
-				Name:     "Test Server",
-				CIType:   "Server",
+				ID:            ciID,
+				Name:          "Test Server",
+				CIType:        "Server",
 				IsAmortizable: true,
 			})
 
@@ -1379,38 +1402,38 @@ func (suite *AmortizationContractTestSuite) TestAuthorization_Contract() {
 		expectedStatus int
 	}{
 		{
-			name:        "Admin with full permissions",
-			permissions: []string{"amortization:read", "amortization:write", "amortization:adjust", "amortization:admin"},
-			method:      http.MethodGet,
-			url:         "/amortization/configuration-items",
+			name:           "Admin with full permissions",
+			permissions:    []string{"amortization:read", "amortization:write", "amortization:adjust", "amortization:admin"},
+			method:         http.MethodGet,
+			url:            "/amortization/configuration-items",
 			expectedStatus: http.StatusOK,
 		},
 		{
-			name:        "Read-only user accessing read endpoint",
-			permissions: []string{"amortization:read"},
-			method:      http.MethodGet,
-			url:         "/amortization/configuration-items",
+			name:           "Read-only user accessing read endpoint",
+			permissions:    []string{"amortization:read"},
+			method:         http.MethodGet,
+			url:            "/amortization/configuration-items",
 			expectedStatus: http.StatusOK,
 		},
 		{
-			name:        "Read-only user accessing write endpoint",
-			permissions: []string{"amortization:read"},
-			method:      http.MethodPut,
-			url:         "/amortization/configuration-items/" + uuid.New().String(),
+			name:           "Read-only user accessing write endpoint",
+			permissions:    []string{"amortization:read"},
+			method:         http.MethodPut,
+			url:            "/amortization/configuration-items/" + uuid.New().String(),
 			expectedStatus: http.StatusForbidden,
 		},
 		{
-			name:        "User without adjust permission",
-			permissions: []string{"amortization:read", "amortization:write"},
-			method:      http.MethodPost,
-			url:         "/amortization/adjustments",
+			name:           "User without adjust permission",
+			permissions:    []string{"amortization:read", "amortization:write"},
+			method:         http.MethodPost,
+			url:            "/amortization/adjustments",
 			expectedStatus: http.StatusForbidden,
 		},
 		{
-			name:        "User without admin permission",
-			permissions: []string{"amortization:read", "amortization:write", "amortization:adjust"},
-			method:      http.MethodPost,
-			url:         "/amortization/runs",
+			name:           "User without admin permission",
+			permissions:    []string{"amortization:read", "amortization:write", "amortization:adjust"},
+			method:         http.MethodPost,
+			url:            "/amortization/runs",
 			expectedStatus: http.StatusForbidden,
 		},
 		{
@@ -1428,9 +1451,9 @@ func (suite *AmortizationContractTestSuite) TestAuthorization_Contract() {
 			if tt.method == http.MethodPut {
 				ciID := uuid.New()
 				suite.mockService.AddAmortizableCI(&AmortizableCI{
-					ID:       ciID,
-					Name:     "Test Server",
-					CIType:   "Server",
+					ID:            ciID,
+					Name:          "Test Server",
+					CIType:        "Server",
 					IsAmortizable: true,
 				})
 				tt.url = "/amortization/configuration-items/" + ciID.String()
@@ -1444,9 +1467,9 @@ func (suite *AmortizationContractTestSuite) TestAuthorization_Contract() {
 			} else if tt.method == http.MethodPost && tt.url == "/amortization/adjustments" {
 				ciID := uuid.New()
 				suite.mockService.AddAmortizableCI(&AmortizableCI{
-					ID:       ciID,
-					Name:     "Test Server",
-					CIType:   "Server",
+					ID:            ciID,
+					Name:          "Test Server",
+					CIType:        "Server",
 					IsAmortizable: true,
 				})
 				json.NewEncoder(&body).Encode(map[string]interface{}{
@@ -1706,13 +1729,13 @@ func (suite *AmortizationContractTestSuite) TestPerformance_Contract() {
 			setupData: func() {
 				for i := 0; i < 100; i++ {
 					ci := &AmortizableCI{
-						ID:       uuid.New(),
-						Name:     fmt.Sprintf("Server %d", i),
-						CIType:   "Server",
-						PurchaseCost: 10000.0,
+						ID:               uuid.New(),
+						Name:             fmt.Sprintf("Server %d", i),
+						CIType:           "Server",
+						PurchaseCost:     10000.0,
 						UsefulLifeMonths: 60,
 						CurrentBookValue: 8000.0,
-						IsAmortizable: true,
+						IsAmortizable:    true,
 					}
 					suite.mockService.AddAmortizableCI(ci)
 				}
@@ -1729,13 +1752,13 @@ func (suite *AmortizationContractTestSuite) TestPerformance_Contract() {
 			name: "Get amortization details performance",
 			setupData: func() {
 				ci := &AmortizableCI{
-					ID:       uuid.New(),
-					Name:     "Performance Test Server",
-					CIType:   "Server",
-					PurchaseCost: 10000.0,
+					ID:               uuid.New(),
+					Name:             "Performance Test Server",
+					CIType:           "Server",
+					PurchaseCost:     10000.0,
 					UsefulLifeMonths: 60,
 					CurrentBookValue: 8000.0,
-					IsAmortizable: true,
+					IsAmortizable:    true,
 				}
 				suite.mockService.AddAmortizableCI(ci)
 			},
@@ -1791,10 +1814,10 @@ func (suite *AmortizationContractTestSuite) TestEdgeCases_Contract() {
 			setupMock: func() {
 				for i := 0; i < 200; i++ {
 					ci := &AmortizableCI{
-						ID:       uuid.New(),
-						Name:     fmt.Sprintf("Server %d", i),
-						CIType:   "Server",
-						PurchaseCost: 10000.0,
+						ID:            uuid.New(),
+						Name:          fmt.Sprintf("Server %d", i),
+						CIType:        "Server",
+						PurchaseCost:  10000.0,
 						IsAmortizable: true,
 					}
 					suite.mockService.AddAmortizableCI(ci)
@@ -1811,14 +1834,14 @@ func (suite *AmortizationContractTestSuite) TestEdgeCases_Contract() {
 			name: "Zero value financials",
 			setupMock: func() {
 				ci := &AmortizableCI{
-					ID:                     uuid.New(),
-					Name:                   "Zero Value Server",
-					CIType:                 "Server",
-					PurchaseCost:           0.0,
-					SalvageValue:           0.0,
-					CurrentBookValue:       0.0,
+					ID:                      uuid.New(),
+					Name:                    "Zero Value Server",
+					CIType:                  "Server",
+					PurchaseCost:            0.0,
+					SalvageValue:            0.0,
+					CurrentBookValue:        0.0,
 					AccumulatedDepreciation: 0.0,
-					IsAmortizable:          true,
+					IsAmortizable:           true,
 				}
 				suite.mockService.AddAmortizableCI(ci)
 			},
@@ -1834,14 +1857,14 @@ func (suite *AmortizationContractTestSuite) TestEdgeCases_Contract() {
 			name: "Very large financial values",
 			setupMock: func() {
 				ci := &AmortizableCI{
-					ID:                     uuid.New(),
-					Name:                   "High Value Server",
-					CIType:                 "Server",
-					PurchaseCost:           999999999.99,
-					SalvageValue:           1000000.00,
-					CurrentBookValue:       500000000.00,
+					ID:                      uuid.New(),
+					Name:                    "High Value Server",
+					CIType:                  "Server",
+					PurchaseCost:            999999999.99,
+					SalvageValue:            1000000.00,
+					CurrentBookValue:        500000000.00,
 					AccumulatedDepreciation: 499999999.99,
-					IsAmortizable:          true,
+					IsAmortizable:           true,
 				}
 				suite.mockService.AddAmortizableCI(ci)
 			},
@@ -1857,10 +1880,10 @@ func (suite *AmortizationContractTestSuite) TestEdgeCases_Contract() {
 			name: "Special characters in CI name",
 			setupMock: func() {
 				ci := &AmortizableCI{
-					ID:       uuid.New(),
-					Name:     "Server-测试_🖥️@#$%^&*()",
-					CIType:   "Server",
-					PurchaseCost: 10000.0,
+					ID:            uuid.New(),
+					Name:          "Server-测试_🖥️@#$%^&*()",
+					CIType:        "Server",
+					PurchaseCost:  10000.0,
 					IsAmortizable: true,
 				}
 				suite.mockService.AddAmortizableCI(ci)
@@ -1877,10 +1900,10 @@ func (suite *AmortizationContractTestSuite) TestEdgeCases_Contract() {
 			setupMock: func() {
 				ciID := uuid.New()
 				suite.mockService.AddAmortizableCI(&AmortizableCI{
-					ID:       ciID,
-					Name:     "Unicode Server",
-					CIType:   "Server",
-					PurchaseCost: 10000.0,
+					ID:            ciID,
+					Name:          "Unicode Server",
+					CIType:        "Server",
+					PurchaseCost:  10000.0,
 					IsAmortizable: true,
 				})
 				description := "Adjustment for currency revaluation Ðóõ₤€£¥١٢٣"

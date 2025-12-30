@@ -32,11 +32,11 @@ type AmortizableCI struct {
 	MonthlyDepreciation     *float64   `json:"monthly_depreciation,omitempty"` // Calculated field
 
 	// Computed Fields (for API responses) - Frontend-specific aliases
-	CIID            *string  `json:"ci_id,omitempty"`           // Alias for ID (for frontend compatibility)
-	CIName          *string  `json:"ci_name,omitempty"`         // Alias for Name (for frontend compatibility)
-	CITypeName      *string  `json:"ci_type_name,omitempty"`    // Alias for CIType (for frontend compatibility)
-	RemainingMonths *int64   `json:"remaining_months,omitempty"` // Calculated remaining months
-	Status          *string  `json:"status,omitempty"`           // Amortization status (for frontend compatibility)
+	CIID            *string `json:"ci_id,omitempty"`            // Alias for ID (for frontend compatibility)
+	CIName          *string `json:"ci_name,omitempty"`          // Alias for Name (for frontend compatibility)
+	CITypeName      *string `json:"ci_type_name,omitempty"`     // Alias for CIType (for frontend compatibility)
+	RemainingMonths *int64  `json:"remaining_months,omitempty"` // Calculated remaining months
+	Status          *string `json:"status,omitempty"`           // Amortization status (for frontend compatibility)
 
 	// Amortization Configuration
 	DepreciationMethod   string `json:"depreciation_method"`   // "straight_line", "declining_balance"
@@ -100,13 +100,13 @@ type AmortizationRun struct {
 
 // AmortizationSummary represents summarized amortization data
 type AmortizationSummary struct {
-	GroupBy                 string              `json:"group_by"` // "ci_type", "lifecycle_status", "department", etc.
-	Groups                  []AmortizationGroup `json:"groups"`
-	TotalCIs                int                 `json:"total_cis"`
-	TotalBookValue          float64             `json:"total_book_value"`
-	TotalDepreciation       float64             `json:"total_depreciation"`        // Accumulated depreciation to date
+	GroupBy                  string              `json:"group_by"` // "ci_type", "lifecycle_status", "department", etc.
+	Groups                   []AmortizationGroup `json:"groups"`
+	TotalCIs                 int                 `json:"total_cis"`
+	TotalBookValue           float64             `json:"total_book_value"`
+	TotalDepreciation        float64             `json:"total_depreciation"`         // Accumulated depreciation to date
 	TotalMonthlyDepreciation float64             `json:"total_monthly_depreciation"` // Sum of monthly depreciation rates
-	GeneratedAt             time.Time           `json:"generated_at"`
+	GeneratedAt              time.Time           `json:"generated_at"`
 }
 
 // AmortizationGroup represents a grouped summary
@@ -210,16 +210,18 @@ type AmortizableCIFilters struct {
 
 // LedgerFilters represents filters for listing ledger entries
 type LedgerFilters struct {
-	CIID       *uuid.UUID `json:"ci_id,omitempty"`
-	EntryTypes []string   `json:"entry_types,omitempty"`
-	DateFrom   *time.Time `json:"date_from,omitempty"`
-	DateTo     *time.Time `json:"date_to,omitempty"`
-	MinAmount  *float64   `json:"min_amount,omitempty"`
-	MaxAmount  *float64   `json:"max_amount,omitempty"`
-	Page       *int       `json:"page,omitempty"`
-	PageSize   *int       `json:"page_size,omitempty"`
-	SortBy     *string    `json:"sort_by,omitempty"`
-	SortOrder  *string    `json:"sort_order,omitempty"`
+	CIID         *uuid.UUID `json:"ci_id,omitempty"`
+	CITypeID     *uuid.UUID `json:"ci_type_id,omitempty"`
+	CINameSearch *string    `json:"ci_name_search,omitempty"`
+	EntryTypes   []string   `json:"entry_types,omitempty"`
+	DateFrom     *time.Time `json:"date_from,omitempty"`
+	DateTo       *time.Time `json:"date_to,omitempty"`
+	MinAmount    *float64   `json:"min_amount,omitempty"`
+	MaxAmount    *float64   `json:"max_amount,omitempty"`
+	Page         *int       `json:"page,omitempty"`
+	PageSize     *int       `json:"page_size,omitempty"`
+	SortBy       *string    `json:"sort_by,omitempty"`
+	SortOrder    *string    `json:"sort_order,omitempty"`
 }
 
 // AmortizationRunFilters represents filters for listing amortization runs

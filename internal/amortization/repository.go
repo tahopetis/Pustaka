@@ -551,6 +551,18 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 		argIndex++
 	}
 
+	if filters.CITypeID != nil {
+		whereConditions = append(whereConditions, fmt.Sprintf("ctd.id = $%d", argIndex))
+		args = append(args, *filters.CITypeID)
+		argIndex++
+	}
+
+	if filters.CINameSearch != nil && *filters.CINameSearch != "" {
+		whereConditions = append(whereConditions, fmt.Sprintf("ci.name ILIKE $%d", argIndex))
+		args = append(args, "%"+*filters.CINameSearch+"%")
+		argIndex++
+	}
+
 	if len(filters.EntryTypes) > 0 {
 		placeholders := make([]string, len(filters.EntryTypes))
 		for i, entryType := range filters.EntryTypes {
@@ -652,6 +664,7 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 			ale.created_by
 		FROM amortization_ledger ale
 		JOIN configuration_items ci ON ale.ci_id = ci.id
+		LEFT JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
 		%s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
@@ -1244,13 +1257,13 @@ func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryR
 	}
 
 	return &AmortizationSummary{
-		GroupBy:                 "all",
-		Groups:                  []AmortizationGroup{},
-		TotalCIs:                int(totalCIs),
-		TotalBookValue:          totalBookValue,
-		TotalDepreciation:       totalDepreciation,
+		GroupBy:                  "all",
+		Groups:                   []AmortizationGroup{},
+		TotalCIs:                 int(totalCIs),
+		TotalBookValue:           totalBookValue,
+		TotalDepreciation:        totalDepreciation,
 		TotalMonthlyDepreciation: totalMonthlyDepreciation,
-		GeneratedAt:             time.Now(),
+		GeneratedAt:              time.Now(),
 	}, nil
 }
 

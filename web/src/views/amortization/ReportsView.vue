@@ -136,6 +136,25 @@
       <div v-if="activeTab === 'journal'" class="tab-content">
         <div class="report-controls">
           <div class="control-group">
+            <label>Search CI Name</label>
+            <input
+              v-model="journalFilters.ci_name_search"
+              type="text"
+              class="control-input"
+              placeholder="Search by name..."
+              @keyup.enter="loadJournalReport"
+            />
+          </div>
+          <div class="control-group">
+            <label>CI Type</label>
+            <select v-model="journalFilters.ci_type_id" @change="loadJournalReport" class="control-select">
+              <option value="">All Types</option>
+              <option v-for="ciType in ciTypes" :key="ciType.id" :value="ciType.id">
+                {{ ciType.name }}
+              </option>
+            </select>
+          </div>
+          <div class="control-group">
             <label>Date From</label>
             <input v-model="journalFilters.date_from" type="date" class="control-input" />
           </div>
@@ -224,11 +243,26 @@ const assetFilters = ref({
 })
 
 const journalFilters = ref({
+  ci_name_search: '',
+  ci_type_id: '',
   date_from: '',
   date_to: '',
 })
 
+const ciTypes = ref<{id: string, name: string}[]>([])
+
+const loadCITypes = async () => {
+  try {
+    const response = await fetch('/api/v1/ci-types')
+    const data = await response.json()
+    ciTypes.value = data.data || []
+  } catch (error) {
+    console.error('Failed to load CI types:', error)
+  }
+}
+
 onMounted(async () => {
+  await loadCITypes()
   await loadReportData()
 })
 
@@ -274,10 +308,11 @@ const loadAssets = async () => {
 
 const loadJournalReport = async () => {
   try {
-    // Use the ledger endpoint instead of reports/journal (which doesn't exist)
     const filters = {
       date_from: journalFilters.value.date_from,
       date_to: journalFilters.value.date_to,
+      ci_name_search: journalFilters.value.ci_name_search || undefined,
+      ci_type_id: journalFilters.value.ci_type_id || undefined,
       sort_by: 'entry_date',
       sort_order: 'desc' as const,
       limit: 100

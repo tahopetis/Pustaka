@@ -364,7 +364,18 @@ func (h *AmortizationHandler) parseLedgerFilters(r *http.Request) (*amortization
 		filters.CIID = &ciID
 	}
 
-	// Parse entry types
+	if ciTypeIDStr := r.URL.Query().Get("ci_type_id"); ciTypeIDStr != "" {
+		ciTypeID, err := uuid.Parse(ciTypeIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ci_type_id format: %w", err)
+		}
+		filters.CITypeID = &ciTypeID
+	}
+
+	if ciNameSearch := r.URL.Query().Get("ci_name_search"); ciNameSearch != "" {
+		filters.CINameSearch = &ciNameSearch
+	}
+
 	if entryTypesStr := r.URL.Query().Get("entry_types"); entryTypesStr != "" {
 		entryTypes := strings.Split(entryTypesStr, ",")
 		filters.EntryTypes = entryTypes

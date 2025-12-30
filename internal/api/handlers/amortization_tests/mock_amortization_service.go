@@ -3,10 +3,10 @@ package amortization
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/go-chi/chi/v5"
 )
 
 // MockAmortizationService implements the AmortizationService interface for testing
@@ -110,11 +110,11 @@ func (m *MockAmortizationService) ListAmortizableCIs(ctx context.Context, filter
 	}
 
 	return &AmortizationCIList{
-		CIs:         results,
-		TotalCount:  total,
-		Page:        page,
-		PageSize:    pageSize,
-		TotalPages:  totalPages,
+		CIs:        results,
+		TotalCount: total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
 	}, nil
 }
 
@@ -273,13 +273,13 @@ func (m *MockAmortizationService) GetLedgerEntry(ctx context.Context, entryID uu
 	// Add CI details
 	if ci, exists := m.cis[entry.CIID]; exists {
 		response.CIDetails = &BaseCI{
-			ID:   ci.ID,
-			Name: ci.Name,
-			CIType: ci.CIType,
+			ID:         ci.ID,
+			Name:       ci.Name,
+			CIType:     ci.CIType,
 			Attributes: ci.Attributes,
-			Tags: ci.Tags,
-			CreatedAt: ci.CreatedAt,
-			UpdatedAt: ci.UpdatedAt,
+			Tags:       ci.Tags,
+			CreatedAt:  ci.CreatedAt,
+			UpdatedAt:  ci.UpdatedAt,
 		}
 	}
 
@@ -299,16 +299,16 @@ func (m *MockAmortizationService) CreateAdjustment(ctx context.Context, req *Cre
 
 	// Create adjustment entry
 	entry := &AmortizationEntry{
-		ID:                         uuid.New(),
-		CIID:                       req.CIID,
-		EntryType:                  "adjustment",
-		EntryDate:                  time.Now(),
-		Amount:                     req.Amount,
-		BookValueBefore:            ci.CurrentBookValue,
+		ID:                            uuid.New(),
+		CIID:                          req.CIID,
+		EntryType:                     "adjustment",
+		EntryDate:                     time.Now(),
+		Amount:                        req.Amount,
+		BookValueBefore:               ci.CurrentBookValue,
 		AccumulatedDepreciationBefore: ci.AccumulatedDepreciation,
-		Description:                &req.Description,
-		CreatedAt:                  time.Now(),
-		CreatedBy:                  &userID,
+		Description:                   &req.Description,
+		CreatedAt:                     time.Now(),
+		CreatedBy:                     &userID,
 	}
 
 	// Calculate new book value
@@ -386,26 +386,26 @@ func (m *MockAmortizationService) GetAmortizationRun(ctx context.Context, runID 
 	response := &AmortizationRunResponse{
 		AmortizationRun: *run,
 		ProcessedItems: []struct {
-			CIID           uuid.UUID `json:"ci_id"`
-			CIName         string    `json:"ci_name"`
-			Status         string    `json:"status"`
-			ErrorMessage   string    `json:"error_message,omitempty"`
-			DepreciationAmount float64 `json:"depreciation_amount"`
+			CIID               uuid.UUID `json:"ci_id"`
+			CIName             string    `json:"ci_name"`
+			Status             string    `json:"status"`
+			ErrorMessage       string    `json:"error_message,omitempty"`
+			DepreciationAmount float64   `json:"depreciation_amount"`
 		}{},
 	}
 
 	// Add some mock processed items
 	for _, ci := range m.cis {
 		response.ProcessedItems = append(response.ProcessedItems, struct {
-			CIID           uuid.UUID `json:"ci_id"`
-			CIName         string    `json:"ci_name"`
-			Status         string    `json:"status"`
-			ErrorMessage   string    `json:"error_message,omitempty"`
-			DepreciationAmount float64 `json:"depreciation_amount"`
+			CIID               uuid.UUID `json:"ci_id"`
+			CIName             string    `json:"ci_name"`
+			Status             string    `json:"status"`
+			ErrorMessage       string    `json:"error_message,omitempty"`
+			DepreciationAmount float64   `json:"depreciation_amount"`
 		}{
-			CIID: ci.ID,
-			CIName: ci.Name,
-			Status: "processed",
+			CIID:               ci.ID,
+			CIName:             ci.Name,
+			Status:             "processed",
 			DepreciationAmount: 100.0,
 		})
 	}
@@ -419,15 +419,15 @@ func (m *MockAmortizationService) TriggerManualRun(ctx context.Context, req *Man
 	}
 
 	run := &AmortizationRun{
-		ID:                 uuid.New(),
-		Status:             "started",
-		ProcessingDate:     time.Now(),
-		StartedAt:          timePtr(time.Now()),
+		ID:                  uuid.New(),
+		Status:              "started",
+		ProcessingDate:      time.Now(),
+		StartedAt:           timePtr(time.Now()),
 		TotalAmortizableCIs: len(m.cis),
-		IsManual:           true,
-		DryRun:             req.DryRun,
-		TriggeredBy:        &userID,
-		CreatedAt:          time.Now(),
+		IsManual:            true,
+		DryRun:              req.DryRun,
+		TriggeredBy:         &userID,
+		CreatedAt:           time.Now(),
 	}
 
 	if !req.DryRun {
@@ -460,16 +460,16 @@ func (m *MockAmortizationService) GetAmortizationSummaries(ctx context.Context, 
 
 	// Create a default summary if none exist
 	summary := &AmortizationSummary{
-		GroupBy:    req.GroupBy,
-		TotalCIs:   len(m.cis),
+		GroupBy:     req.GroupBy,
+		TotalCIs:    len(m.cis),
 		GeneratedAt: time.Now(),
 		Groups: []AmortizationGroup{
 			{
-				GroupName:          "Server",
-				CICount:            len(m.cis),
-				TotalBookValue:     100000.0,
-				TotalDepreciation:  20000.0,
-				AverageAge:         24.5,
+				GroupName:         "Server",
+				CICount:           len(m.cis),
+				TotalBookValue:    100000.0,
+				TotalDepreciation: 20000.0,
+				AverageAge:        24.5,
 			},
 		},
 	}
@@ -588,12 +588,25 @@ func (m *MockAmortizationService) matchesLedgerFilters(entry *AmortizationEntry,
 		return true
 	}
 
-	// CI filter
 	if filters.CIID != nil && entry.CIID != *filters.CIID {
 		return false
 	}
 
-	// Entry type filter
+	if filters.CITypeID != nil {
+		ci, exists := m.cis[entry.CIID]
+		if !exists || ci.CITypeID != *filters.CITypeID {
+			return false
+		}
+	}
+
+	if filters.CINameSearch != nil && *filters.CINameSearch != "" {
+		ci, exists := m.cis[entry.CIID]
+		if !exists || !strings.Contains(strings.ToLower(ci.Name), strings.ToLower(*filters.CINameSearch)) {
+			return false
+		}
+	}
+
+	if len(filters.EntryTypes) > 0 {
 	if len(filters.EntryTypes) > 0 {
 		found := false
 		for _, entryType := range filters.EntryTypes {
@@ -671,9 +684,9 @@ func (m *MockAmortizationService) matchesRunFilters(run *AmortizationRun, filter
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr ||
 		len(s) > len(substr) &&
-		(s[:len(substr)] == substr ||
-		 s[len(s)-len(substr):] == substr ||
-		 indexOf(s, substr) >= 0))
+			(s[:len(substr)] == substr ||
+				s[len(s)-len(substr):] == substr ||
+				indexOf(s, substr) >= 0))
 }
 
 func indexOf(s, substr string) int {

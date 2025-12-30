@@ -86,6 +86,8 @@ export interface AdjustmentEntry {
 
 export interface AmortizationLedgerFilters {
   ci_id?: string
+  ci_type_id?: string
+  ci_name_search?: string
   entry_type?: string[]
   date_from?: string
   date_to?: string
