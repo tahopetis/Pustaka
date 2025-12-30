@@ -8,22 +8,45 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="summary-cards">
-      <div class="summary-card">
-        <h3>Total Amortizable Assets</h3>
-        <div class="summary-value">{{ metrics.total_amortizable_assets || 0 }}</div>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-icon">
+          <i class="fas fa-coins"></i>
+        </div>
+        <div class="metric-content">
+          <h3>Total Amortizable Assets</h3>
+          <div class="metric-value">{{ metrics.total_amortizable_assets || 0 }}</div>
+        </div>
       </div>
-      <div class="summary-card">
-        <h3>Total Book Value</h3>
-        <div class="summary-value">{{ formatCurrency(metrics.total_book_value || 0) }}</div>
+
+      <div class="metric-card">
+        <div class="metric-icon">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="metric-content">
+          <h3>Total Book Value</h3>
+          <div class="metric-value">{{ formatCurrency(metrics.total_book_value || 0) }}</div>
+        </div>
       </div>
-      <div class="summary-card">
-        <h3>Monthly Depreciation</h3>
-        <div class="summary-value">{{ formatCurrency(metrics.monthly_depreciation || 0) }}</div>
+
+      <div class="metric-card">
+        <div class="metric-icon">
+          <i class="fas fa-calculator"></i>
+        </div>
+        <div class="metric-content">
+          <h3>Monthly Depreciation</h3>
+          <div class="metric-value">{{ formatCurrency(metrics.monthly_depreciation || 0) }}</div>
+        </div>
       </div>
-      <div class="summary-card">
-        <h3>Active Amortizations</h3>
-        <div class="summary-value">{{ metrics.active_amortizations || 0 }}</div>
+
+      <div class="metric-card">
+        <div class="metric-icon">
+          <i class="fas fa-history"></i>
+        </div>
+        <div class="metric-content">
+          <h3>Active Amortizations</h3>
+          <div class="metric-value">{{ metrics.active_amortizations || 0 }}</div>
+        </div>
       </div>
     </div>
 
@@ -214,8 +237,8 @@ const loadReportData = async () => {
   try {
     // Load metrics
     const metricsResponse = await amortizationStore.loadMetrics()
-    if (metricsResponse.data) {
-      metrics.value = metricsResponse.data
+    if (metricsResponse) {
+      metrics.value = metricsResponse
     }
 
     // Load assets
@@ -240,8 +263,9 @@ const loadReportData = async () => {
 const loadAssets = async () => {
   try {
     const response = await amortizationStore.loadAssetSummaries(assetFilters.value)
-    if (response.data) {
-      assets.value = response.data.data
+    // Store returns { cis: AssetSummary[], pagination: {...} }
+    if (response && response.cis) {
+      assets.value = response.cis
     }
   } catch (error) {
     console.error('Failed to load assets:', error)
@@ -396,28 +420,42 @@ const formatEntryType = (entryType: string): string => {
   font-size: 1rem;
 }
 
-.summary-cards {
+.metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
 }
 
-.summary-card {
+.metric-card {
   background: white;
   padding: 1.5rem;
   border-radius: 0.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
-.summary-card h3 {
+.metric-icon {
+  width: 3rem;
+  height: 3rem;
+  background: #f3f4f6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f46e5;
+}
+
+.metric-content h3 {
   font-size: 0.875rem;
   color: #6b7280;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
 }
 
-.summary-value {
+.metric-value {
   font-size: 1.5rem;
   font-weight: 700;
   color: #1f2937;
@@ -650,9 +688,13 @@ const formatEntryType = (entryType: string): string => {
     padding: 1rem;
   }
 
-  .summary-cards {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-card {
+    flex-direction: column;
+    text-align: center;
   }
 
   .report-controls {

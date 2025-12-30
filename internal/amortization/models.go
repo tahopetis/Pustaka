@@ -31,6 +31,13 @@ type AmortizableCI struct {
 	AccumulatedDepreciation float64    `json:"accumulated_depreciation"`
 	MonthlyDepreciation     *float64   `json:"monthly_depreciation,omitempty"` // Calculated field
 
+	// Computed Fields (for API responses) - Frontend-specific aliases
+	CIID            *string  `json:"ci_id,omitempty"`           // Alias for ID (for frontend compatibility)
+	CIName          *string  `json:"ci_name,omitempty"`         // Alias for Name (for frontend compatibility)
+	CITypeName      *string  `json:"ci_type_name,omitempty"`    // Alias for CIType (for frontend compatibility)
+	RemainingMonths *int64   `json:"remaining_months,omitempty"` // Calculated remaining months
+	Status          *string  `json:"status,omitempty"`           // Amortization status (for frontend compatibility)
+
 	// Amortization Configuration
 	DepreciationMethod   string `json:"depreciation_method"`   // "straight_line", "declining_balance"
 	AmortizationBehavior string `json:"amortization_behavior"` // "pending", "active", "terminal"

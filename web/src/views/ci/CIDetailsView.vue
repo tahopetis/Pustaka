@@ -177,6 +177,16 @@
             </div>
           </div>
 
+          <!-- Amortization Journey -->
+          <div v-if="isAmortizable && financialData" class="card">
+            <div class="card-header">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Amortization Journey</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <AmortizationTimeline :ci-id="ci.id" />
+            </div>
+          </div>
+
           <!-- Relationships -->
           <div class="card">
             <div class="card-header">
@@ -285,6 +295,7 @@ import { useAuthStore } from '@/stores/auth'
 import { ciAPI, relationshipAPI, ciTypeAPI } from '@/services/api'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import FlexibleAttributeDisplay from '@/components/ci/FlexibleAttributeDisplay.vue'
+import AmortizationTimeline from '@/components/amortization/AmortizationTimeline.vue'
 import { useAmortizationStore } from '@/stores/amortization'
 import type { CI, Relationship, CIType } from '@/types/ci'
 import type { AssetFinancials } from '@/types/amortization'

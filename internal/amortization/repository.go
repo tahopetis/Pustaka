@@ -284,9 +284,9 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 	// Main query
 	query := fmt.Sprintf(`
 		SELECT
-			ci.id,
-			ci.name,
-			ci.ci_type,
+			ci.id as ci_id,
+			ci.name as ci_name,
+			ci.ci_type as ci_type_name,
 			ctd.id as ci_type_id,
 			ci.attributes,
 			ci.tags,
@@ -302,6 +302,11 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 				THEN ROUND((COALESCE(ci.purchase_cost, 0) - COALESCE(ci.salvage_value, 0)) / NULLIF(ci.useful_life_months, 0)::numeric, 2)
 				ELSE NULL
 			END as monthly_depreciation,
+			CASE
+				WHEN ci.amort_start_date IS NOT NULL AND ci.useful_life_months IS NOT NULL AND ci.useful_life_months > 0
+				THEN GREATEST(0, ci.useful_life_months - EXTRACT(YEAR FROM AGE(CURRENT_DATE, ci.amort_start_date)) * 12 - EXTRACT(MONTH FROM AGE(CURRENT_DATE, ci.amort_start_date)))
+				ELSE NULL
+			END as remaining_months,
 			ci.created_at,
 			ci.updated_at,
 			ci.created_by,
@@ -309,7 +314,8 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 			ctd.is_amortizable,
 			'straight_line' as depreciation_method,
 			ls.name as lifecycle_status_name,
-			COALESCE(ls.amortization_behavior, 'pending') as amortization_behavior
+			COALESCE(ls.amortization_behavior, 'pending') as status,
+			ci.amort_start_date
 		FROM configuration_items ci
 		JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
 		LEFT JOIN lifecycle_statuses ls ON ci.lifecycle_status_id = ls.id
@@ -333,9 +339,10 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 	for rows.Next() {
 		var ci AmortizableCI
 		var lifecycleStatusName sql.NullString
-		var amortizationBehavior sql.NullString
 		var amortStartDate sql.NullTime
 		var monthlyDepreciation sql.NullFloat64
+		var remainingMonths sql.NullInt64
+		var status sql.NullString
 
 		err := rows.Scan(
 			&ci.ID,
@@ -352,6 +359,7 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 			&ci.CurrentBookValue,
 			&ci.AccumulatedDepreciation,
 			&monthlyDepreciation,
+			&remainingMonths,
 			&ci.CreatedAt,
 			&ci.UpdatedAt,
 			&ci.CreatedBy,
@@ -359,7 +367,8 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 			&ci.IsAmortizable,
 			&ci.DepreciationMethod,
 			&lifecycleStatusName,
-			&amortizationBehavior,
+			&status,
+			&amortStartDate, // Scan amort_start_date again for the AmortizableCI struct field
 		)
 
 		if err != nil {
@@ -377,11 +386,33 @@ func (r *repository) ListAmortizableCIs(ctx context.Context, filters *Amortizabl
 			ci.MonthlyDepreciation = &monthlyDepreciation.Float64
 		}
 
+		// Set computed remaining months field
+		if remainingMonths.Valid {
+			ci.RemainingMonths = &remainingMonths.Int64
+		}
+
+		// Set status field (alias for amortization_behavior)
+		if status.Valid {
+			statusStr := status.String
+			ci.Status = &statusStr
+			ci.AmortizationBehavior = statusStr
+		} else {
+			defaultStatus := "pending"
+			ci.Status = &defaultStatus
+			ci.AmortizationBehavior = "pending"
+		}
+
+		// Populate frontend-specific aliases for backward compatibility
+		ciIDStr := ci.ID.String()
+		ci.CIID = &ciIDStr
+		ci.CIName = &ci.Name
+		ci.CITypeName = &ci.CIType
+
 		// Set lifecycle status if available
 		if lifecycleStatusName.Valid {
 			ci.LifecycleStatus = &LifecycleStatus{
 				Name:                 lifecycleStatusName.String,
-				AmortizationBehavior: amortizationBehavior.String,
+				AmortizationBehavior: ci.AmortizationBehavior,
 			}
 		}
 
