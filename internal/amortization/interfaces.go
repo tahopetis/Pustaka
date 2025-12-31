@@ -34,7 +34,7 @@ type Service interface {
 
 	// Reporting and Summaries
 	GetAmortizationSummaries(ctx context.Context, req *SummaryRequest) (*AmortizationSummary, error)
-	GenerateDepreciationSchedule(ctx context.Context, req *DepreciationScheduleRequest) (*DepreciationSchedule, error)
+	GenerateDepreciationSchedule(ctx context.Context, req *DepreciationScheduleRequest) (*DepreciationScheduleResponse, error)
 
 	// Lifecycle Integration
 	HandleTerminalStatusChange(ctx context.Context, ciID uuid.UUID, oldStatusID, newStatusID uuid.UUID, userID uuid.UUID) error
@@ -67,7 +67,7 @@ type Repository interface {
 
 	// Summary and Reporting
 	GetAmortizationSummaries(ctx context.Context, req *SummaryRequest) (*AmortizationSummary, error)
-	GetDepreciationScheduleData(ctx context.Context, req *DepreciationScheduleRequest) ([]DepreciationScheduleEntry, error)
+	GetDepreciationScheduleData(ctx context.Context, req *DepreciationScheduleRequest) (*DepreciationScheduleResponse, error)
 
 	// Batch Operations for Scheduler
 	GetCIsForProcessing(ctx context.Context, processingDate time.Time, limit int) ([]uuid.UUID, error)

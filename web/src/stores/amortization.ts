@@ -13,7 +13,9 @@ import type {
   BulkFinancialsUpdate,
   AmortizationLedgerFilters,
   AssetFinancialsFilters,
-  ApiResponse
+  ApiResponse,
+  DepreciationScheduleRequest,
+  DepreciationScheduleResponse
 } from '@/types/amortization'
 import amortizationApi from '@/services/amortizationApi'
 
@@ -24,6 +26,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
   const ledgerEntries = ref<AmortizationLedgerEntry[]>([])
   const metrics = ref<AmortizationMetrics | null>(null)
   const schedulerStatus = ref<SchedulerStatus | null>(null)
+  const depreciationSchedule = ref<DepreciationScheduleResponse | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -204,6 +207,21 @@ export const useAmortizationStore = defineStore('amortization', () => {
     }
   }
 
+  async function loadDepreciationSchedule(params: DepreciationScheduleRequest) {
+    setLoading(true)
+    clearError()
+    try {
+      const response = await amortizationApi.getDepreciationSchedule(params)
+      depreciationSchedule.value = response
+      return response
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to load depreciation schedule')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Scheduler Actions
   async function runScheduler() {
     setLoading(true)
@@ -299,6 +317,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
     ledgerEntries.value = []
     metrics.value = null
     schedulerStatus.value = null
+    depreciationSchedule.value = null
     loading.value = false
     error.value = null
   }
@@ -310,6 +329,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
     ledgerEntries,
     metrics,
     schedulerStatus,
+    depreciationSchedule,
     loading,
     error,
 
@@ -332,6 +352,7 @@ export const useAmortizationStore = defineStore('amortization', () => {
     loadMetrics,
     loadLedgerEntries,
     loadJournalReport,
+    loadDepreciationSchedule,
     runScheduler,
     loadSchedulerStatus,
     loadSchedulerRuns,

@@ -76,6 +76,7 @@ type AmortizationEntry struct {
 	AccumulatedDepreciation float64                `json:"accumulated_depreciation"`
 	CreatedAt               time.Time              `json:"created_at"`
 	CreatedBy               *uuid.UUID             `json:"created_by,omitempty"`
+	CreatedByName          *string                `json:"created_by_name,omitempty"` // Username of creator
 	Metadata                map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -399,6 +400,74 @@ type DepreciationSchedule struct {
 	ReportID  uuid.UUID                   `json:"report_id"`
 	DateRange DepreciationScheduleRange   `json:"date_range"`
 	Schedule  []DepreciationScheduleEntry `json:"schedule"`
+}
+
+// MonthlyScheduleEntry represents a single month's schedule data
+type MonthlyScheduleEntry struct {
+	Month                   time.Time `json:"month"`
+	IsProjected             bool      `json:"is_projected"`
+	OpeningBookValue        float64   `json:"opening_book_value"`        // NBV opening
+	GrossBookValue          float64   `json:"gross_book_value"`          // GVB for this month
+	DepreciationAmount      float64   `json:"depreciation_amount"`
+	WriteOffAmount          float64   `json:"write_off_amount"`
+	AdjustmentAmount        float64   `json:"adjustment_amount"`        // ± impact to GVB
+	AccumulatedDepreciation float64   `json:"accumulated_depreciation"` // Running AD
+	ClosingBookValue        float64   `json:"closing_book_value"`        // NBV closing
+	ActiveAssetsCount       int       `json:"active_assets_count"`
+}
+
+// ScheduleSummary represents summary statistics for the schedule
+type ScheduleSummary struct {
+	TotalOriginalCost        float64 `json:"total_original_cost"`        // OCC
+	TotalGrossBookValue      float64 `json:"total_gross_book_value"`     // GVB
+	TotalNetBookValue        float64 `json:"total_net_book_value"`       // NBV
+	TotalDepreciation        float64 `json:"total_depreciation"`         // AD
+	TotalWriteOffs           float64 `json:"total_write_offs"`
+	TotalAdjustments         float64 `json:"total_adjustments"`          // Net ±
+	TotalSalvageValue        float64 `json:"total_salvage_value"`        // SV
+	AverageMonthlyExpense    float64 `json:"average_monthly_expense"`
+	ProjectedEndValue        float64 `json:"projected_end_value"`
+	DepreciationPercentage   float64 `json:"depreciation_percentage"`    // AD/GVB × 100
+	RemainingPercentage      float64 `json:"remaining_percentage"`       // NBV/GVB × 100
+}
+
+// CITypeScheduleSummary represents schedule summary grouped by CI type
+type CITypeScheduleSummary struct {
+	CITypeID           uuid.UUID `json:"ci_type_id"`
+	CITypeName         string    `json:"ci_type_name"`
+	AssetCount         int       `json:"asset_count"`
+	TotalBookValue     float64   `json:"total_book_value"`
+	MonthlyDepreciation float64   `json:"monthly_depreciation"`
+}
+
+// AssetScheduleSummary represents schedule summary for a single asset
+type AssetScheduleSummary struct {
+	CIID                uuid.UUID  `json:"ci_id"`
+	CIName              string     `json:"ci_name"`
+	CITypeName          string     `json:"ci_type_name"`
+	CurrentBookValue    float64    `json:"current_book_value"`
+	MonthlyDepreciation float64    `json:"monthly_depreciation"`
+	RemainingMonths     int        `json:"remaining_months"`
+	ProjectedEndDate    *time.Time `json:"projected_end_date,omitempty"`
+}
+
+// DepreciationScheduleResponse represents the response for the depreciation schedule report
+type DepreciationScheduleResponse struct {
+	Currency                    string                   `json:"currency"`
+	StartDate                   time.Time                `json:"start_date"`
+	EndDate                     time.Time                `json:"end_date"`
+
+	// New comprehensive metrics
+	TotalOriginalCost           float64                  `json:"total_original_cost"`           // OCC
+	TotalGrossBookValue         float64                  `json:"total_gross_book_value"`         // GVB
+	TotalNetBookValue           float64                  `json:"total_net_book_value"`           // NBV (current)
+	TotalSalvageValue           float64                  `json:"total_salvage_value"`            // SV
+	TotalAccumulatedDepreciation float64                 `json:"total_accumulated_depreciation"` // AD
+
+	Summary                     ScheduleSummary          `json:"summary"`
+	MonthlyData                 []MonthlyScheduleEntry   `json:"monthly_data"`
+	ByCIType                    []CITypeScheduleSummary  `json:"by_ci_type,omitempty"`
+	ByAsset                     []AssetScheduleSummary   `json:"by_asset,omitempty"`
 }
 
 // RestructuringCalculation represents a prospective recalculation when useful life changes

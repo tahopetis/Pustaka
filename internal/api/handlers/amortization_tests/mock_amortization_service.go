@@ -477,52 +477,68 @@ func (m *MockAmortizationService) GetAmortizationSummaries(ctx context.Context, 
 	return summary, nil
 }
 
-func (m *MockAmortizationService) GenerateDepreciationSchedule(ctx context.Context, req *DepreciationScheduleRequest) (*DepreciationSchedule, error) {
+func (m *MockAmortizationService) GenerateDepreciationSchedule(ctx context.Context, req *DepreciationScheduleRequest) (*DepreciationScheduleResponse, error) {
 	if err, ok := m.errors["GenerateDepreciationSchedule"]; ok {
 		return nil, err
 	}
 
-	reportID := uuid.New()
-	schedule := &DepreciationSchedule{
-		ReportID: reportID,
-		DateRange: DepreciationScheduleRange{
-			StartDate: req.DateFrom,
-			EndDate:   req.DateTo,
-		},
-		Schedule: []DepreciationScheduleEntry{},
+	response := &DepreciationScheduleResponse{
+		Currency:  "USD",
+		StartDate: req.DateFrom,
+		EndDate:   req.DateTo,
+		MonthlyData: []MonthlyScheduleEntry{},
+		ByCIType: []CITypeScheduleSummary{},
+		ByAsset: []AssetScheduleSummary{},
 	}
 
-	// Generate schedule entries for each CI
-	for _, ci := range m.cis {
-		if len(req.CIIDs) > 0 {
-			found := false
-			for _, id := range req.CIIDs {
-				if ci.ID == id {
-					found = true
-					break
-				}
-			}
-			if !found {
-				continue
-			}
-		}
+	totalBookValue := 0.0
+	totalMonthlyDepreciation := 0.0
 
-		entry := DepreciationScheduleEntry{
-			CIID:                    ci.ID,
-			CIName:                  ci.Name,
-			CIType:                  ci.CIType,
-			PeriodStart:             req.DateFrom,
-			PeriodEnd:               req.DateTo,
-			OpeningBookValue:        ci.CurrentBookValue,
-			DepreciationAmount:      166.67, // Mock monthly depreciation
-			ClosingBookValue:        ci.CurrentBookValue - 166.67,
-			AccumulatedDepreciation: ci.AccumulatedDepreciation + 166.67,
+	// Generate monthly entries
+	currentDate := req.DateFrom
+	runningBookValue := totalBookValue
+
+	for currentDate.Before(req.DateTo) || currentDate.Equal(req.DateTo) {
+		monthlyDepreciation := totalMonthlyDepreciation
+		openingBookValue := runningBookValue
+		closingBookValue := openingBookValue - monthlyDepreciation
+
+		entry := MonthlyScheduleEntry{
+			Month:              currentDate,
+			IsProjected:        currentDate.After(time.Now()),
+			OpeningBookValue:   openingBookValue,
+			DepreciationAmount: monthlyDepreciation,
+			WriteOffAmount:     0,
+			AdjustmentAmount:   0,
+			ClosingBookValue:   closingBookValue,
+			ActiveAssetsCount:  len(m.cis),
 		}
-		schedule.Schedule = append(schedule.Schedule, entry)
+		response.MonthlyData = append(response.MonthlyData, entry)
+		runningBookValue = closingBookValue
+		currentDate = currentDate.AddDate(0, 1, 0)
 	}
 
-	m.depreciationSchedules[reportID] = schedule
-	return schedule, nil
+	// Calculate summary
+	totalDepreciation := 0.0
+	for _, entry := range response.MonthlyData {
+		totalDepreciation += entry.DepreciationAmount
+	}
+
+	monthsCount := len(response.MonthlyData)
+	averageMonthlyExpense := 0.0
+	if monthsCount > 0 {
+		averageMonthlyExpense = totalDepreciation / float64(monthsCount)
+	}
+
+	response.Summary = ScheduleSummary{
+		TotalDepreciation:     totalDepreciation,
+		TotalWriteOffs:        0,
+		TotalAdjustments:      0,
+		AverageMonthlyExpense: averageMonthlyExpense,
+		ProjectedEndValue:     runningBookValue,
+	}
+
+	return response, nil
 }
 
 // Helper methods for filtering

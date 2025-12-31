@@ -33,6 +33,7 @@ export interface AmortizationLedgerEntry {
   accumulated_depreciation: number
   created_at: string
   created_by?: string
+  created_by_name?: string
   metadata?: Record<string, any>
   ci_name?: string
   ci_type_name?: string
@@ -177,4 +178,75 @@ export interface RestructureResult {
   calculation: RestructuringCalculation
   updated_details?: AssetFinancials
   message?: string
+}
+
+// Depreciation Schedule Types
+export interface DepreciationScheduleRequest {
+  start_date: string
+  end_date: string
+  ci_type_ids?: string[]
+  ci_ids?: string[]
+}
+
+export interface MonthlyScheduleEntry {
+  month: string
+  is_projected: boolean
+  opening_book_value: number          // NBV opening
+  gross_book_value: number            // GVB for this month
+  depreciation_amount: number
+  write_off_amount: number
+  adjustment_amount: number           // ± impact to GVB
+  closing_book_value: number          // NBV closing
+  accumulated_depreciation: number    // Running AD
+  active_assets_count: number
+}
+
+export interface ScheduleSummary {
+  total_original_cost: number          // OCC
+  total_gross_book_value: number        // GVB
+  total_net_book_value: number          // NBV
+  total_depreciation: number            // AD
+  total_write_offs: number
+  total_adjustments: number             // Net ±
+  total_salvage_value: number           // SV
+  average_monthly_expense: number
+  projected_end_value: number
+  depreciation_percentage: number       // AD/GVB × 100
+  remaining_percentage: number          // NBV/GVB × 100
+}
+
+export interface CITypeScheduleSummary {
+  ci_type_id: string
+  ci_type_name: string
+  asset_count: number
+  total_book_value: number
+  monthly_depreciation: number
+}
+
+export interface AssetScheduleSummary {
+  ci_id: string
+  ci_name: string
+  ci_type_name: string
+  current_book_value: number
+  monthly_depreciation: number
+  remaining_months: number
+  projected_end_date?: string
+}
+
+export interface DepreciationScheduleResponse {
+  currency: string
+  start_date: string
+  end_date: string
+
+  // New comprehensive metrics
+  total_original_cost: number           // OCC
+  total_gross_book_value: number        // GVB
+  total_net_book_value: number          // NBV (current)
+  total_salvage_value: number           // SV
+  total_accumulated_depreciation: number // AD
+
+  summary: ScheduleSummary
+  monthly_data: MonthlyScheduleEntry[]
+  by_ci_type?: CITypeScheduleSummary[]
+  by_asset?: AssetScheduleSummary[]
 }

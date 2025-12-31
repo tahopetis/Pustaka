@@ -486,10 +486,27 @@ func (h *AmortizationHandler) parseDepreciationScheduleRequest(r *http.Request) 
 		DateTo:   dateTo,
 	}
 
-	// Parse CI IDs
+	// Parse CI Type IDs
+	if ciTypeIDStr := r.URL.Query().Get("ci_type_ids"); ciTypeIDStr != "" {
+		ciTypeID, err := uuid.Parse(ciTypeIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ci_type_id: %w", err)
+		}
+		req.CITypeIDs = []uuid.UUID{ciTypeID}
+	}
+
+	// Parse CI IDs (comma-separated)
 	if ciIDsStr := r.URL.Query().Get("ci_ids"); ciIDsStr != "" {
-		// This would need to handle comma-separated UUIDs
-		// For simplicity, we'll skip this implementation
+		ciIDStrs := strings.Split(ciIDsStr, ",")
+		ciIDs := make([]uuid.UUID, 0, len(ciIDStrs))
+		for _, idStr := range ciIDStrs {
+			ciID, err := uuid.Parse(strings.TrimSpace(idStr))
+			if err != nil {
+				return nil, fmt.Errorf("invalid ci_id: %w", err)
+			}
+			ciIDs = append(ciIDs, ciID)
+		}
+		req.CIIDs = ciIDs
 	}
 
 	return req, nil
@@ -533,31 +550,35 @@ func (h *AmortizationHandler) writeJSON(w http.ResponseWriter, status int, data 
 	json.NewEncoder(w).Encode(data)
 }
 
-func (h *AmortizationHandler) writeCSV(w http.ResponseWriter, schedule *amortization.DepreciationSchedule) {
+func (h *AmortizationHandler) writeCSV(w http.ResponseWriter, schedule *amortization.DepreciationScheduleResponse) {
 	// Set CSV headers
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=depreciation_schedule_%s.csv", schedule.ReportID))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=depreciation_schedule_%s.csv", schedule.StartDate.Format("2006-01-02")))
 
 	// Write CSV header
 	csvWriter := csv.NewWriter(w)
 	csvWriter.Write([]string{
-		"CI ID", "CI Name", "CI Type", "Period Start", "Period End",
-		"Opening Book Value", "Depreciation Amount", "Closing Book Value",
-		"Accumulated Depreciation",
+		"Month", "Type", "Opening Book Value", "Depreciation Amount",
+		"Write Off Amount", "Adjustment Amount", "Closing Book Value",
+		"Active Assets Count",
 	})
 
 	// Write data rows
-	for _, entry := range schedule.Schedule {
+	for _, entry := range schedule.MonthlyData {
 		csvWriter.Write([]string{
-			entry.CIID.String(),
-			entry.CIName,
-			entry.CIType,
-			entry.PeriodStart.Format("2006-01-02"),
-			entry.PeriodEnd.Format("2006-01-02"),
+			entry.Month.Format("2006-01"),
+			func() string {
+				if entry.IsProjected {
+					return "Projected"
+				}
+				return "Actual"
+			}(),
 			fmt.Sprintf("%.2f", entry.OpeningBookValue),
 			fmt.Sprintf("%.2f", entry.DepreciationAmount),
+			fmt.Sprintf("%.2f", entry.WriteOffAmount),
+			fmt.Sprintf("%.2f", entry.AdjustmentAmount),
 			fmt.Sprintf("%.2f", entry.ClosingBookValue),
-			fmt.Sprintf("%.2f", entry.AccumulatedDepreciation),
+			fmt.Sprintf("%d", entry.ActiveAssetsCount),
 		})
 	}
 

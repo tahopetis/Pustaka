@@ -132,7 +132,7 @@
             <td class="amount">{{ formatCurrency(entry.book_value_before) }}</td>
             <td class="amount">{{ formatCurrency(entry.book_value_after) }}</td>
             <td class="amount">{{ formatCurrency(entry.accumulated_depreciation) }}</td>
-            <td>{{ entry.created_by || 'System' }}</td>
+            <td>{{ entry.created_by_name || entry.created_by || 'System' }}</td>
           </tr>
         </tbody>
       </table>

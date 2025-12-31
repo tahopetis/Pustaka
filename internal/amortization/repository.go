@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -661,10 +662,12 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 			ale.description,
 			ale.amortization_run_id,
 			ale.created_at,
-			ale.created_by
+			ale.created_by,
+			u.username as created_by_name
 		FROM amortization_ledger ale
 		JOIN configuration_items ci ON ale.ci_id = ci.id
 		LEFT JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
+		LEFT JOIN users u ON ale.created_by = u.id
 		%s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
@@ -686,6 +689,8 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 		var entry LedgerEntry
 		var description sql.NullString
 		var runID sql.NullString
+		var createdBy sql.NullString
+		var createdByName sql.NullString
 
 		err := rows.Scan(
 			&entry.ID,
@@ -700,7 +705,8 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 			&description,
 			&runID,
 			&entry.CreatedAt,
-			&entry.CreatedBy,
+			&createdBy,
+			&createdByName,
 		)
 
 		if err != nil {
@@ -716,6 +722,15 @@ func (r *repository) GetLedgerEntries(ctx context.Context, filters *LedgerFilter
 			if runUUID, err := uuid.Parse(runID.String); err == nil {
 				entry.AmortizationRunID = &runUUID
 			}
+		}
+		if createdBy.Valid {
+			// Parse UUID from string
+			if createdByUUID, err := uuid.Parse(createdBy.String); err == nil {
+				entry.CreatedBy = &createdByUUID
+			}
+		}
+		if createdByName.Valid {
+			entry.CreatedByName = &createdByName.String
 		}
 
 		entries = append(entries, entry)
@@ -1268,10 +1283,466 @@ func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryR
 }
 
 // GetDepreciationScheduleData retrieves data for depreciation schedule generation
-func (r *repository) GetDepreciationScheduleData(ctx context.Context, req *DepreciationScheduleRequest) ([]DepreciationScheduleEntry, error) {
-	// This would involve complex queries to generate depreciation schedule data
-	// For now, return an empty slice as a placeholder
-	return []DepreciationScheduleEntry{}, nil
+func (r *repository) GetDepreciationScheduleData(ctx context.Context, req *DepreciationScheduleRequest) (*DepreciationScheduleResponse, error) {
+	// Get amortization settings for currency
+	// If settings don't exist yet, use default currency
+	currency := "USD"
+	settings, err := r.GetAmortizationSettings(ctx)
+	if err == nil && settings != nil {
+		currency = settings.Currency
+	}
+	// If settings table doesn't exist, we continue with default currency
+
+	response := &DepreciationScheduleResponse{
+		Currency:  currency,
+		StartDate: req.DateFrom,
+		EndDate:   req.DateTo,
+		MonthlyData: []MonthlyScheduleEntry{},
+	}
+
+	// Build WHERE clause for filters
+	whereClause := "WHERE ale.entry_date >= $1 AND ale.entry_date <= $2"
+	args := []interface{}{req.DateFrom, req.DateTo}
+	argIndex := 3
+
+	// Add CI type filter if specified
+	if len(req.CITypeIDs) > 0 {
+		placeholders := make([]string, len(req.CITypeIDs))
+		for i, id := range req.CITypeIDs {
+			placeholders[i] = fmt.Sprintf("$%d", argIndex)
+			args = append(args, id)
+			argIndex++
+		}
+		whereClause += fmt.Sprintf(" AND ctd.id IN (%s)", strings.Join(placeholders, ", "))
+	}
+
+	// Add CI filter if specified
+	if len(req.CIIDs) > 0 {
+		placeholders := make([]string, len(req.CIIDs))
+		for i, id := range req.CIIDs {
+			placeholders[i] = fmt.Sprintf("$%d", argIndex)
+			args = append(args, id)
+			argIndex++
+		}
+		whereClause += fmt.Sprintf(" AND ale.ci_id IN (%s)", strings.Join(placeholders, ", "))
+	}
+
+	// Query 1: Get historical monthly data from ledger
+	// For each month, get opening value (first entry) and closing value (last entry)
+	historicalQuery := `
+		WITH monthly_opening AS (
+			SELECT DISTINCT ON (date_trunc('month', ale.entry_date), ale.ci_id)
+				date_trunc('month', ale.entry_date) as month,
+				ale.ci_id,
+				ale.book_value_before as opening_value
+			FROM amortization_ledger ale
+		` + whereClause + `
+			ORDER BY date_trunc('month', ale.entry_date), ale.ci_id, ale.entry_date ASC, ale.created_at ASC
+		),
+		monthly_closing AS (
+			SELECT DISTINCT ON (date_trunc('month', ale.entry_date), ale.ci_id)
+				date_trunc('month', ale.entry_date) as month,
+				ale.ci_id,
+				ale.book_value_after as closing_value
+			FROM amortization_ledger ale
+		` + whereClause + `
+			ORDER BY date_trunc('month', ale.entry_date), ale.ci_id, ale.entry_date DESC, ale.created_at DESC
+		),
+		monthly_amounts AS (
+			SELECT
+				date_trunc('month', ale.entry_date) as month,
+				SUM(CASE WHEN ale.entry_type IN ('depreciation', 'monthly_depreciation', 'catch_up_depreciation') THEN ale.amount ELSE 0 END) as depreciation_amount,
+				SUM(CASE WHEN ale.entry_type = 'write_off' THEN ale.amount ELSE 0 END) as write_off_amount,
+				SUM(CASE WHEN ale.entry_type = 'adjustment' THEN ale.amount ELSE 0 END) as adjustment_amount,
+				COUNT(DISTINCT ale.ci_id) as active_assets_count
+			FROM amortization_ledger ale
+			JOIN configuration_items ci ON ale.ci_id = ci.id
+			LEFT JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
+		` + whereClause + `
+			GROUP BY date_trunc('month', ale.entry_date)
+		)
+		SELECT
+			mc.month,
+			COALESCE(ma.depreciation_amount, 0) as depreciation_amount,
+			COALESCE(ma.write_off_amount, 0) as write_off_amount,
+			COALESCE(ma.adjustment_amount, 0) as adjustment_amount,
+			SUM(mo.opening_value) as opening_book_value,
+			SUM(mc.closing_value) as closing_book_value,
+			COALESCE(ma.active_assets_count, 0) as active_assets_count
+		FROM monthly_closing mc
+		JOIN monthly_opening mo ON mc.month = mo.month AND mc.ci_id = mo.ci_id
+		LEFT JOIN monthly_amounts ma ON mc.month = ma.month
+		GROUP BY mc.month, ma.depreciation_amount, ma.write_off_amount, ma.adjustment_amount, ma.active_assets_count
+		ORDER BY mc.month
+	`
+
+	rows, err := r.db.Query(ctx, historicalQuery, args...)
+	if err != nil {
+		r.logger.Error().Err(err).Str("query", "historical_data").Msg("Failed to query historical data")
+		return nil, fmt.Errorf("failed to query historical data: %w", err)
+	}
+	defer rows.Close()
+
+	historicalData := map[string]MonthlyScheduleEntry{}
+	for rows.Next() {
+		var entry MonthlyScheduleEntry
+		var openingBookValue, closingBookValue sql.NullFloat64
+
+		err := rows.Scan(
+			&entry.Month,
+			&entry.DepreciationAmount,
+			&entry.WriteOffAmount,
+			&entry.AdjustmentAmount,
+			&openingBookValue,
+			&closingBookValue,
+			&entry.ActiveAssetsCount,
+		)
+		if err != nil {
+			r.logger.Error().Err(err).Msg("Failed to scan historical row")
+			return nil, fmt.Errorf("failed to scan historical row: %w", err)
+		}
+
+		entry.IsProjected = false
+		entry.OpeningBookValue = openingBookValue.Float64
+		entry.ClosingBookValue = closingBookValue.Float64
+		historicalData[entry.Month.Format("2006-01")] = entry
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating historical rows: %w", err)
+	}
+
+	// Find the last month with actual ledger entries
+	lastHistoricalMonth := time.Time{}
+	for monthStr := range historicalData {
+		entry := historicalData[monthStr]
+		if entry.Month.After(lastHistoricalMonth) {
+			lastHistoricalMonth = entry.Month
+		}
+	}
+
+	// Query 2: Get projected data from active assets
+	// Get all active amortizable assets
+	assetWhereClause := "WHERE ci.current_book_value > COALESCE(ci.salvage_value, 0)"
+	assetArgs := []interface{}{}
+	assetArgIndex := 1
+
+	if len(req.CITypeIDs) > 0 {
+		placeholders := make([]string, len(req.CITypeIDs))
+		for i, id := range req.CITypeIDs {
+			placeholders[i] = fmt.Sprintf("$%d", assetArgIndex)
+			assetArgs = append(assetArgs, id)
+			assetArgIndex++
+		}
+		assetWhereClause += fmt.Sprintf(" AND ctd.id IN (%s)", strings.Join(placeholders, ", "))
+	}
+
+	if len(req.CIIDs) > 0 {
+		placeholders := make([]string, len(req.CIIDs))
+		for i, id := range req.CIIDs {
+			placeholders[i] = fmt.Sprintf("$%d", assetArgIndex)
+			assetArgs = append(assetArgs, id)
+			assetArgIndex++
+		}
+		assetWhereClause += fmt.Sprintf(" AND ci.id IN (%s)", strings.Join(placeholders, ", "))
+	}
+
+	// Query for active assets to project
+	assetQuery := `
+		SELECT
+			ci.id,
+			ci.name,
+			ci.current_book_value,
+			COALESCE(ci.salvage_value, 0) as salvage_value,
+			COALESCE(ci.purchase_cost, 0) as purchase_cost,
+			ci.useful_life_months,
+			ci.amort_start_date,
+			ctd.id as ci_type_id,
+			ctd.name as ci_type_name
+		FROM configuration_items ci
+		JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
+		LEFT JOIN lifecycle_statuses ls ON ci.lifecycle_status_id = ls.id
+		` + assetWhereClause + `
+		AND ci.amort_start_date IS NOT NULL
+		AND ci.useful_life_months IS NOT NULL
+		AND ci.purchase_cost IS NOT NULL
+		AND (ls.amortization_behavior IN ('active', 'pending', NULL) OR ls.amortization_behavior != 'terminal')
+	`
+
+	assetRows, err := r.db.Query(ctx, assetQuery, assetArgs...)
+	if err != nil {
+		r.logger.Error().Err(err).Msg("Failed to query active assets")
+		return nil, fmt.Errorf("failed to query active assets: %w", err)
+	}
+	defer assetRows.Close()
+
+	type assetInfo struct {
+		ID                 uuid.UUID
+		Name               string
+		CurrentBookValue   float64
+		SalvageValue       float64
+		PurchaseCost       float64
+		UsefulLifeMonths   int
+		AmortStartDate     time.Time
+		CITypeID           uuid.UUID
+		CITypeName         string
+		MonthlyDepreciation float64
+	}
+
+	var assets []assetInfo
+	totalBookValue := 0.0
+	totalMonthlyDepreciation := 0.0
+	totalSalvageValue := 0.0
+	totalOriginalCost := 0.0 // OCC - Original Capitalized Cost
+	totalGrossBookValue := 0.0 // GVB - Gross Book Value
+
+	for assetRows.Next() {
+		var asset assetInfo
+		var salvageValue, purchaseCost sql.NullFloat64
+		var amortStartDate sql.NullTime
+
+		err := assetRows.Scan(
+			&asset.ID,
+			&asset.Name,
+			&asset.CurrentBookValue,
+			&salvageValue,
+			&purchaseCost,
+			&asset.UsefulLifeMonths,
+			&amortStartDate,
+			&asset.CITypeID,
+			&asset.CITypeName,
+		)
+		if err != nil {
+			r.logger.Error().Err(err).Msg("Failed to scan asset row")
+			return nil, fmt.Errorf("failed to scan asset row: %w", err)
+		}
+
+		asset.SalvageValue = salvageValue.Float64
+		asset.PurchaseCost = purchaseCost.Float64
+		if amortStartDate.Valid {
+			asset.AmortStartDate = amortStartDate.Time
+		}
+
+		// Calculate monthly depreciation: (purchase_cost - salvage_value) / useful_life_months
+		if asset.UsefulLifeMonths > 0 && asset.PurchaseCost > asset.SalvageValue {
+			asset.MonthlyDepreciation = (asset.PurchaseCost - asset.SalvageValue) / float64(asset.UsefulLifeMonths)
+		}
+
+		assets = append(assets, asset)
+		totalBookValue += asset.CurrentBookValue
+		totalMonthlyDepreciation += asset.MonthlyDepreciation
+		totalSalvageValue += asset.SalvageValue
+		totalOriginalCost += asset.PurchaseCost // OCC calculation
+	}
+
+	// Calculate GVB: OCC + net adjustments from ledger
+	// Query for all adjustments within the date range
+	adjustmentsQuery := `
+		SELECT
+			COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as positive_adj,
+			COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as negative_adj
+		FROM amortization_ledger ale
+		JOIN configuration_items ci ON ale.ci_id = ci.id
+		LEFT JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
+	` + whereClause + `
+		AND ale.entry_type = 'adjustment'
+	`
+
+	var positiveAdj, negativeAdj sql.NullFloat64
+	err = r.db.QueryRow(ctx, adjustmentsQuery, args...).Scan(&positiveAdj, &negativeAdj)
+	if err != nil && err != pgx.ErrNoRows {
+		r.logger.Error().Err(err).Msg("Failed to query adjustments")
+		// Continue with zero adjustments
+	}
+
+	netAdjustments := 0.0
+	if positiveAdj.Valid {
+		netAdjustments += positiveAdj.Float64
+	}
+	if negativeAdj.Valid {
+		netAdjustments -= negativeAdj.Float64
+	}
+
+	totalGrossBookValue = totalOriginalCost + netAdjustments
+
+	if err := assetRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating asset rows: %w", err)
+	}
+
+	// Generate monthly entries from start date to end date
+	// Strategy:
+	// 1. For months at or before lastHistoricalMonth: only show actual ledger entries
+	// 2. For months after lastHistoricalMonth: show projections starting from last actual book value
+
+	currentDate := req.DateFrom
+	runningBookValue := 0.0      // Will be initialized from last historical entry
+	runningGrossBookValue := totalGrossBookValue // GVB stays constant unless there are adjustments
+	accumulatedDepreciation := 0.0 // Running total of accumulated depreciation
+
+	for currentDate.Before(req.DateTo) || currentDate.Equal(req.DateTo) {
+		monthKey := currentDate.Format("2006-01")
+
+		// Check if we have historical data for this month
+		if histEntry, exists := historicalData[monthKey]; exists {
+			// This is a historical month with actual ledger data
+			// Add accumulated depreciation to this entry
+			accumulatedDepreciation += histEntry.DepreciationAmount + histEntry.WriteOffAmount + histEntry.AdjustmentAmount
+			histEntry.AccumulatedDepreciation = accumulatedDepreciation
+			histEntry.GrossBookValue = runningGrossBookValue // GVB for this month
+
+			response.MonthlyData = append(response.MonthlyData, histEntry)
+			runningBookValue = histEntry.ClosingBookValue
+		} else {
+			// No historical data for this month
+			// Only create projections if this month is AFTER the last historical month
+			if !lastHistoricalMonth.IsZero() && (currentDate.Month() == lastHistoricalMonth.Month() && currentDate.Year() == lastHistoricalMonth.Year()) {
+				// This is the same month as the last historical entry but has no data
+				// Skip it to avoid duplicates
+			} else if !lastHistoricalMonth.IsZero() && currentDate.Before(lastHistoricalMonth) {
+				// This is a past month before the last historical entry
+				// Don't show projections for past periods - skip it
+			} else {
+				// This is a future month - create projected entry
+				// Calculate total depreciation for this month from active assets
+				monthlyDepreciation := 0.0
+				activeCount := 0
+
+				// Get the first day of current month for comparison
+				currentMonthStart := time.Date(currentDate.Year(), currentDate.Month(), 1, 0, 0, 0, 0, time.UTC)
+
+				for _, asset := range assets {
+					// Only depreciate if:
+					// 1. Current month is on or after amortization start date
+					// 2. Book value is above salvage value
+					if currentMonthStart.After(asset.AmortStartDate) || currentMonthStart.Equal(asset.AmortStartDate) {
+						if asset.CurrentBookValue > asset.SalvageValue {
+							monthlyDepreciation += asset.MonthlyDepreciation
+							activeCount++
+						}
+					}
+				}
+
+				// Update accumulated depreciation
+				accumulatedDepreciation += monthlyDepreciation
+
+				// Use running book value (from last actual entry) as opening
+				openingBookValue := runningBookValue
+				closingBookValue := openingBookValue - monthlyDepreciation
+				if closingBookValue < 0 {
+					closingBookValue = 0
+				}
+
+				projectedEntry := MonthlyScheduleEntry{
+					Month:                   currentDate,
+					IsProjected:             true,
+					OpeningBookValue:        openingBookValue,
+					GrossBookValue:          runningGrossBookValue, // GVB for this month
+					DepreciationAmount:      monthlyDepreciation,
+					WriteOffAmount:          0,
+					AdjustmentAmount:        0,
+					ClosingBookValue:        closingBookValue,
+					AccumulatedDepreciation: accumulatedDepreciation,
+					ActiveAssetsCount:       activeCount,
+				}
+
+				response.MonthlyData = append(response.MonthlyData, projectedEntry)
+				runningBookValue = closingBookValue
+			}
+		}
+
+		currentDate = currentDate.AddDate(0, 1, 0)
+	}
+
+	// Calculate summary statistics
+	totalDepreciation := 0.0
+	totalWriteOffs := 0.0
+	totalAdjustments := 0.0
+
+	for _, entry := range response.MonthlyData {
+		totalDepreciation += entry.DepreciationAmount
+		totalWriteOffs += entry.WriteOffAmount
+		totalAdjustments += entry.AdjustmentAmount
+	}
+
+	monthsCount := len(response.MonthlyData)
+	averageMonthlyExpense := 0.0
+	if monthsCount > 0 {
+		averageMonthlyExpense = totalDepreciation / float64(monthsCount)
+	}
+
+	// Get final book value as projected end value
+	projectedEndValue := 0.0
+	if len(response.MonthlyData) > 0 {
+		projectedEndValue = response.MonthlyData[len(response.MonthlyData)-1].ClosingBookValue
+	}
+
+	// Calculate accounting percentages
+	totalNetBookValue := totalBookValue // NBV is current book value
+	totalAccumulatedDepreciation := totalDepreciation + totalWriteOffs // AD
+	depreciationPercentage := 0.0
+	if totalGrossBookValue > 0 {
+		depreciationPercentage = (totalAccumulatedDepreciation / totalGrossBookValue) * 100
+	}
+	remainingPercentage := 0.0
+	if totalGrossBookValue > 0 {
+		remainingPercentage = (totalNetBookValue / totalGrossBookValue) * 100
+	}
+
+	response.Summary = ScheduleSummary{
+		TotalOriginalCost:        totalOriginalCost,          // OCC
+		TotalGrossBookValue:      totalGrossBookValue,        // GVB
+		TotalNetBookValue:        totalNetBookValue,          // NBV
+		TotalDepreciation:        totalDepreciation,          // AD
+		TotalWriteOffs:           totalWriteOffs,
+		TotalAdjustments:         totalAdjustments,           // Net ±
+		TotalSalvageValue:        totalSalvageValue,          // SV
+		AverageMonthlyExpense:    averageMonthlyExpense,
+		ProjectedEndValue:        projectedEndValue,
+		DepreciationPercentage:   depreciationPercentage,     // AD/GVB × 100
+		RemainingPercentage:      remainingPercentage,        // NBV/GVB × 100
+	}
+
+	// Update top-level response fields
+	response.TotalOriginalCost = totalOriginalCost           // OCC
+	response.TotalGrossBookValue = totalGrossBookValue       // GVB
+	response.TotalNetBookValue = totalNetBookValue           // NBV
+	response.TotalSalvageValue = totalSalvageValue           // SV
+	response.TotalAccumulatedDepreciation = totalAccumulatedDepreciation // AD
+
+	// Group by CI type
+	byCITypeMap := make(map[uuid.UUID]*CITypeScheduleSummary)
+	for _, asset := range assets {
+		if _, exists := byCITypeMap[asset.CITypeID]; !exists {
+			byCITypeMap[asset.CITypeID] = &CITypeScheduleSummary{
+				CITypeID:   asset.CITypeID,
+				CITypeName: asset.CITypeName,
+			}
+		}
+		byCITypeMap[asset.CITypeID].AssetCount++
+		byCITypeMap[asset.CITypeID].TotalBookValue += asset.CurrentBookValue
+		byCITypeMap[asset.CITypeID].MonthlyDepreciation += asset.MonthlyDepreciation
+	}
+
+	for _, summary := range byCITypeMap {
+		response.ByCIType = append(response.ByCIType, *summary)
+	}
+
+	// Sort by CI type name
+	sort.Slice(response.ByCIType, func(i, j int) bool {
+		return response.ByCIType[i].CITypeName < response.ByCIType[j].CITypeName
+	})
+
+	// Set total salvage value
+	response.TotalSalvageValue = totalSalvageValue
+
+	r.logger.Info().
+		Int("total_months", monthsCount).
+		Float64("total_depreciation", totalDepreciation).
+		Float64("total_salvage_value", totalSalvageValue).
+		Int("ci_types", len(response.ByCIType)).
+		Msg("Generated depreciation schedule")
+
+	return response, nil
 }
 
 // GetCIsForProcessing retrieves CIs that need amortization processing

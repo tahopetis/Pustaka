@@ -256,23 +256,12 @@ func (s *service) GetAmortizationSummaries(ctx context.Context, req *SummaryRequ
 }
 
 // GenerateDepreciationSchedule generates a depreciation schedule
-func (s *service) GenerateDepreciationSchedule(ctx context.Context, req *DepreciationScheduleRequest) (*DepreciationSchedule, error) {
-	result := &DepreciationSchedule{
-		ReportID: uuid.New(),
-		DateRange: DepreciationScheduleRange{
-			StartDate: req.DateFrom,
-			EndDate:   req.DateTo,
-		},
-		Schedule: []DepreciationScheduleEntry{},
-	}
-
+func (s *service) GenerateDepreciationSchedule(ctx context.Context, req *DepreciationScheduleRequest) (*DepreciationScheduleResponse, error) {
 	// Get schedule data from repository
-	entries, err := s.repo.GetDepreciationScheduleData(ctx, req)
+	result, err := s.repo.GetDepreciationScheduleData(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate depreciation schedule: %w", err)
 	}
-
-	result.Schedule = entries
 
 	return result, nil
 }

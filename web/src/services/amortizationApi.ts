@@ -14,7 +14,9 @@ import type {
   ApiResponse,
   PaginatedResponse,
   RestructuringCalculation,
-  RestructureResult
+  RestructureResult,
+  DepreciationScheduleRequest,
+  DepreciationScheduleResponse
 } from '@/types/amortization'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
@@ -116,6 +118,11 @@ class AmortizationApiService {
   // Reports
   async getJournalReport(filters?: AmortizationLedgerFilters): Promise<PaginatedResponse<AmortizationLedgerEntry>> {
     const response = await this.api.get('/reports/journal', { params: filters })
+    return response.data
+  }
+
+  async getDepreciationSchedule(params: DepreciationScheduleRequest): Promise<DepreciationScheduleResponse> {
+    const response = await this.api.get('/reports/depreciation-schedule', { params })
     return response.data
   }
 
