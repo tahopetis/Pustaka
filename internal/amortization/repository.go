@@ -1235,15 +1235,13 @@ func (r *repository) ListAmortizationRuns(ctx context.Context, filters *Amortiza
 
 // GetAmortizationSummaries retrieves amortization summaries for reporting
 func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryRequest) (*AmortizationSummary, error) {
+	// Main query for CI metrics
 	query := `
 		SELECT
 			COUNT(ci.id) as total_cis,
-			COALESCE(SUM(ci.current_book_value), 0) as total_book_value,
-			COALESCE(SUM(CASE
-				WHEN ci.purchase_cost > 0 AND ci.current_book_value IS NOT NULL
-				THEN ci.purchase_cost - COALESCE(ci.current_book_value, 0)
-				ELSE 0
-			END), 0) as total_depreciation,
+			COALESCE(SUM(ci.current_book_value), 0) as total_net_book_value,
+			COALESCE(SUM(ci.purchase_cost), 0) as total_original_cost,
+			COALESCE(SUM(ci.salvage_value), 0) as total_salvage_value,
 			COALESCE(SUM(
 				CASE
 					WHEN COALESCE(ci.useful_life_months, 0) > 0
@@ -1259,11 +1257,18 @@ func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryR
 	`
 
 	var totalCIs int64
-	var totalBookValue float64
-	var totalDepreciation float64
+	var totalNetBookValue float64
+	var totalOriginalCost float64
+	var totalSalvageValue float64
 	var totalMonthlyDepreciation float64
 
-	err := r.db.QueryRow(ctx, query).Scan(&totalCIs, &totalBookValue, &totalDepreciation, &totalMonthlyDepreciation)
+	err := r.db.QueryRow(ctx, query).Scan(
+		&totalCIs,
+		&totalNetBookValue,
+		&totalOriginalCost,
+		&totalSalvageValue,
+		&totalMonthlyDepreciation,
+	)
 	if err != nil {
 		r.logger.ErrorService("amortization", "get_amortization_summaries", err, map[string]interface{}{
 			"request": req,
@@ -1271,14 +1276,49 @@ func (r *repository) GetAmortizationSummaries(ctx context.Context, req *SummaryR
 		return nil, fmt.Errorf("failed to get amortization summaries: %w", err)
 	}
 
+	// Calculate net adjustments from ledger for GVB
+	adjustmentsQuery := `
+		SELECT
+			COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as positive_adj,
+			COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as negative_adj
+		FROM amortization_ledger ale
+		JOIN configuration_items ci ON ale.ci_id = ci.id
+		JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
+		WHERE ctd.is_amortizable = true
+		AND ale.entry_type = 'adjustment'
+	`
+
+	var positiveAdj, negativeAdj sql.NullFloat64
+	err = r.db.QueryRow(ctx, adjustmentsQuery).Scan(&positiveAdj, &negativeAdj)
+	if err != nil && err != pgx.ErrNoRows {
+		r.logger.Error().Err(err).Msg("Failed to query adjustments for summaries")
+	}
+
+	netAdjustments := 0.0
+	if positiveAdj.Valid {
+		netAdjustments += positiveAdj.Float64
+	}
+	if negativeAdj.Valid {
+		netAdjustments -= negativeAdj.Float64
+	}
+
+	// GVB = OCC + net adjustments
+	totalGrossBookValue := totalOriginalCost + netAdjustments
+
+	// AD = GVB - NBV (accumulated depreciation is the difference between gross and net book value)
+	totalAccumulatedDepreciation := totalGrossBookValue - totalNetBookValue
+
 	return &AmortizationSummary{
-		GroupBy:                  "all",
-		Groups:                   []AmortizationGroup{},
-		TotalCIs:                 int(totalCIs),
-		TotalBookValue:           totalBookValue,
-		TotalDepreciation:        totalDepreciation,
-		TotalMonthlyDepreciation: totalMonthlyDepreciation,
-		GeneratedAt:              time.Now(),
+		GroupBy:                   "all",
+		Groups:                    []AmortizationGroup{},
+		TotalCIs:                  int(totalCIs),
+		TotalOriginalCost:         totalOriginalCost,                    // OCC
+		TotalGrossBookValue:       totalGrossBookValue,                  // GVB
+		TotalNetBookValue:         totalNetBookValue,                    // NBV
+		TotalAccumulatedDepreciation: totalAccumulatedDepreciation,       // AD = GVB - NBV
+		TotalSalvageValue:         totalSalvageValue,                    // SV
+		TotalMonthlyDepreciation:  totalMonthlyDepreciation,
+		GeneratedAt:               time.Now(),
 	}, nil
 }
 
@@ -1336,6 +1376,8 @@ func (r *repository) GetDepreciationScheduleData(ctx context.Context, req *Depre
 				ale.ci_id,
 				ale.book_value_before as opening_value
 			FROM amortization_ledger ale
+			JOIN configuration_items ci ON ale.ci_id = ci.id
+			LEFT JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
 		` + whereClause + `
 			ORDER BY date_trunc('month', ale.entry_date), ale.ci_id, ale.entry_date ASC, ale.created_at ASC
 		),
@@ -1345,6 +1387,8 @@ func (r *repository) GetDepreciationScheduleData(ctx context.Context, req *Depre
 				ale.ci_id,
 				ale.book_value_after as closing_value
 			FROM amortization_ledger ale
+			JOIN configuration_items ci ON ale.ci_id = ci.id
+			LEFT JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
 		` + whereClause + `
 			ORDER BY date_trunc('month', ale.entry_date), ale.ci_id, ale.entry_date DESC, ale.created_at DESC
 		),
@@ -1585,8 +1629,9 @@ func (r *repository) GetDepreciationScheduleData(ctx context.Context, req *Depre
 		// Check if we have historical data for this month
 		if histEntry, exists := historicalData[monthKey]; exists {
 			// This is a historical month with actual ledger data
-			// Add accumulated depreciation to this entry
-			accumulatedDepreciation += histEntry.DepreciationAmount + histEntry.WriteOffAmount + histEntry.AdjustmentAmount
+			// Accumulated depreciation only includes depreciation and write-offs, NOT adjustments
+			// Adjustments (revaluations) change GVB but are not depreciation expenses
+			accumulatedDepreciation += histEntry.DepreciationAmount + histEntry.WriteOffAmount
 			histEntry.AccumulatedDepreciation = accumulatedDepreciation
 			histEntry.GrossBookValue = runningGrossBookValue // GVB for this month
 
@@ -1678,7 +1723,7 @@ func (r *repository) GetDepreciationScheduleData(ctx context.Context, req *Depre
 
 	// Calculate accounting percentages
 	totalNetBookValue := totalBookValue // NBV is current book value
-	totalAccumulatedDepreciation := totalDepreciation + totalWriteOffs // AD
+	totalAccumulatedDepreciation := totalGrossBookValue - totalNetBookValue // AD = GVB - NBV
 	depreciationPercentage := 0.0
 	if totalGrossBookValue > 0 {
 		depreciationPercentage = (totalAccumulatedDepreciation / totalGrossBookValue) * 100
@@ -1692,7 +1737,7 @@ func (r *repository) GetDepreciationScheduleData(ctx context.Context, req *Depre
 		TotalOriginalCost:        totalOriginalCost,          // OCC
 		TotalGrossBookValue:      totalGrossBookValue,        // GVB
 		TotalNetBookValue:        totalNetBookValue,          // NBV
-		TotalDepreciation:        totalDepreciation,          // AD
+		TotalDepreciation:        totalAccumulatedDepreciation, // AD (corrected)
 		TotalWriteOffs:           totalWriteOffs,
 		TotalAdjustments:         totalAdjustments,           // Net ±
 		TotalSalvageValue:        totalSalvageValue,          // SV
@@ -1734,6 +1779,31 @@ func (r *repository) GetDepreciationScheduleData(ctx context.Context, req *Depre
 
 	// Set total salvage value
 	response.TotalSalvageValue = totalSalvageValue
+
+	// Calculate period-specific metrics (for the selected date range only)
+	if len(response.MonthlyData) > 0 {
+		// Opening book value is the opening value of the first month
+		response.PeriodSummary.OpeningBookValue = response.MonthlyData[0].OpeningBookValue
+
+		// Closing book value is the closing value of the last month
+		lastMonth := response.MonthlyData[len(response.MonthlyData)-1]
+		response.PeriodSummary.ClosingBookValue = lastMonth.ClosingBookValue
+
+		// Calculate totals for the period
+		for _, entry := range response.MonthlyData {
+			response.PeriodSummary.PeriodDepreciation += entry.DepreciationAmount
+			response.PeriodSummary.PeriodWriteOffs += entry.WriteOffAmount
+			response.PeriodSummary.PeriodAdjustments += entry.AdjustmentAmount
+		}
+
+		// Average monthly expense for the period
+		response.PeriodSummary.MonthsCount = len(response.MonthlyData)
+		response.PeriodSummary.AverageMonthlyExpense = response.PeriodSummary.PeriodDepreciation / float64(response.PeriodSummary.MonthsCount)
+
+		// Format dates for display
+		response.PeriodSummary.OpeningDate = response.StartDate.Format("2006-01")
+		response.PeriodSummary.ClosingDate = response.EndDate.Format("2006-01")
+	}
 
 	r.logger.Info().
 		Int("total_months", monthsCount).

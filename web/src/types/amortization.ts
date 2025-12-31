@@ -69,6 +69,15 @@ export interface AssetSummary {
 
 export interface AmortizationMetrics {
   total_amortizable_assets: number
+
+  // New comprehensive accounting metrics
+  total_original_cost: number           // OCC
+  total_gross_book_value: number        // GVB
+  total_net_book_value: number          // NBV
+  total_accumulated_depreciation: number // AD
+  total_salvage_value: number           // SV
+
+  // Legacy fields (for backward compatibility)
   total_book_value: number
   monthly_depreciation: number
   total_monthly_depreciation: number
@@ -233,17 +242,32 @@ export interface AssetScheduleSummary {
   projected_end_date?: string
 }
 
+export interface PeriodSummary {
+  opening_book_value: number        // NBV at start of period
+  closing_book_value: number        // NBV at end of period
+  period_depreciation: number       // Total depreciation during period
+  period_write_offs: number         // Total write-offs during period
+  period_adjustments: number        // Net adjustments during period
+  average_monthly_expense: number   // Avg monthly depreciation for period
+  opening_date: string              // Formatted opening date
+  closing_date: string              // Formatted closing date
+  months_count: number              // Number of months in period
+}
+
 export interface DepreciationScheduleResponse {
   currency: string
   start_date: string
   end_date: string
 
-  // New comprehensive metrics
+  // New comprehensive metrics (cumulative/lifetime values)
   total_original_cost: number           // OCC
   total_gross_book_value: number        // GVB
   total_net_book_value: number          // NBV (current)
   total_salvage_value: number           // SV
   total_accumulated_depreciation: number // AD
+
+  // Period-specific metrics (for the selected date range only)
+  period_summary: PeriodSummary
 
   summary: ScheduleSummary
   monthly_data: MonthlyScheduleEntry[]

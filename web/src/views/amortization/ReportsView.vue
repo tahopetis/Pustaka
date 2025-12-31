@@ -7,49 +7,6 @@
       </p>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="metrics-grid">
-      <div class="metric-card">
-        <div class="metric-icon">
-          <i class="fas fa-coins"></i>
-        </div>
-        <div class="metric-content">
-          <h3>Total Amortizable Assets</h3>
-          <div class="metric-value">{{ metrics.total_amortizable_assets || 0 }}</div>
-        </div>
-      </div>
-
-      <div class="metric-card">
-        <div class="metric-icon">
-          <i class="fas fa-chart-line"></i>
-        </div>
-        <div class="metric-content">
-          <h3>Total Book Value</h3>
-          <div class="metric-value">{{ formatCurrency(metrics.total_book_value || 0) }}</div>
-        </div>
-      </div>
-
-      <div class="metric-card">
-        <div class="metric-icon">
-          <i class="fas fa-calculator"></i>
-        </div>
-        <div class="metric-content">
-          <h3>Monthly Depreciation</h3>
-          <div class="metric-value">{{ formatCurrency(metrics.monthly_depreciation || 0) }}</div>
-        </div>
-      </div>
-
-      <div class="metric-card">
-        <div class="metric-icon">
-          <i class="fas fa-history"></i>
-        </div>
-        <div class="metric-content">
-          <h3>Active Amortizations</h3>
-          <div class="metric-value">{{ metrics.active_amortizations || 0 }}</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Report Sections -->
     <div class="reports-section">
       <div class="report-tabs">
@@ -256,11 +213,27 @@
           <div class="filter-row">
             <div class="control-group">
               <label>Date Range</label>
-              <select v-model="scheduleFilters.months_ahead" @change="loadScheduleData" class="control-select">
-                <option :value="6">Last 6 + Next 6 months</option>
-                <option :value="12">Last 12 + Next 12 months</option>
-                <option :value="24">Last 24 + Next 24 months</option>
-              </select>
+              <div class="date-range-inputs">
+                <input
+                  v-model="scheduleFilters.date_from"
+                  type="month"
+                  class="control-input"
+                  max="9999-12"
+                />
+                <span class="date-separator">to</span>
+                <input
+                  v-model="scheduleFilters.date_to"
+                  type="month"
+                  class="control-input"
+                  max="9999-12"
+                />
+              </div>
+              <div class="preset-buttons">
+                <button @click.prevent="setDatePreset(6)" class="preset-btn">Last 6 + Next 6</button>
+                <button @click.prevent="setDatePreset(12)" class="preset-btn">Last 12 + Next 12</button>
+                <button @click.prevent="setDatePreset(24)" class="preset-btn">Last 24 + Next 24</button>
+              </div>
+              <div v-if="dateRangeError" class="filter-error">{{ dateRangeError }}</div>
             </div>
             <div class="control-group">
               <label>CI Type</label>
@@ -350,27 +323,106 @@
           </div>
         </div>
 
+        <!-- Period-Specific Metrics Cards -->
+        <div class="metrics-section">
+          <h3 class="metrics-section-title">Period Metrics ({{ scheduleData?.period_summary?.opening_date || '' }} to {{ scheduleData?.period_summary?.closing_date || '' }})</h3>
+          <div class="metrics-grid">
+            <!-- Opening NBV Card -->
+            <div class="metric-card metric-card-teal">
+              <div class="metric-icon">
+                <i class="fas fa-play-circle"></i>
+              </div>
+              <div class="metric-content">
+                <div class="metric-label">Opening Book Value</div>
+                <div class="metric-value">{{ formatCurrency(scheduleData?.period_summary?.opening_book_value || 0) }}</div>
+                <div class="metric-sublabel">Start of Period</div>
+              </div>
+            </div>
+
+            <!-- Closing NBV Card -->
+            <div class="metric-card metric-card-indigo">
+              <div class="metric-icon">
+                <i class="fas fa-stop-circle"></i>
+              </div>
+              <div class="metric-content">
+                <div class="metric-label">Closing Book Value</div>
+                <div class="metric-value">{{ formatCurrency(scheduleData?.period_summary?.closing_book_value || 0) }}</div>
+                <div class="metric-sublabel">End of Period</div>
+              </div>
+            </div>
+
+            <!-- Period Depreciation Card -->
+            <div class="metric-card metric-card-yellow">
+              <div class="metric-icon">
+                <i class="fas fa-chart-line"></i>
+              </div>
+              <div class="metric-content">
+                <div class="metric-label">Period Depreciation</div>
+                <div class="metric-value">{{ formatCurrency(scheduleData?.period_summary?.period_depreciation || 0) }}</div>
+                <div class="metric-sublabel">Total for Period</div>
+                <div class="metric-badge">{{ scheduleData?.period_summary?.months_count || 0 }} months</div>
+              </div>
+            </div>
+
+            <!-- Period Write-offs Card -->
+            <div class="metric-card metric-card-pink">
+              <div class="metric-icon">
+                <i class="fas fa-times-circle"></i>
+              </div>
+              <div class="metric-content">
+                <div class="metric-label">Period Write-offs</div>
+                <div class="metric-value">{{ formatCurrency(scheduleData?.period_summary?.period_write_offs || 0) }}</div>
+                <div class="metric-sublabel">Write-offs in Period</div>
+              </div>
+            </div>
+
+            <!-- Period Adjustments Card -->
+            <div class="metric-card metric-card-cyan">
+              <div class="metric-icon">
+                <i class="fas fa-edit"></i>
+              </div>
+              <div class="metric-content">
+                <div class="metric-label">Period Adjustments</div>
+                <div class="metric-value">{{ formatCurrency(scheduleData?.period_summary?.period_adjustments || 0) }}</div>
+                <div class="metric-sublabel">Net Adjustments</div>
+              </div>
+            </div>
+
+            <!-- Average Monthly Expense Card -->
+            <div class="metric-card metric-card-lime">
+              <div class="metric-icon">
+                <i class="fas fa-calculator"></i>
+              </div>
+              <div class="metric-content">
+                <div class="metric-label">Avg Monthly Depreciation</div>
+                <div class="metric-value">{{ formatCurrency(scheduleData?.period_summary?.average_monthly_expense || 0) }}</div>
+                <div class="metric-sublabel">Per Month</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Chart Section -->
         <div class="schedule-chart-section">
           <h3>Monthly Depreciation Trend</h3>
           <div v-if="scheduleLoading" class="loading-placeholder">
             Loading chart data...
           </div>
-          <div v-else-if="scheduleData && scheduleData.monthly_data.length > 0" class="chart-container">
+          <div v-else-if="hasValidScheduleData" class="chart-container">
             <svg ref="chartSvg" class="depreciation-chart"></svg>
           </div>
           <div v-else class="no-data">
-            No schedule data available. Try adjusting the filters.
+            No schedule data available. Try adjusting the filters or selecting a different CI type.
           </div>
         </div>
 
         <!-- Data Table -->
-        <div class="schedule-table-section">
+        <div v-if="hasValidScheduleData" class="schedule-table-section">
           <h3>Monthly Schedule Details</h3>
           <div v-if="scheduleLoading" class="loading-placeholder">
             Loading table data...
           </div>
-          <div v-else-if="scheduleData && scheduleData.monthly_data.length > 0" class="report-table">
+          <div v-else class="report-table">
             <table class="data-table">
               <thead>
                 <tr>
@@ -403,11 +455,20 @@
                   <td class="amount">{{ formatCurrency(entry.closing_book_value) }}</td>
                   <td>{{ entry.active_assets_count }}</td>
                 </tr>
+                <!-- Summary Row -->
+                <tr v-if="scheduleData.monthly_data.length > 0" class="summary-row">
+                  <td colspan="2"><strong>Period Totals</strong></td>
+                  <td class="amount">-</td>
+                  <td class="amount">-</td>
+                  <td class="amount">{{ formatCurrency(scheduleData.period_summary.period_depreciation) }}</td>
+                  <td class="amount">{{ formatCurrency(scheduleData.period_summary.period_write_offs) }}</td>
+                  <td class="amount">{{ formatCurrency(scheduleData.period_summary.period_adjustments) }}</td>
+                  <td class="amount">-</td>
+                  <td class="amount">-</td>
+                  <td>-</td>
+                </tr>
               </tbody>
             </table>
-          </div>
-          <div v-else class="no-data">
-            No schedule data available. Try adjusting the filters.
           </div>
         </div>
       </div>
@@ -416,7 +477,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useAmortizationStore } from '@/stores/amortization'
 import { ciAPI, ciTypeAPI } from '@/services/api'
 import type {
@@ -456,15 +517,65 @@ const journalFilters = ref({
 // Schedule state
 const scheduleData = ref<DepreciationScheduleResponse | null>(null)
 const scheduleLoading = ref(false)
+const dateRangeError = ref('')
 const scheduleFilters = ref({
-  months_ahead: 12,
-  months_behind: 12,
+  date_from: '',
+  date_to: '',
   ci_type_id: '',
   ci_name: '',
 })
 const chartSvg = ref<SVGSVGElement | null>(null)
 
+// Computed property to check if schedule has valid data for display
+const hasValidScheduleData = computed(() => {
+  if (!scheduleData.value?.monthly_data?.length) return false
+  return scheduleData.value.monthly_data.some(d =>
+    (d.opening_book_value || 0) > 0 ||
+    (d.closing_book_value || 0) > 0 ||
+    (d.depreciation_amount || 0) > 0
+  )
+})
+
 const ciTypes = ref<{id: string, name: string}[]>([])
+
+// Date range helper functions
+const setDatePreset = (months: number) => {
+  const now = new Date()
+  const startDate = new Date(now.getFullYear(), now.getMonth() - months, 1)
+  const endDate = new Date(now.getFullYear(), now.getMonth() + months, 1)
+
+  scheduleFilters.value.date_from = startDate.toISOString().slice(0, 7) // YYYY-MM
+  scheduleFilters.value.date_to = endDate.toISOString().slice(0, 7)
+  dateRangeError.value = ''
+  loadScheduleData()
+}
+
+const validateDateRange = (): boolean => {
+  if (!scheduleFilters.value.date_from || !scheduleFilters.value.date_to) {
+    dateRangeError.value = 'Please select both start and end dates'
+    return false
+  }
+
+  const startDate = new Date(scheduleFilters.value.date_from + '-01')
+  const endDate = new Date(scheduleFilters.value.date_to + '-01')
+
+  if (startDate >= endDate) {
+    dateRangeError.value = 'Start date must be before end date'
+    return false
+  }
+
+  // Calculate the difference in months
+  const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+    (endDate.getMonth() - startDate.getMonth())
+
+  if (monthsDiff > 120) { // 10 years = 120 months
+    dateRangeError.value = 'Date range cannot exceed 10 years'
+    return false
+  }
+
+  dateRangeError.value = ''
+  return true
+}
 
 // CI Name Autocomplete state
 const ciSearchResults = ref<any[]>([])
@@ -624,6 +735,10 @@ const clearCIType = () => {
 
 onMounted(async () => {
   await loadCITypes()
+
+  // Initialize default date range (Last 12 + Next 12 months)
+  setDatePreset(12)
+
   await loadReportData()
 })
 
@@ -806,15 +921,16 @@ const getLatestAssetCount = (): number => {
 }
 
 const loadScheduleData = async () => {
+  // Validate date range
+  if (!validateDateRange()) {
+    return
+  }
+
   scheduleLoading.value = true
   try {
-    const now = new Date()
-    const endDate = new Date(now.getFullYear(), now.getMonth() + scheduleFilters.value.months_ahead, 1)
-    const startDate = new Date(now.getFullYear(), now.getMonth() - scheduleFilters.value.months_behind, 1)
-
     const params: any = {
-      date_from: startDate.toISOString().split('T')[0],
-      date_to: endDate.toISOString().split('T')[0],
+      date_from: scheduleFilters.value.date_from + '-01',
+      date_to: scheduleFilters.value.date_to + '-01',
     }
 
     if (scheduleFilters.value.ci_type_id) {
@@ -828,8 +944,11 @@ const loadScheduleData = async () => {
 
     const response = await amortizationStore.loadDepreciationSchedule(params)
     scheduleData.value = response
-  } catch (error) {
+    // Note: Chart will be drawn by the scheduleData watcher
+  } catch (error: any) {
     console.error('Failed to load schedule data:', error)
+    // Clear old data on error to avoid showing stale data
+    scheduleData.value = null
   } finally {
     scheduleLoading.value = false
   }
@@ -883,21 +1002,62 @@ watch(activeTab, (newTab) => {
   }
 })
 
-// Watch schedule data changes to redraw chart
+// Watch chartSvg ref to draw chart when it becomes available
+watch(chartSvg, () => {
+  if (chartSvg.value && hasValidScheduleData.value) {
+    // SVG ref is now available, draw the chart
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        drawSimpleChart()
+      })
+    })
+  }
+})
+
+// Watch schedule data changes to redraw chart (for filter changes)
 watch(scheduleData, async () => {
-  if (scheduleData.value) {
-    // Wait for DOM to update before drawing chart
-    await nextTick()
-    drawSimpleChart()
+  if (scheduleData.value?.monthly_data?.length > 0 && chartSvg.value) {
+    // Chart already exists, just redraw it
+    requestAnimationFrame(() => {
+      drawSimpleChart()
+    })
   }
 }, { deep: true })
 
 const drawSimpleChart = () => {
-  if (!chartSvg.value || !scheduleData.value?.monthly_data.length) return
+  if (!chartSvg.value) {
+    console.warn('Chart SVG ref is not available')
+    return
+  }
+
+  if (!scheduleData.value?.monthly_data?.length) {
+    console.warn('No monthly data available')
+    return
+  }
 
   const svg = chartSvg.value
   const data = scheduleData.value.monthly_data
-  const width = svg.clientWidth || 800
+
+  // Check if data has valid values (not all zeros)
+  const hasValidData = data.some(d =>
+    (d.opening_book_value || 0) > 0 ||
+    (d.closing_book_value || 0) > 0 ||
+    (d.depreciation_amount || 0) > 0
+  )
+
+  if (!hasValidData) {
+    console.warn('No valid chart data available (all values are 0)')
+    // Clear the chart and hide it
+    while (svg.firstChild) {
+      svg.removeChild(svg.firstChild)
+    }
+    return
+  }
+
+  // Get container dimensions for proper sizing
+  const container = svg.parentElement
+  const containerWidth = container ? container.clientWidth : 800
+  const width = Math.max(containerWidth - 40, 800) // Account for padding
   const height = 400
   const padding = { top: 30, right: 40, bottom: 80, left: 80 }
 
@@ -906,14 +1066,35 @@ const drawSimpleChart = () => {
     svg.removeChild(svg.firstChild)
   }
 
-  // Set SVG dimensions
+  // Set SVG dimensions explicitly
+  svg.style.width = width + 'px'
+  svg.style.height = height + 'px'
   svg.setAttribute('width', width.toString())
   svg.setAttribute('height', height.toString())
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
 
-  // Calculate scales
-  const maxValue = Math.max(...data.map(d => d.opening_book_value), ...data.map(d => d.closing_book_value)) * 1.1
-  const maxDepreciation = Math.max(...data.map(d => d.depreciation_amount))
+  // Calculate scales with validation to prevent NaN
+  const validValues = data.flatMap(d => [
+    d.opening_book_value || 0,
+    d.closing_book_value || 0
+  ]).filter(v => isFinite(v) && v > 0)
+
+  const maxValue = validValues.length > 0
+    ? Math.max(...validValues) * 1.1
+    : 100 // fallback default
+
+  if (!isFinite(maxValue) || maxValue <= 0) {
+    console.warn('Invalid max value for chart, skipping render')
+    return
+  }
+
+  const validDepreciation = data
+    .map(d => d.depreciation_amount || 0)
+    .filter(v => isFinite(v) && v > 0)
+
+  const maxDepreciation = validDepreciation.length > 0
+    ? Math.max(...validDepreciation)
+    : 1 // fallback default
   const chartWidth = width - padding.left - padding.right
   const chartHeight = height - padding.top - padding.bottom
 
@@ -1569,6 +1750,14 @@ const drawSimpleChart = () => {
 .metric-card-orange::before { background: #f97316; }
 .metric-card-red::before { background: #ef4444; }
 
+/* New period-specific card colors */
+.metric-card-teal::before { background: #14b8a6; }
+.metric-card-indigo::before { background: #6366f1; }
+.metric-card-yellow::before { background: #eab308; }
+.metric-card-pink::before { background: #ec4899; }
+.metric-card-cyan::before { background: #06b6d4; }
+.metric-card-lime::before { background: #84cc16; }
+
 .metric-icon {
   width: 2.5rem;
   height: 2.5rem;
@@ -1584,6 +1773,23 @@ const drawSimpleChart = () => {
 .metric-card-blue .metric-icon { background: #dbeafe; color: #3b82f6; }
 .metric-card-orange .metric-icon { background: #ffedd5; color: #f97316; }
 .metric-card-red .metric-icon { background: #fee2e2; color: #ef4444; }
+.metric-card-teal .metric-icon { background: #ccfbf1; color: #14b8a6; }
+.metric-card-indigo .metric-icon { background: #e0e7ff; color: #6366f1; }
+.metric-card-yellow .metric-icon { background: #fef9c3; color: #ca8a04; }
+.metric-card-pink .metric-icon { background: #fce7f3; color: #ec4899; }
+.metric-card-cyan .metric-icon { background: #cffafe; color: #06b6d4; }
+.metric-card-lime .metric-icon { background: #ecfccb; color: #84cc16; }
+
+.metrics-section {
+  margin-bottom: 2rem;
+}
+
+.metrics-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 1rem;
+}
 
 .metric-content {
   flex: 1;
@@ -1808,6 +2014,16 @@ const drawSimpleChart = () => {
   background: #f9fafb;
 }
 
+.summary-row {
+  background: #f0fdf4 !important;
+  font-weight: 600;
+  border-top: 2px solid #16a34a;
+}
+
+.summary-row:hover {
+  background: #f0fdf4 !important;
+}
+
 .asset-link {
   color: #4f46e5;
   text-decoration: none;
@@ -2030,6 +2246,51 @@ const drawSimpleChart = () => {
   border: 1px solid #d1d5db;
   border-radius: 0.375rem;
   font-size: 0.875rem;
+}
+
+.date-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-range-inputs .control-input {
+  flex: 1;
+}
+
+.date-separator {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.preset-btn {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.filter-error {
+  color: #dc2626;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
 }
 
 .schedule-chart-section {

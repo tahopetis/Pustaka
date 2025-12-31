@@ -104,8 +104,13 @@ type AmortizationSummary struct {
 	GroupBy                  string              `json:"group_by"` // "ci_type", "lifecycle_status", "department", etc.
 	Groups                   []AmortizationGroup `json:"groups"`
 	TotalCIs                 int                 `json:"total_cis"`
-	TotalBookValue           float64             `json:"total_book_value"`
-	TotalDepreciation        float64             `json:"total_depreciation"`         // Accumulated depreciation to date
+
+	// New comprehensive accounting metrics
+	TotalOriginalCost        float64             `json:"total_original_cost"`        // OCC
+	TotalGrossBookValue      float64             `json:"total_gross_book_value"`      // GVB
+	TotalNetBookValue        float64             `json:"total_net_book_value"`        // NBV
+	TotalAccumulatedDepreciation float64         `json:"total_accumulated_depreciation"` // AD
+	TotalSalvageValue        float64             `json:"total_salvage_value"`         // SV
 	TotalMonthlyDepreciation float64             `json:"total_monthly_depreciation"` // Sum of monthly depreciation rates
 	GeneratedAt              time.Time           `json:"generated_at"`
 }
@@ -457,17 +462,33 @@ type DepreciationScheduleResponse struct {
 	StartDate                   time.Time                `json:"start_date"`
 	EndDate                     time.Time                `json:"end_date"`
 
-	// New comprehensive metrics
+	// New comprehensive metrics (cumulative/lifetime values)
 	TotalOriginalCost           float64                  `json:"total_original_cost"`           // OCC
 	TotalGrossBookValue         float64                  `json:"total_gross_book_value"`         // GVB
 	TotalNetBookValue           float64                  `json:"total_net_book_value"`           // NBV (current)
 	TotalSalvageValue           float64                  `json:"total_salvage_value"`            // SV
 	TotalAccumulatedDepreciation float64                 `json:"total_accumulated_depreciation"` // AD
 
+	// Period-specific metrics (for the selected date range only)
+	PeriodSummary               PeriodSummary            `json:"period_summary"`
+
 	Summary                     ScheduleSummary          `json:"summary"`
 	MonthlyData                 []MonthlyScheduleEntry   `json:"monthly_data"`
 	ByCIType                    []CITypeScheduleSummary  `json:"by_ci_type,omitempty"`
 	ByAsset                     []AssetScheduleSummary   `json:"by_asset,omitempty"`
+}
+
+// PeriodSummary represents metrics for a specific date range (not cumulative)
+type PeriodSummary struct {
+	OpeningBookValue      float64  `json:"opening_book_value"`       // NBV at start of period
+	ClosingBookValue      float64  `json:"closing_book_value"`       // NBV at end of period
+	PeriodDepreciation    float64  `json:"period_depreciation"`      // Total depreciation during period
+	PeriodWriteOffs       float64  `json:"period_write_offs"`        // Total write-offs during period
+	PeriodAdjustments     float64  `json:"period_adjustments"`       // Net adjustments during period
+	AverageMonthlyExpense float64  `json:"average_monthly_expense"` // Avg monthly depreciation for period
+	OpeningDate           string   `json:"opening_date"`            // Formatted opening date
+	ClosingDate           string   `json:"closing_date"`            // Formatted closing date
+	MonthsCount           int      `json:"months_count"`            // Number of months in period
 }
 
 // RestructuringCalculation represents a prospective recalculation when useful life changes

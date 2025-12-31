@@ -160,13 +160,20 @@ export const useAmortizationStore = defineStore('amortization', () => {
     try {
       const response = await amortizationApi.getAssetSummary()
       // Map AmortizationSummary response to AmortizationMetrics format
-      // Fix: Use snake_case field names as defined in TypeScript interface
       metrics.value = {
+        // New accounting metrics
+        total_original_cost: response.total_original_cost || 0,
+        total_gross_book_value: response.total_gross_book_value || 0,
+        total_net_book_value: response.total_net_book_value || 0,
+        total_accumulated_depreciation: response.total_accumulated_depreciation || 0,
+        total_salvage_value: response.total_salvage_value || 0,
+
+        // Legacy fields (for backward compatibility)
         total_amortizable_assets: response.total_cis || 0,
-        total_book_value: response.total_book_value || 0,
-        monthly_depreciation: response.total_monthly_depreciation || 0, // Sum of monthly rates (stable, excludes catch-up)
+        total_book_value: response.total_net_book_value || 0,
+        monthly_depreciation: response.total_monthly_depreciation || 0,
         total_monthly_depreciation: response.total_monthly_depreciation || 0,
-        active_amortizations: response.total_cis || 0 // Assuming all CIs with amortization are active
+        active_amortizations: response.total_cis || 0
       }
       return metrics.value
     } catch (err: any) {
