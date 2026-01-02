@@ -5,6 +5,8 @@
 *.so
 *.dylib
 bin/
+api
+bdui-*
 
 # Test binary, built with `go test -c`
 *.test
@@ -189,3 +191,13 @@ verification-*.png
 
 # Auto Claude data directory
 .auto-claude/
+
+# Beads workflow management - keep issues and config, ignore runtime
+.beads/*.db
+.beads/*.db-*
+.beads/*.sock
+.beads/daemon.lock
+.beads/daemon.pid
+.beads/daemon.log
+.beads/last-touched
+.beads/interactions.jsonl
