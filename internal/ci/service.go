@@ -713,6 +713,82 @@ func (s *Service) GetCIGrowth(ctx context.Context, fromDate, toDate string) (*Gr
 	}, nil
 }
 
+// GetHealthScore calculates and returns the current CMDB health score
+func (s *Service) GetHealthScore(ctx context.Context) (*HealthScore, error) {
+	// Get current metrics
+	metrics, err := s.repo.GetHealthScoreMetrics(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get health score metrics: %w", err)
+	}
+
+	// Calculate health score
+	score := CalculateHealthScore(*metrics)
+
+	// Get historical data for trend calculation (last 35 days to ensure we have 30-day data)
+	history, err := s.repo.GetHealthScoreHistory(ctx, 35)
+	if err != nil {
+		// Log error but don't fail - trend will be "stable" by default
+		s.logger.Error().Err(err).Str("component", "health_score").Str("action", "GET_HISTORY").Msg("Failed to get health score history")
+	} else {
+		// Calculate trend
+		score.Trend = calculateTrend(score.Overall, history)
+	}
+
+	// Save current score to history (do this in background to not block response)
+	go func() {
+		saveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.repo.SaveHealthScore(saveCtx, &score, metrics); err != nil {
+			s.logger.Error().Err(err).Str("component", "health_score").Str("action", "SAVE_HISTORY").Msg("Failed to save health score history")
+		}
+	}()
+
+	return &score, nil
+}
+
+// GetDataQualityMetrics returns data quality metrics for the CMDB
+func (s *Service) GetDataQualityMetrics(ctx context.Context, includeDetails bool, limit int) (*DataQualityMetrics, error) {
+	metrics, err := s.repo.GetDataQualityMetrics(ctx, includeDetails, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data quality metrics: %w", err)
+	}
+
+	return metrics, nil
+}
+
+// GetAssetAgingMetrics returns asset aging metrics for the dashboard
+func (s *Service) GetAssetAgingMetrics(ctx context.Context, eolThresholdMonths int, limit int) (*AssetAgingMetrics, error) {
+	// Set defaults if not provided
+	if eolThresholdMonths <= 0 {
+		eolThresholdMonths = 6 // Default: 6 months
+	}
+	if limit <= 0 {
+		limit = 10 // Default: top 10 assets approaching EOL
+	}
+
+	metrics, err := s.repo.GetAssetAgingMetrics(ctx, eolThresholdMonths, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get asset aging metrics: %w", err)
+	}
+
+	return metrics, nil
+}
+
+// GetRiskMetrics returns risk assessment metrics for the dashboard
+func (s *Service) GetRiskMetrics(ctx context.Context, limit int) (*RiskMetrics, error) {
+	// Set default if not provided
+	if limit <= 0 {
+		limit = 10 // Default: top 10 high-risk assets
+	}
+
+	metrics, err := s.repo.GetRiskMetrics(ctx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get risk metrics: %w", err)
+	}
+
+	return metrics, nil
+}
+
 // Custom error types
 type ServiceValidationError struct {
 	Message string                 `json:"message"`

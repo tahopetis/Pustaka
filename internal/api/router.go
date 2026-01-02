@@ -99,6 +99,7 @@ func (r *Router) setupRoutes() {
 
 	// Dashboard
 	v1.HandleFunc("/dashboard/stats", r.ciHandlers.GetDashboardStats).Methods("GET")
+	v1.HandleFunc("/dashboard/health-score", r.ciHandlers.GetHealthScore).Methods("GET")
 }
 
 func (r *Router) healthCheck(w http.ResponseWriter, req *http.Request) {

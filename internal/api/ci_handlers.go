@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/google/uuid"
@@ -495,4 +496,122 @@ func (h *CIHandlers) GetCIGrowth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusOK, growthData)
+}
+
+// GetHealthScore godoc
+// @Summary Get CMDB health score
+// @Description Get the overall CMDB health score with sub-scores for completeness, correctness, and compliance
+// @Tags dashboard
+// @Produce json
+// @Success 200 {object} ci.HealthScore
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/dashboard/health-score [get]
+func (h *CIHandlers) GetHealthScore(w http.ResponseWriter, r *http.Request) {
+	score, err := h.ciService.GetHealthScore(r.Context())
+	if err != nil {
+		h.logger.ErrorService("dashboard", "GET_HEALTH_SCORE", err, nil)
+		h.writeError(w, http.StatusInternalServerError, "Failed to get health score")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, score)
+}
+
+// GetDataQualityMetrics returns data quality metrics for the CMDB
+// @Summary Get Data Quality Metrics
+// @Description Returns data quality metrics including missing attributes, orphaned CIs, and other quality issues
+// @Tags dashboard
+// @Produce json
+// @Param include_details query bool false "Include detailed CI lists (default: false)"
+// @Param limit query int false "Max number of CIs to return per category (default: 10)"
+// @Success 200 {object} ci.DataQualityMetrics
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/dashboard/data-quality [get]
+func (h *CIHandlers) GetDataQualityMetrics(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	includeDetails := r.URL.Query().Get("include_details") == "true"
+	limit := 10 // default
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	metrics, err := h.ciService.GetDataQualityMetrics(r.Context(), includeDetails, limit)
+	if err != nil {
+		h.logger.ErrorService("dashboard", "GET_DATA_QUALITY_METRICS", err, nil)
+		h.writeError(w, http.StatusInternalServerError, "Failed to get data quality metrics")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, metrics)
+}
+
+// GetAssetAgingMetrics returns asset aging metrics for the dashboard
+// @Summary Get Asset Aging Metrics
+// @Description Returns asset age distribution, EOL alerts, and aging statistics
+// @Tags dashboard
+// @Produce json
+// @Param eol_threshold_months query int false "EOL threshold in months (default: 6)"
+// @Param limit query int false "Max number of EOL assets to return (default: 10)"
+// @Success 200 {object} ci.AssetAgingMetrics
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/dashboard/asset-aging [get]
+func (h *CIHandlers) GetAssetAgingMetrics(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	eolThresholdMonths := 6 // default
+	if thresholdStr := r.URL.Query().Get("eol_threshold_months"); thresholdStr != "" {
+		if parsedThreshold, err := strconv.Atoi(thresholdStr); err == nil && parsedThreshold > 0 {
+			eolThresholdMonths = parsedThreshold
+		}
+	}
+
+	limit := 10 // default
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	metrics, err := h.ciService.GetAssetAgingMetrics(r.Context(), eolThresholdMonths, limit)
+	if err != nil {
+		h.logger.ErrorService("dashboard", "GET_ASSET_AGING_METRICS", err, nil)
+		h.writeError(w, http.StatusInternalServerError, "Failed to get asset aging metrics")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, metrics)
+}
+
+// GetRiskMetrics returns risk assessment metrics for the dashboard
+// @Summary Get Risk Metrics
+// @Description Returns risk assessment including SPOFs, critical assets, and compliance issues
+// @Tags dashboard
+// @Produce json
+// @Param limit query int false "Max number of high-risk CIs to return (default: 10)"
+// @Success 200 {object} ci.RiskMetrics
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/dashboard/risk-metrics [get]
+func (h *CIHandlers) GetRiskMetrics(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	limit := 10 // default
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	metrics, err := h.ciService.GetRiskMetrics(r.Context(), limit)
+	if err != nil {
+		h.logger.ErrorService("dashboard", "GET_RISK_METRICS", err, nil)
+		h.writeError(w, http.StatusInternalServerError, "Failed to get risk metrics")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, metrics)
 }

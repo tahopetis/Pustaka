@@ -590,6 +590,10 @@ func setupRouter(
 			r.Route("/dashboard", func(r chi.Router) {
 				r.Use(middleware.RBAC("ci:read"))
 				r.Get("/stats", ciHandlers.GetDashboardStats)
+				r.Get("/health-score", ciHandlers.GetHealthScore)
+				r.Get("/data-quality", ciHandlers.GetDataQualityMetrics)
+				r.Get("/asset-aging", ciHandlers.GetAssetAgingMetrics)
+				r.Get("/risk-metrics", ciHandlers.GetRiskMetrics)
 			})
 		})
 	})

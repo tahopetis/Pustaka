@@ -7,6 +7,9 @@
         <p class="page-subtitle">Welcome back, {{ user?.username }}!</p>
       </div>
 
+      <!-- Global Search -->
+      <GlobalSearch class="mx-4" />
+
       <!-- Refresh button -->
       <button
         @click="refreshAllData"
@@ -210,6 +213,31 @@
       </DashboardWidget>
     </div>
 
+    <!-- Health Score Widget -->
+    <div class="mb-5">
+      <HealthScoreWidget />
+    </div>
+
+    <!-- Data Quality Widget -->
+    <div class="mb-5">
+      <DataQualityWidget />
+    </div>
+
+    <!-- Asset Aging Widget -->
+    <div class="mb-5">
+      <AssetAgingWidget />
+    </div>
+
+    <!-- Financial Summary Widget -->
+    <div class="mb-5">
+      <FinancialSummaryWidget />
+    </div>
+
+    <!-- Risk Metrics Widget -->
+    <div class="mb-5">
+      <RiskMetricsWidget />
+    </div>
+
     <!-- Analytics Charts - Custom Layout -->
     <div class="space-y-4 mb-5">
       <!-- Activity Trend and Heatmap - Side by Side -->
@@ -404,6 +432,12 @@ import { useAmortizationStore } from '@/stores/amortization'
 import { useDashboardData } from '@/composables/useDashboardData'
 import TimeRangeFilter from '@/components/dashboard/TimeRangeFilter.vue'
 import DashboardWidget from '@/components/dashboard/DashboardWidget.vue'
+import HealthScoreWidget from '@/components/dashboard/HealthScoreWidget.vue'
+import DataQualityWidget from '@/components/dashboard/DataQualityWidget.vue'
+import AssetAgingWidget from '@/components/dashboard/AssetAgingWidget.vue'
+import FinancialSummaryWidget from '@/components/dashboard/FinancialSummaryWidget.vue'
+import RiskMetricsWidget from '@/components/dashboard/RiskMetricsWidget.vue'
+import GlobalSearch from '@/components/dashboard/GlobalSearch.vue'
 import TrendChart from '@/components/dashboard/TrendChart.vue'
 import DonutChart from '@/components/dashboard/DonutChart.vue'
 import NetworkAnalyticsCard from '@/components/dashboard/NetworkAnalyticsCard.vue'

@@ -155,7 +155,7 @@ func (r *Repository) ListCIs(ctx context.Context, filters ListCIFilters, page, l
 	}
 
 	if filters.Search != "" {
-		whereClause += fmt.Sprintf(" AND (name ILIKE $%d OR attributes::text ILIKE $%d)", argIndex, argIndex+1)
+		whereClause += fmt.Sprintf(" AND (ci.name ILIKE $%d OR ci.attributes::text ILIKE $%d)", argIndex, argIndex+1)
 		args = append(args, "%"+filters.Search+"%", "%"+filters.Search+"%")
 		argIndex += 2
 	}
@@ -200,7 +200,7 @@ func (r *Repository) ListCIs(ctx context.Context, filters ListCIFilters, page, l
 	}
 
 	// Get total count
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM configuration_items %s", whereClause)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM configuration_items ci %s", whereClause)
 	var total int64
 	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
@@ -1078,3 +1078,884 @@ func (r *Repository) CountCIsWithStatus(ctx context.Context, statusID uuid.UUID)
 
 	return count, nil
 }
+
+// Health score calculation functions
+
+// GetHealthScoreMetrics retrieves metrics needed to calculate health scores
+func (r *Repository) GetHealthScoreMetrics(ctx context.Context) (*HealthScoreMetrics, error) {
+	// Get total CIs first
+	totalCIs, err := r.CountCIs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get CIs updated in last 90 days
+	currentQuery := `
+		SELECT COUNT(*) FROM configuration_items
+		WHERE updated_at > NOW() - INTERVAL '90 days'
+	`
+	var currentCIs int
+	err = r.db.QueryRow(ctx, currentQuery).Scan(&currentCIs)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return nil, fmt.Errorf("failed to get current CIs: %w", err)
+	}
+
+	// Get compliant CIs (following naming convention)
+	compliantQuery := `
+		SELECT COUNT(*) FROM configuration_items
+		WHERE name ~ '^[a-z][a-z0-9-]*$'
+	`
+	var compliantCIs int
+	err = r.db.QueryRow(ctx, compliantQuery).Scan(&compliantCIs)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return nil, fmt.Errorf("failed to get compliant CIs: %w", err)
+	}
+
+	// For completeness, we need to check if all required attributes are present
+	// This is complex, so for now we'll count CIs that have non-empty attributes
+	completeQuery := `
+		SELECT COUNT(*) FROM configuration_items
+		WHERE attributes != '{}'::jsonb
+	`
+	var completeCIs int
+	err = r.db.QueryRow(ctx, completeQuery).Scan(&completeCIs)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return nil, fmt.Errorf("failed to get complete CIs: %w", err)
+	}
+
+	return &HealthScoreMetrics{
+		TotalCIs:     int(totalCIs),
+		CompleteCIs:  completeCIs,
+		CurrentCIs:   currentCIs,
+		CompliantCIs: compliantCIs,
+	}, nil
+}
+
+// SaveHealthScore saves a health score snapshot to history
+func (r *Repository) SaveHealthScore(ctx context.Context, score *HealthScore, metrics *HealthScoreMetrics) error {
+	query := `
+		INSERT INTO health_score_history (
+			calculated_at, overall_score, completeness_score, correctness_score, compliance_score,
+			total_cis, complete_cis, current_cis, compliant_cis
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+
+	_, err := r.db.Exec(ctx, query,
+		score.CalculatedAt,
+		score.Overall,
+		score.Completeness,
+		score.Correctness,
+		score.Compliance,
+		metrics.TotalCIs,
+		metrics.CompleteCIs,
+		metrics.CurrentCIs,
+		metrics.CompliantCIs,
+	)
+
+	if err != nil {
+		r.logger.ErrorDatabase("INSERT", "health_score_history", err, nil)
+		return fmt.Errorf("failed to save health score: %w", err)
+	}
+
+	r.logger.InfoDatabase("INSERT", "health_score_history", 0, map[string]interface{}{
+		"overall_score": score.Overall,
+	})
+
+	return nil
+}
+
+// GetHealthScoreHistory retrieves health score history for trend calculation
+func (r *Repository) GetHealthScoreHistory(ctx context.Context, days int) ([]HealthScoreHistory, error) {
+	query := `
+		SELECT id, calculated_at, overall_score, completeness_score, correctness_score, compliance_score,
+		       total_cis, complete_cis, current_cis, compliant_cis, created_at
+		FROM health_score_history
+		WHERE calculated_at > NOW() - INTERVAL '1 day' * $1
+		ORDER BY calculated_at DESC
+	`
+
+	rows, err := r.db.Query(ctx, query, days)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "health_score_history", err, map[string]interface{}{
+			"days": days,
+		})
+		return nil, fmt.Errorf("failed to get health score history: %w", err)
+	}
+	defer rows.Close()
+
+	var history []HealthScoreHistory
+	for rows.Next() {
+		var record HealthScoreHistory
+		err := rows.Scan(
+			&record.ID,
+			&record.CalculatedAt,
+			&record.OverallScore,
+			&record.CompletenessScore,
+			&record.CorrectnessScore,
+			&record.ComplianceScore,
+			&record.TotalCIs,
+			&record.CompleteCIs,
+			&record.CurrentCIs,
+			&record.CompliantCIs,
+			&record.CreatedAt,
+		)
+		if err != nil {
+			r.logger.ErrorDatabase("SCAN", "health_score_history", err, nil)
+			return nil, fmt.Errorf("failed to scan health score history: %w", err)
+		}
+		history = append(history, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		r.logger.ErrorDatabase("ROWS", "health_score_history", err, nil)
+		return nil, fmt.Errorf("error iterating health score history: %w", err)
+	}
+
+	return history, nil
+}
+
+// Data Quality Metrics functions
+
+// GetDataQualityMetrics retrieves all data quality metrics
+func (r *Repository) GetDataQualityMetrics(ctx context.Context, includeDetails bool, limit int) (*DataQualityMetrics, error) {
+	totalCIs, err := r.CountCIs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if totalCIs == 0 {
+		return &DataQualityMetrics{}, nil
+	}
+
+	// Get metrics concurrently
+	type result struct {
+		name   string
+		count  int
+		stale30 int
+		stale60 int
+		stale90 int
+		err    error
+	}
+	results := make(chan result, 7)
+
+	// Missing attributes
+	go func() {
+		count, _, err := r.getCIsWithMissingAttributes(ctx, limit)
+		results <- result{name: "missing_attributes", count: count, err: err}
+	}()
+
+	// Orphaned CIs
+	go func() {
+		count, _, err := r.getOrphanedCIs(ctx, limit)
+		results <- result{name: "orphaned_cis", count: count, err: err}
+	}()
+
+	// No lifecycle status
+	go func() {
+		count, _, err := r.getCIsWithoutLifecycleStatus(ctx, limit)
+		results <- result{name: "no_lifecycle_status", count: count, err: err}
+	}()
+
+	// No tags
+	go func() {
+		count, _, err := r.getCIsWithoutTags(ctx, limit)
+		results <- result{name: "no_tags", count: count, err: err}
+	}()
+
+	// Stale data - get all three values
+	go func() {
+		stale30, stale60, stale90, err := r.getStaleCIs(ctx)
+		results <- result{name: "stale", stale30: stale30, stale60: stale60, stale90: stale90, err: err}
+	}()
+
+	// Duplicates
+	go func() {
+		count, err := r.getDuplicateCIs(ctx)
+		results <- result{name: "duplicates", count: count, err: err}
+	}()
+
+	// Collect results
+	metrics := &DataQualityMetrics{}
+	completed := 0
+
+	for completed < 6 {
+		select {
+		case res := <-results:
+			switch res.name {
+			case "missing_attributes":
+				if res.err != nil {
+					return nil, fmt.Errorf("failed to get CIs with missing attributes: %w", res.err)
+				}
+				metrics.MissingAttributes.Count = res.count
+				metrics.MissingAttributes.Percentage = calculatePercentage(int64(res.count), totalCIs)
+
+			case "orphaned_cis":
+				if res.err != nil {
+					return nil, fmt.Errorf("failed to get orphaned CIs: %w", res.err)
+				}
+				metrics.OrphanedCIs.Count = res.count
+				metrics.OrphanedCIs.Percentage = calculatePercentage(int64(res.count), totalCIs)
+
+			case "no_lifecycle_status":
+				if res.err != nil {
+					return nil, fmt.Errorf("failed to get CIs without lifecycle status: %w", res.err)
+				}
+				metrics.NoLifecycleStatus.Count = res.count
+				metrics.NoLifecycleStatus.Percentage = calculatePercentage(int64(res.count), totalCIs)
+
+			case "no_tags":
+				if res.err != nil {
+					return nil, fmt.Errorf("failed to get CIs without tags: %w", res.err)
+				}
+				metrics.NoTags.Count = res.count
+				metrics.NoTags.Percentage = calculatePercentage(int64(res.count), totalCIs)
+
+			case "stale":
+				if res.err != nil {
+					return nil, fmt.Errorf("failed to get stale CIs: %w", res.err)
+				}
+				// Store all three stale values
+				metrics.Stale30Days = res.stale30
+				metrics.Stale60Days = res.stale60
+				metrics.Stale90Days = res.stale90
+
+			case "duplicates":
+				if res.err != nil {
+					return nil, fmt.Errorf("failed to get duplicate CIs: %w", res.err)
+				}
+				metrics.Duplicates = res.count
+			}
+			completed++
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	// If details are requested, fetch the CI lists
+	if includeDetails {
+		_, missingCIs, err := r.getCIsWithMissingAttributes(ctx, limit)
+		if err == nil {
+			metrics.MissingAttributes.CIs = missingCIs
+		}
+
+		_, orphanedCIs, err := r.getOrphanedCIs(ctx, limit)
+		if err == nil {
+			metrics.OrphanedCIs.CIs = orphanedCIs
+		}
+
+		_, noStatusCIs, err := r.getCIsWithoutLifecycleStatus(ctx, limit)
+		if err == nil {
+			metrics.NoLifecycleStatus.CIs = noStatusCIs
+		}
+
+		_, noTagsCIs, err := r.getCIsWithoutTags(ctx, limit)
+		if err == nil {
+			metrics.NoTags.CIs = noTagsCIs
+		}
+	}
+
+	return metrics, nil
+}
+
+// getCIsWithMissingAttributes returns CIs that are missing required attributes
+func (r *Repository) getCIsWithMissingAttributes(ctx context.Context, limit int) (int, []QualityIssueCI, error) {
+	// For now, we'll check if attributes field is empty or null
+	// A more sophisticated check would verify against required_attributes in ci_type_definitions
+	query := `
+		SELECT id, name, ci_type, created_at, updated_at
+		FROM configuration_items
+		WHERE attributes = '{}'::jsonb OR attributes IS NULL
+		ORDER BY updated_at DESC
+	`
+
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, nil, fmt.Errorf("failed to get CIs with missing attributes: %w", err)
+	}
+	defer rows.Close()
+
+	var cis []QualityIssueCI
+	for rows.Next() {
+		var ci QualityIssueCI
+		err := rows.Scan(&ci.ID, &ci.Name, &ci.CIType, &ci.CreatedAt, &ci.UpdatedAt)
+		if err != nil {
+			r.logger.ErrorDatabase("SCAN", "configuration_items", err, nil)
+			return 0, nil, fmt.Errorf("failed to scan CI: %w", err)
+		}
+		cis = append(cis, ci)
+	}
+
+	// Get total count
+	countQuery := `
+		SELECT COUNT(*) FROM configuration_items
+		WHERE attributes = '{}'::jsonb OR attributes IS NULL
+	`
+	var count int
+	err = r.db.QueryRow(ctx, countQuery).Scan(&count)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, nil, err
+	}
+
+	return count, cis, nil
+}
+
+// getOrphanedCIs returns CIs that have no relationships
+func (r *Repository) getOrphanedCIs(ctx context.Context, limit int) (int, []QualityIssueCI, error) {
+	query := `
+		SELECT DISTINCT c.id, c.name, c.ci_type, c.created_at, c.updated_at
+		FROM configuration_items c
+		LEFT JOIN relationships r ON c.id = r.source_id OR c.id = r.target_id
+		WHERE r.id IS NULL
+		ORDER BY c.updated_at DESC
+	`
+
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, nil, fmt.Errorf("failed to get orphaned CIs: %w", err)
+	}
+	defer rows.Close()
+
+	var cis []QualityIssueCI
+	for rows.Next() {
+		var ci QualityIssueCI
+		err := rows.Scan(&ci.ID, &ci.Name, &ci.CIType, &ci.CreatedAt, &ci.UpdatedAt)
+		if err != nil {
+			r.logger.ErrorDatabase("SCAN", "configuration_items", err, nil)
+			return 0, nil, fmt.Errorf("failed to scan CI: %w", err)
+		}
+		cis = append(cis, ci)
+	}
+
+	// Get total count
+	countQuery := `
+		SELECT COUNT(DISTINCT c.id)
+		FROM configuration_items c
+		LEFT JOIN relationships r ON c.id = r.source_id OR c.id = r.target_id
+		WHERE r.id IS NULL
+	`
+	var count int
+	err = r.db.QueryRow(ctx, countQuery).Scan(&count)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, nil, err
+	}
+
+	return count, cis, nil
+}
+
+// getCIsWithoutLifecycleStatus returns CIs without lifecycle status
+func (r *Repository) getCIsWithoutLifecycleStatus(ctx context.Context, limit int) (int, []QualityIssueCI, error) {
+	query := `
+		SELECT id, name, ci_type, created_at, updated_at
+		FROM configuration_items
+		WHERE lifecycle_status_id IS NULL
+		ORDER BY updated_at DESC
+	`
+
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, nil, fmt.Errorf("failed to get CIs without lifecycle status: %w", err)
+	}
+	defer rows.Close()
+
+	var cis []QualityIssueCI
+	for rows.Next() {
+		var ci QualityIssueCI
+		err := rows.Scan(&ci.ID, &ci.Name, &ci.CIType, &ci.CreatedAt, &ci.UpdatedAt)
+		if err != nil {
+			r.logger.ErrorDatabase("SCAN", "configuration_items", err, nil)
+			return 0, nil, fmt.Errorf("failed to scan CI: %w", err)
+		}
+		cis = append(cis, ci)
+	}
+
+	// Get total count
+	countQuery := `SELECT COUNT(*) FROM configuration_items WHERE lifecycle_status_id IS NULL`
+	var count int
+	err = r.db.QueryRow(ctx, countQuery).Scan(&count)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, nil, err
+	}
+
+	return count, cis, nil
+}
+
+// getCIsWithoutTags returns CIs that have no tags
+func (r *Repository) getCIsWithoutTags(ctx context.Context, limit int) (int, []QualityIssueCI, error) {
+	query := `
+		SELECT id, name, ci_type, created_at, updated_at
+		FROM configuration_items
+		WHERE tags = '{}'::text[] OR array_length(tags, 1) IS NULL
+		ORDER BY updated_at DESC
+	`
+
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, nil, fmt.Errorf("failed to get CIs without tags: %w", err)
+	}
+	defer rows.Close()
+
+	var cis []QualityIssueCI
+	for rows.Next() {
+		var ci QualityIssueCI
+		err := rows.Scan(&ci.ID, &ci.Name, &ci.CIType, &ci.CreatedAt, &ci.UpdatedAt)
+		if err != nil {
+			r.logger.ErrorDatabase("SCAN", "configuration_items", err, nil)
+			return 0, nil, fmt.Errorf("failed to scan CI: %w", err)
+		}
+		cis = append(cis, ci)
+	}
+
+	// Get total count
+	countQuery := `
+		SELECT COUNT(*) FROM configuration_items
+		WHERE tags = '{}'::text[] OR array_length(tags, 1) IS NULL
+	`
+	var count int
+	err = r.db.QueryRow(ctx, countQuery).Scan(&count)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, nil, err
+	}
+
+	return count, cis, nil
+}
+
+// getStaleCIs returns counts of CIs stale by 30, 60, and 90 days
+func (r *Repository) getStaleCIs(ctx context.Context) (stale30, stale60, stale90 int, err error) {
+	// Stale 30+ days
+	query30 := `
+		SELECT COUNT(*) FROM configuration_items
+		WHERE updated_at < NOW() - INTERVAL '30 days'
+	`
+	err = r.db.QueryRow(ctx, query30).Scan(&stale30)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, 0, 0, fmt.Errorf("failed to get stale 30 CIs: %w", err)
+	}
+
+	// Stale 60+ days
+	query60 := `
+		SELECT COUNT(*) FROM configuration_items
+		WHERE updated_at < NOW() - INTERVAL '60 days'
+	`
+	err = r.db.QueryRow(ctx, query60).Scan(&stale60)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return stale30, 0, 0, fmt.Errorf("failed to get stale 60 CIs: %w", err)
+	}
+
+	// Stale 90+ days
+	query90 := `
+		SELECT COUNT(*) FROM configuration_items
+		WHERE updated_at < NOW() - INTERVAL '90 days'
+	`
+	err = r.db.QueryRow(ctx, query90).Scan(&stale90)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return stale30, stale60, 0, fmt.Errorf("failed to get stale 90 CIs: %w", err)
+	}
+
+	return stale30, stale60, stale90, nil
+}
+
+// getDuplicateCIs returns count of duplicate CIs (by name and type)
+func (r *Repository) getDuplicateCIs(ctx context.Context) (int, error) {
+	query := `
+		SELECT COUNT(*) FROM (
+			SELECT name, ci_type, COUNT(*)
+			FROM configuration_items
+			GROUP BY name, ci_type
+			HAVING COUNT(*) > 1
+		) duplicates
+	`
+	var count int
+	err := r.db.QueryRow(ctx, query).Scan(&count)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, fmt.Errorf("failed to get duplicate CIs: %w", err)
+	}
+
+	return count, nil
+}
+
+// Helper function to calculate percentage
+func calculatePercentage(count, total int64) float64 {
+	if total == 0 {
+		return 0
+	}
+	return float64(count) / float64(total) * 100
+}
+
+// Asset Aging Metrics functions
+
+// GetAssetAgingMetrics retrieves comprehensive asset aging metrics
+func (r *Repository) GetAssetAgingMetrics(ctx context.Context, eolThresholdMonths int, limit int) (*AssetAgingMetrics, error) {
+	// Get all metrics concurrently
+	type result struct {
+		metrics     *AssetAgingMetrics
+		distribution AgeDistribution
+		eolAssets    []ApproachingEOLAsset
+		avgAge       float64
+		oldest       *OldestAsset
+		err          error
+	}
+	results := make(chan result, 1)
+
+	go func() {
+		var metrics AssetAgingMetrics
+
+		// Get age distribution
+		distribution, err := r.getAgeDistribution(ctx)
+		if err != nil {
+			results <- result{err: fmt.Errorf("failed to get age distribution: %w", err)}
+			return
+		}
+		metrics.Distribution = distribution
+
+		// Get approaching EOL assets
+		eolAssets, err := r.getApproachingEOLAssets(ctx, eolThresholdMonths, limit)
+		if err != nil {
+			results <- result{err: fmt.Errorf("failed to get approaching EOL assets: %w", err)}
+			return
+		}
+		metrics.ApproachingEOL = eolAssets
+
+		// Get average age
+		avgAge, err := r.getAverageAge(ctx)
+		if err != nil {
+			results <- result{err: fmt.Errorf("failed to get average age: %w", err)}
+			return
+		}
+		metrics.AverageAgeMonths = avgAge
+
+		// Get oldest asset
+		oldest, err := r.getOldestAsset(ctx)
+		if err != nil {
+			// Don't fail on oldest asset error, just log it
+			r.logger.Error().Err(err).Str("component", "asset_aging").Msg("Failed to get oldest asset")
+		} else {
+			metrics.OldestAsset = oldest
+		}
+
+		results <- result{metrics: &metrics}
+	}()
+
+	select {
+	case res := <-results:
+		if res.err != nil {
+			return nil, res.err
+		}
+		return res.metrics, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// getAgeDistribution calculates the distribution of assets by age
+func (r *Repository) getAgeDistribution(ctx context.Context) (AgeDistribution, error) {
+	query := `
+		SELECT
+			COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 year') AS less_than_1_year,
+			COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '3 years' AND created_at < NOW() - INTERVAL '1 year') AS one_to_3_years,
+			COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '5 years' AND created_at < NOW() - INTERVAL '3 years') AS three_to_5_years,
+			COUNT(*) FILTER (WHERE created_at < NOW() - INTERVAL '5 years') AS more_than_5_years
+		FROM configuration_items
+	`
+
+	var distribution AgeDistribution
+	err := r.db.QueryRow(ctx, query).Scan(
+		&distribution.LessThan1Year,
+		&distribution.OneTo3Years,
+		&distribution.ThreeTo5Years,
+		&distribution.MoreThan5Years,
+	)
+
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return AgeDistribution{}, fmt.Errorf("failed to get age distribution: %w", err)
+	}
+
+	return distribution, nil
+}
+
+// getApproachingEOLAssets finds assets approaching end-of-life within threshold
+func (r *Repository) getApproachingEOLAssets(ctx context.Context, thresholdMonths int, limit int) ([]ApproachingEOLAsset, error) {
+	// Default to 6 months if not specified
+	if thresholdMonths <= 0 {
+		thresholdMonths = 6
+	}
+
+	query := `
+		SELECT
+			ci.id,
+			ci.name,
+			ci.ci_type,
+			ci.created_at + (ci.useful_life_months * INTERVAL '1 month') AS eol_date,
+			EXTRACT(DAY FROM (ci.created_at + (ci.useful_life_months * INTERVAL '1 month') - NOW())) AS days_until_eol
+		FROM configuration_items ci
+		WHERE ci.useful_life_months IS NOT NULL
+			AND ci.created_at + (ci.useful_life_months * INTERVAL '1 month') < NOW() + INTERVAL '1 month' * $1
+			AND ci.created_at + (ci.useful_life_months * INTERVAL '1 month') > NOW()
+		ORDER BY days_until_eol ASC
+	`
+
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := r.db.Query(ctx, query, thresholdMonths)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return nil, fmt.Errorf("failed to get approaching EOL assets: %w", err)
+	}
+	defer rows.Close()
+
+	var assets []ApproachingEOLAsset
+	for rows.Next() {
+		var asset ApproachingEOLAsset
+		var eolDate time.Time
+
+		err := rows.Scan(
+			&asset.CI.ID,
+			&asset.CI.Name,
+			&asset.Type,
+			&eolDate,
+			&asset.DaysUntilEOL,
+		)
+		if err != nil {
+			r.logger.ErrorDatabase("SCAN", "configuration_items", err, nil)
+			return nil, fmt.Errorf("failed to scan EOL asset: %w", err)
+		}
+
+		asset.EOLDate = eolDate
+		assets = append(assets, asset)
+	}
+
+	return assets, nil
+}
+
+// getAverageAge calculates the average age of all assets in months
+func (r *Repository) getAverageAge(ctx context.Context) (float64, error) {
+	query := `
+		SELECT AVG(EXTRACT(EPOCH FROM (NOW() - created_at)) / (30 * 86400)) AS avg_age_months
+		FROM configuration_items
+		WHERE created_at IS NOT NULL
+	`
+
+	var avgAge float64
+	err := r.db.QueryRow(ctx, query).Scan(&avgAge)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, fmt.Errorf("failed to get average age: %w", err)
+	}
+
+	return avgAge, nil
+}
+
+// getOldestAsset finds the oldest asset in the CMDB
+func (r *Repository) getOldestAsset(ctx context.Context) (*OldestAsset, error) {
+	query := `
+		SELECT
+			id,
+			name,
+			created_at,
+			FLOOR(EXTRACT(EPOCH FROM (NOW() - created_at)) / (30 * 86400)) AS age_months
+		FROM configuration_items
+		WHERE created_at IS NOT NULL
+		ORDER BY created_at ASC
+		LIMIT 1
+	`
+
+	var oldest OldestAsset
+	err := r.db.QueryRow(ctx, query).Scan(
+		&oldest.ID,
+		&oldest.Name,
+		&oldest.CreatedAt,
+		&oldest.AgeMonths,
+	)
+
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, nil // No assets yet
+		}
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return nil, fmt.Errorf("failed to get oldest asset: %w", err)
+	}
+
+	return &oldest, nil
+}
+
+// GetRiskMetrics retrieves risk assessment metrics for the dashboard
+func (r *Repository) GetRiskMetrics(ctx context.Context, limit int) (*RiskMetrics, error) {
+	// Get high-risk CIs (this will also calculate the overall risk metrics)
+	highRiskCIs, err := r.getHighRiskCIs(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculate metrics from high-risk CIs
+	metrics := &RiskMetrics{
+		HighRiskCIs:         highRiskCIs,
+		NoRedundancyCount:   0,
+		CriticalAssetsCount: 0,
+		SPOFCount:           0,
+		RiskScore:           0,
+		ComplianceViolations: 0,
+	}
+
+	// Count by category
+	for _, ci := range highRiskCIs {
+		if ci.IsCritical {
+			metrics.CriticalAssetsCount++
+		}
+		if !ci.HasRedundancy && ci.IsAmortizable {
+			metrics.NoRedundancyCount++
+		}
+		if !ci.HasRedundancy && ci.IsAmortizable && ci.AgeMonths > 36 {
+			metrics.SPOFCount++
+		}
+	}
+
+	// Calculate overall risk score based on percentages
+	totalCIs := 0
+	if len(highRiskCIs) > 0 {
+		// Get total count of amortizable CIs for percentage calculation
+		var totalAmortizable int
+		countQuery := `SELECT COUNT(*) FROM configuration_items WHERE is_amortizable = true`
+		_ = r.db.QueryRow(ctx, countQuery).Scan(&totalAmortizable)
+		totalCIs = totalAmortizable
+
+		if totalCIs > 0 {
+			spofRisk := (float64(metrics.SPOFCount) / float64(totalCIs)) * 40
+			criticalRisk := (float64(metrics.CriticalAssetsCount) / float64(totalCIs)) * 30
+			noRedundancyRisk := (float64(metrics.NoRedundancyCount) / float64(totalCIs)) * 30
+			metrics.RiskScore = int(spofRisk + criticalRisk + noRedundancyRisk)
+			if metrics.RiskScore > 100 {
+				metrics.RiskScore = 100
+			}
+		}
+	}
+
+	return metrics, nil
+}
+
+// getNoRedundancyCount returns count of assets without redundancy tags
+func (r *Repository) getNoRedundancyCount(ctx context.Context) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM configuration_items ci
+		WHERE ci.is_amortizable = true
+		AND NOT EXISTS (
+			SELECT 1
+			FROM unnest(ci.tags) tag
+			WHERE tag IN ('backup', 'redundancy', 'ha', 'failover', 'cluster')
+		)
+	`
+
+	var count int
+	err := r.db.QueryRow(ctx, query).Scan(&count)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return 0, fmt.Errorf("failed to get no redundancy count: %w", err)
+	}
+
+	return count, nil
+}
+
+// getHighRiskCIs retrieves high-risk CIs with detailed risk information
+func (r *Repository) getHighRiskCIs(ctx context.Context, limit int) ([]HighRiskCI, error) {
+	query := `
+		SELECT
+			ci.id,
+			ci.name,
+			ci.ci_type,
+			ctd.is_amortizable,
+			EXISTS (
+				SELECT 1
+				FROM unnest(ci.tags) tag
+				WHERE tag IN ('backup', 'redundancy', 'ha', 'failover', 'cluster')
+			) as has_redundancy,
+			EXISTS (
+				SELECT 1
+				FROM unnest(ci.tags)
+				LIMIT 1
+			) as has_tags,
+			FLOOR(EXTRACT(EPOCH FROM (NOW() - ci.created_at)) / (30 * 86400))::int as age_months,
+			-- Calculate risk score (0-100)
+			LEAST(100,
+				(CASE WHEN NOT ctd.is_amortizable THEN 10 ELSE 0 END) +
+				(CASE WHEN ctd.is_amortizable AND NOT EXISTS (
+					SELECT 1 FROM unnest(ci.tags) tag
+					WHERE tag IN ('backup', 'redundancy', 'ha', 'failover', 'cluster')
+				) THEN 30 ELSE 0 END) +
+				(CASE WHEN FLOOR(EXTRACT(EPOCH FROM (NOW() - ci.created_at)) / (30 * 86400)) > 60 THEN 20 ELSE 0 END) +
+				(CASE WHEN NOT EXISTS (SELECT 1 FROM unnest(ci.tags) LIMIT 1) THEN 20 ELSE 0 END) +
+				(CASE WHEN ci.lifecycle_status_id IS NULL THEN 20 ELSE 0 END)
+			)::int as risk_score
+		FROM configuration_items ci
+		INNER JOIN ci_type_definitions ctd ON ci.ci_type = ctd.name
+		WHERE ctd.is_amortizable = true
+		ORDER BY risk_score DESC
+		LIMIT $1
+	`
+
+	rows, err := r.db.Query(ctx, query, limit)
+	if err != nil {
+		r.logger.ErrorDatabase("SELECT", "configuration_items", err, nil)
+		return nil, fmt.Errorf("failed to get high-risk CIs: %w", err)
+	}
+	defer rows.Close()
+
+	var highRiskCIs []HighRiskCI
+	for rows.Next() {
+		var ci HighRiskCI
+		err := rows.Scan(
+			&ci.ID,
+			&ci.Name,
+			&ci.CIType,
+			&ci.IsAmortizable,
+			&ci.HasRedundancy,
+			&ci.HasTags,
+			&ci.AgeMonths,
+			&ci.RiskScore,
+		)
+		if err != nil {
+			r.logger.ErrorDatabase("SCAN", "configuration_items", err, nil)
+			return nil, fmt.Errorf("failed to scan high-risk CI: %w", err)
+		}
+
+		// Mark as critical if no redundancy and amortizable
+		ci.IsCritical = ci.IsAmortizable && !ci.HasRedundancy
+
+		highRiskCIs = append(highRiskCIs, ci)
+	}
+
+	return highRiskCIs, nil
+}
+
