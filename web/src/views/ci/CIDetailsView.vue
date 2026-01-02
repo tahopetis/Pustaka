@@ -23,7 +23,12 @@
           <h1 class="text-3xl font-bold text-gray-900 mt-2">{{ ci?.name }}</h1>
           <p class="mt-2 text-gray-600">{{ ci?.ci_type }} Configuration Item</p>
         </div>
-        <div class="flex space-x-3">
+        <div class="flex space-x-3 items-center">
+          <QRCodeButton
+            v-if="ci"
+            :ci-id="ci.id"
+            :ci-name="ci.name"
+          />
           <router-link
             v-if="hasPermission('ci:update')"
             :to="`/ci/${$route.params.id}/edit`"
@@ -296,6 +301,7 @@ import { ciAPI, relationshipAPI, ciTypeAPI } from '@/services/api'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import FlexibleAttributeDisplay from '@/components/ci/FlexibleAttributeDisplay.vue'
 import AmortizationTimeline from '@/components/amortization/AmortizationTimeline.vue'
+import QRCodeButton from '@/components/qr/QRCodeButton.vue'
 import { useAmortizationStore } from '@/stores/amortization'
 import type { CI, Relationship, CIType } from '@/types/ci'
 import type { AssetFinancials } from '@/types/amortization'

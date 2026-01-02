@@ -186,3 +186,6 @@ before-*.png
 after-*.png
 final-*.png
 verification-*.png
+
+# Auto Claude data directory
+.auto-claude/

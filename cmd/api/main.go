@@ -234,8 +234,17 @@ func main() {
 	auditHandlers := api.NewAuditHandlers(baseHandler, auditService)
 	amortizationHandlers := handlers.NewAmortizationHandler(amortizationService, logger)
 
+	// Get base URL for QR codes (from server config or default)
+	baseURL := cfg.Server.BaseURL
+	if baseURL == "" {
+		baseURL = "http://" + cfg.Server.Host + fmt.Sprintf(":%d", cfg.Server.Port)
+	}
+
+	// Initialize QR handlers
+	qrHandlers := api.NewQRHandlers(baseHandler, ciService, logger, baseURL)
+
 	// Setup router
-	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, amortizationHandlers, jwtService, rbacService)
+	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, amortizationHandlers, qrHandlers, jwtService, rbacService)
 
 	// Start amortization scheduler in background
 	go func() {
@@ -300,6 +309,7 @@ func setupRouter(
 	lifecycleStatusHandlers *handlers.LifecycleStatusHandler,
 	auditHandlers *api.AuditHandlers,
 	amortizationHandlers *handlers.AmortizationHandler,
+	qrHandlers *api.QRHandlers,
 	jwtService *auth.JWTService,
 	rbacService *auth.RBACService,
 ) *chi.Mux {
@@ -534,6 +544,13 @@ func setupRouter(
 				r.Get("/explore", ciHandlers.ExploreGraph)
 			})
 
+			// QR Code routes
+			r.Route("/qr", func(r chi.Router) {
+				r.Use(middleware.RBAC("ci:read"))
+				r.Get("/ci/{id}", qrHandlers.GetCIQRCode)
+				r.Get("/ci/{id}/image", qrHandlers.GetCIQRCodeImage)
+			})
+
 			// CI relationship routes
 			r.Route("/ci/{id}/relationships", func(r chi.Router) {
 				r.Use(middleware.RBAC("relationship:read"))
@@ -575,6 +592,11 @@ func setupRouter(
 				r.Get("/stats", ciHandlers.GetDashboardStats)
 			})
 		})
+	})
+
+	// Public routes (no authentication required)
+	r.Route("/public", func(r chi.Router) {
+		r.Get("/ci/{id}", qrHandlers.GetPublicCI)
 	})
 
 	return r

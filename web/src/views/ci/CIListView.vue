@@ -71,6 +71,7 @@
                   <th class="table-header-cell">Tags</th>
                   <th class="table-header-cell">Created</th>
                   <th class="table-header-cell">Updated</th>
+                  <th class="table-header-cell">QR Code</th>
                   <th class="table-header-cell">Actions</th>
                 </tr>
               </thead>
@@ -116,6 +117,12 @@
                   </td>
                   <td class="table-cell">
                     {{ formatDate(ci.updated_at) }}
+                  </td>
+                  <td class="table-cell">
+                    <QRCodeButton
+                      :ci-id="ci.id"
+                      :ci-name="ci.name"
+                    />
                   </td>
                   <td class="table-cell">
                     <div class="flex space-x-2">
@@ -193,6 +200,7 @@ import { useAuthStore } from '@/stores/auth'
 import { ciAPI, ciTypeAPI } from '@/services/api'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import AdvancedSearch from '@/components/ci/AdvancedSearch.vue'
+import QRCodeButton from '@/components/qr/QRCodeButton.vue'
 import type { CI, CIType, CIListResponse } from '@/types/ci'
 
 const authStore = useAuthStore()
