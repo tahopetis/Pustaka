@@ -88,6 +88,158 @@ func (h *RelationshipHandlers) CreateRelationship(w http.ResponseWriter, r *http
 	h.writeJSON(w, http.StatusCreated, relationship)
 }
 
+// CreateRelationshipsFromSources godoc
+// @Summary Create multiple relationships from multiple sources to a single target
+// @Description Create multiple relationships from multiple source CIs to one target CI atomically
+// @Tags relationships
+// @Accept json
+// @Produce json
+// @Param request body ci.BulkCreateRelationshipsFromSourcesRequest true "Bulk relationship creation from sources"
+// @Success 201 {object} ci.BulkCreateRelationshipResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationships/bulk-sources [post]
+func (h *RelationshipHandlers) CreateRelationshipsFromSources(w http.ResponseWriter, r *http.Request) {
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
+	var req ci.BulkCreateRelationshipsFromSourcesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate request
+	if len(req.SourceIDs) == 0 {
+		h.writeError(w, http.StatusBadRequest, "At least one source CI ID is required")
+		return
+	}
+	if len(req.SourceIDs) > 50 {
+		h.writeError(w, http.StatusBadRequest, "Maximum 50 source CIs allowed per bulk operation")
+		return
+	}
+	if req.TargetID == uuid.Nil {
+		h.writeError(w, http.StatusBadRequest, "Target CI ID is required")
+		return
+	}
+	if req.RelationshipType == "" {
+		h.writeError(w, http.StatusBadRequest, "Relationship type is required")
+		return
+	}
+
+	// Check for duplicate source IDs
+	sourceSet := make(map[uuid.UUID]bool)
+	for _, sourceID := range req.SourceIDs {
+		if sourceSet[sourceID] {
+			h.writeError(w, http.StatusBadRequest, "Duplicate source CI IDs are not allowed")
+			return
+		}
+		sourceSet[sourceID] = true
+	}
+
+	response, err := h.ciService.CreateRelationshipsFromSources(r.Context(), &req, userID)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.writeJSON(w, http.StatusCreated, response)
+}
+
+// CreateRelationshipsMatrix godoc
+// @Summary Create multiple relationships from multiple sources to multiple targets
+// @Description Create multiple relationships from multiple source CIs to multiple target CIs (cartesian product)
+// @Tags relationships
+// @Accept json
+// @Produce json
+// @Param request body ci.BulkCreateRelationshipsMatrixRequest true "Bulk relationship creation matrix"
+// @Success 201 {object} ci.BulkCreateRelationshipResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/relationships/bulk-matrix [post]
+func (h *RelationshipHandlers) CreateRelationshipsMatrix(w http.ResponseWriter, r *http.Request) {
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
+	var req ci.BulkCreateRelationshipsMatrixRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate request
+	if len(req.SourceIDs) == 0 {
+		h.writeError(w, http.StatusBadRequest, "At least one source CI ID is required")
+		return
+	}
+	if len(req.SourceIDs) > 50 {
+		h.writeError(w, http.StatusBadRequest, "Maximum 50 source CIs allowed per bulk operation")
+		return
+	}
+	if len(req.TargetIDs) == 0 {
+		h.writeError(w, http.StatusBadRequest, "At least one target CI ID is required")
+		return
+	}
+	if len(req.TargetIDs) > 50 {
+		h.writeError(w, http.StatusBadRequest, "Maximum 50 target CIs allowed per bulk operation")
+		return
+	}
+	if req.RelationshipType == "" {
+		h.writeError(w, http.StatusBadRequest, "Relationship type is required")
+		return
+	}
+
+	// Check for duplicate source IDs
+	sourceSet := make(map[uuid.UUID]bool)
+	for _, sourceID := range req.SourceIDs {
+		if sourceSet[sourceID] {
+			h.writeError(w, http.StatusBadRequest, "Duplicate source CI IDs are not allowed")
+			return
+		}
+		sourceSet[sourceID] = true
+	}
+
+	// Check for duplicate target IDs
+	targetSet := make(map[uuid.UUID]bool)
+	for _, targetID := range req.TargetIDs {
+		if targetSet[targetID] {
+			h.writeError(w, http.StatusBadRequest, "Duplicate target CI IDs are not allowed")
+			return
+		}
+		targetSet[targetID] = true
+	}
+
+	response, err := h.ciService.CreateRelationshipsMatrix(r.Context(), &req, userID)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.writeJSON(w, http.StatusCreated, response)
+}
+
 // GetRelationship godoc
 // @Summary Get a relationship
 // @Description Get a relationship by ID

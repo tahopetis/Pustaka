@@ -195,6 +195,20 @@ export const relationshipAPI = {
     attributes?: Record<string, any>
   }) => api.post('/relationships', data),
 
+  createBulkFromSources: (data: {
+    source_ids: string[]
+    target_id: string
+    relationship_type: string
+    attributes?: Record<string, any>
+  }) => api.post('/relationships/bulk-sources', data),
+
+  createBulkMatrix: (data: {
+    source_ids: string[]
+    target_ids: string[]
+    relationship_type: string
+    attributes?: Record<string, any>
+  }) => api.post('/relationships/bulk-matrix', data),
+
   update: (id: string, data: {
     attributes?: Record<string, any>
   }) => api.put(`/relationships/${id}`, data),

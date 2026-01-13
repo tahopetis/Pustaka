@@ -103,6 +103,31 @@ type UpdateRelationshipRequest struct {
 	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
 
+// BulkCreateRelationshipsFromSourcesRequest represents a request to create multiple relationships
+// from multiple sources to one or more targets with the same relationship type
+type BulkCreateRelationshipsFromSourcesRequest struct {
+	SourceIDs        []uuid.UUID            `json:"source_ids" validate:"required,min=1,max=50"`
+	TargetID         uuid.UUID              `json:"target_id" validate:"required"`
+	RelationshipType string                 `json:"relationship_type" validate:"required"`
+	Attributes       map[string]interface{} `json:"attributes,omitempty"`
+}
+
+// BulkCreateRelationshipsMatrixRequest represents a request to create multiple relationships
+// from multiple sources to multiple targets with the same relationship type (cartesian product)
+type BulkCreateRelationshipsMatrixRequest struct {
+	SourceIDs        []uuid.UUID            `json:"source_ids" validate:"required,min=1,max=50"`
+	TargetIDs        []uuid.UUID            `json:"target_ids" validate:"required,min=1,max=50"`
+	RelationshipType string                 `json:"relationship_type" validate:"required"`
+	Attributes       map[string]interface{} `json:"attributes,omitempty"`
+}
+
+// BulkCreateRelationshipResponse represents the result of a bulk relationship creation
+type BulkCreateRelationshipResponse struct {
+	Created        []Relationship `json:"created"`
+	TotalCreated   int            `json:"total_created"`
+	TotalRequested int            `json:"total_requested"`
+}
+
 type CIListResponse struct {
 	CIs        []ConfigurationItem `json:"cis"`
 	Page       int                 `json:"page"`

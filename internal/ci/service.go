@@ -402,6 +402,124 @@ func (s *Service) CreateRelationship(ctx context.Context, req *CreateRelationshi
 	return result, nil
 }
 
+// CreateRelationshipsFromSources creates multiple relationships from multiple sources to a single target
+func (s *Service) CreateRelationshipsFromSources(ctx context.Context, req *BulkCreateRelationshipsFromSourcesRequest, userID uuid.UUID) (*BulkCreateRelationshipResponse, error) {
+	// Validate target CI exists
+	_, err := s.repo.GetCI(ctx, req.TargetID)
+	if err != nil {
+		return nil, fmt.Errorf("target CI not found")
+	}
+
+	// Validate all source CIs exist and are different from target
+	for _, sourceID := range req.SourceIDs {
+		if sourceID == req.TargetID {
+			return nil, fmt.Errorf("cannot create self-referencing relationship for source %s", sourceID)
+		}
+
+		_, err := s.repo.GetCI(ctx, sourceID)
+		if err != nil {
+			return nil, fmt.Errorf("source CI %s not found", sourceID)
+		}
+	}
+
+	// Create relationships
+	relationships := make([]Relationship, 0, len(req.SourceIDs))
+	for _, sourceID := range req.SourceIDs {
+		createReq := &CreateRelationshipRequest{
+			SourceID:        sourceID,
+			TargetID:        req.TargetID,
+			RelationshipType: req.RelationshipType,
+			Attributes:      req.Attributes,
+		}
+
+		rel, err := s.CreateRelationship(ctx, createReq, userID)
+		if err != nil {
+			// Skip duplicate errors in bulk operations
+			if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "23505") {
+				continue
+			}
+			return nil, fmt.Errorf("failed to create relationship for source %s: %w", sourceID, err)
+		}
+		relationships = append(relationships, *rel)
+	}
+
+	s.logger.InfoService("relationship", "create_relationships_from_sources", map[string]interface{}{
+		"target_id":     req.TargetID,
+		"total_created": len(relationships),
+		"user_id":       userID,
+	})
+
+	return &BulkCreateRelationshipResponse{
+		Created:        relationships,
+		TotalCreated:   len(relationships),
+		TotalRequested: len(req.SourceIDs),
+	}, nil
+}
+
+// CreateRelationshipsMatrix creates multiple relationships from multiple sources to multiple targets (cartesian product)
+func (s *Service) CreateRelationshipsMatrix(ctx context.Context, req *BulkCreateRelationshipsMatrixRequest, userID uuid.UUID) (*BulkCreateRelationshipResponse, error) {
+	// Validate all source CIs exist
+	for _, sourceID := range req.SourceIDs {
+		_, err := s.repo.GetCI(ctx, sourceID)
+		if err != nil {
+			return nil, fmt.Errorf("source CI %s not found", sourceID)
+		}
+	}
+
+	// Validate all target CIs exist
+	for _, targetID := range req.TargetIDs {
+		_, err := s.repo.GetCI(ctx, targetID)
+		if err != nil {
+			return nil, fmt.Errorf("target CI %s not found", targetID)
+		}
+	}
+
+	// Calculate total requested relationships
+	totalRequested := len(req.SourceIDs) * len(req.TargetIDs)
+	if totalRequested > 2500 { // 50 * 50
+		return nil, fmt.Errorf("too many relationships requested (max 2500)")
+	}
+
+	// Create relationships
+	relationships := make([]Relationship, 0, totalRequested)
+	for _, sourceID := range req.SourceIDs {
+		for _, targetID := range req.TargetIDs {
+			// Skip self-referencing relationships
+			if sourceID == targetID {
+				continue
+			}
+
+			createReq := &CreateRelationshipRequest{
+				SourceID:        sourceID,
+				TargetID:        targetID,
+				RelationshipType: req.RelationshipType,
+				Attributes:      req.Attributes,
+			}
+
+			rel, err := s.CreateRelationship(ctx, createReq, userID)
+			if err != nil {
+				// Skip duplicate errors in bulk operations
+				if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "23505") {
+					continue
+				}
+				return nil, fmt.Errorf("failed to create relationship for source %s to target %s: %w", sourceID, targetID, err)
+			}
+			relationships = append(relationships, *rel)
+		}
+	}
+
+	s.logger.InfoService("relationship", "create_relationships_matrix", map[string]interface{}{
+		"total_created": len(relationships),
+		"user_id":       userID,
+	})
+
+	return &BulkCreateRelationshipResponse{
+		Created:        relationships,
+		TotalCreated:   len(relationships),
+		TotalRequested: totalRequested,
+	}, nil
+}
+
 func (s *Service) GetRelationship(ctx context.Context, id uuid.UUID) (*Relationship, error) {
 	return s.repo.GetRelationship(ctx, id)
 }

@@ -45,7 +45,7 @@
     </div>
 
     <!-- Form -->
-    <div v-else class="max-w-2xl mx-auto">
+    <div v-else class="max-w-3xl mx-auto">
       <!-- Relationship Info Display (Edit Mode) -->
       <div v-if="isEditing && existingRelationship" class="card mb-6">
         <div class="card-header">
@@ -129,46 +129,114 @@
           <form @submit.prevent="handleSubmit" class="space-y-6">
             <!-- Create Mode Fields -->
             <div v-if="!isEditing">
-              <!-- Source CI -->
-              <div>
-                <label class="form-label">Source Configuration Item</label>
-                <select
-                  v-model="form.source_id"
-                  class="form-input"
-                  required
-                  :disabled="!!sourceId"
-                >
-                  <option value="">Select a source CI</option>
-                  <option
-                    v-for="ci in configurationItems"
-                    :key="ci.id"
-                    :value="ci.id"
-                  >
-                    {{ ci.name }} ({{ ci.ci_type }})
-                  </option>
-                </select>
-                <p class="form-help">The configuration item that is the source of this relationship</p>
+              <!-- Bulk Mode Selection -->
+              <div class="bg-blue-50 rounded-lg p-4 mb-6">
+                <label class="form-label mb-2 block">Bulk Creation Mode</label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <label class="flex items-center p-3 bg-white rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors"
+                         :class="bulkMode === 'none' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'">
+                    <input
+                      v-model="bulkMode"
+                      type="radio"
+                      value="none"
+                      class="mr-3"
+                    />
+                    <div>
+                      <div class="font-medium text-gray-900">Single Relationship</div>
+                      <div class="text-sm text-gray-500">One source → One target</div>
+                    </div>
+                  </label>
+
+                  <label class="flex items-center p-3 bg-white rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors"
+                         :class="bulkMode === 'targets' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'">
+                    <input
+                      v-model="bulkMode"
+                      type="radio"
+                      value="targets"
+                      class="mr-3"
+                    />
+                    <div>
+                      <div class="font-medium text-gray-900">Multiple Targets</div>
+                      <div class="text-sm text-gray-500">One source → Multiple targets</div>
+                    </div>
+                  </label>
+
+                  <label class="flex items-center p-3 bg-white rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors"
+                         :class="bulkMode === 'sources' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'">
+                    <input
+                      v-model="bulkMode"
+                      type="radio"
+                      value="sources"
+                      class="mr-3"
+                    />
+                    <div>
+                      <div class="font-medium text-gray-900">Multiple Sources</div>
+                      <div class="text-sm text-gray-500">Multiple sources → One target</div>
+                    </div>
+                  </label>
+                </div>
+
+                <!-- Matrix Mode Option -->
+                <div class="mt-3 pt-3 border-t border-blue-200">
+                  <label class="flex items-center cursor-pointer">
+                    <input
+                      v-model="matrixMode"
+                      type="checkbox"
+                      :disabled="bulkMode === 'none'"
+                      class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 mr-2"
+                    />
+                    <span class="text-sm text-gray-700">Matrix mode: Create all combinations (multiple sources × multiple targets)</span>
+                  </label>
+                </div>
               </div>
 
-              <!-- Target CI -->
+              <!-- Source CI(s) -->
               <div>
-                <label class="form-label">Target Configuration Item</label>
-                <select
+                <label class="form-label">{{ bulkMode === 'sources' || matrixMode ? 'Source Configuration Items (Multiple)' : 'Source Configuration Item' }}</label>
+                <SearchableCISelect
+                  v-if="bulkMode === 'sources' || matrixMode"
+                  v-model="form.source_ids"
+                  :multiple="true"
+                  placeholder="Search and select source CIs..."
+                  :help-text="matrixMode ? 'Select multiple source CIs for matrix creation' : 'Select multiple configuration items as sources'"
+                  :exclude-ids="getExcludeIdsForSources()"
+                  :max-results="5"
+                  @change="handleSourcesChange"
+                />
+                <SearchableCISelect
+                  v-else
+                  v-model="form.source_id"
+                  placeholder="Search for source CI..."
+                  help-text="The configuration item that is the source of this relationship"
+                  :disabled="!!sourceId"
+                  :exclude-ids="[]"
+                  :max-results="5"
+                  @change="handleSourceChange"
+                />
+              </div>
+
+              <!-- Target CI(s) -->
+              <div>
+                <label class="form-label">{{ bulkMode === 'targets' || matrixMode ? 'Target Configuration Items (Multiple)' : 'Target Configuration Item' }}</label>
+                <SearchableCISelect
+                  v-if="bulkMode === 'targets' || matrixMode"
+                  v-model="form.target_ids"
+                  :multiple="true"
+                  placeholder="Search and select target CIs..."
+                  :help-text="matrixMode ? 'Select multiple target CIs for matrix creation' : 'Select multiple configuration items as targets'"
+                  :exclude-ids="getExcludeIdsForTargets()"
+                  :max-results="5"
+                  @change="handleTargetsChange"
+                />
+                <SearchableCISelect
+                  v-else
                   v-model="form.target_id"
-                  class="form-input"
-                  required
-                >
-                  <option value="">Select a target CI</option>
-                  <option
-                    v-for="ci in configurationItems"
-                    :key="ci.id"
-                    :value="ci.id"
-                    :disabled="ci.id === form.source_id"
-                  >
-                    {{ ci.name }} ({{ ci.ci_type }})
-                  </option>
-                </select>
-                <p class="form-help">The configuration item that is the target of this relationship</p>
+                  placeholder="Search for target CI..."
+                  help-text="The configuration item that is the target of this relationship"
+                  :exclude-ids="form.source_id ? [form.source_id] : []"
+                  :max-results="5"
+                  @change="handleTargetChange"
+                />
               </div>
 
               <!-- Relationship Type -->
@@ -219,14 +287,24 @@
             </div>
 
             <!-- Form Actions -->
-            <div class="flex space-x-3 pt-4 border-t border-gray-200">
+            <div class="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
+              <button
+                v-if="!isEditing"
+                type="button"
+                :disabled="submitting"
+                class="btn btn-outline"
+                @click="handleSubmitAndAddMore"
+              >
+                <span v-if="submitting" class="spinner w-4 h-4 mr-2"></span>
+                {{ submitting ? 'Creating...' : 'Create Relationship & Add More' }}
+              </button>
               <button
                 type="submit"
                 :disabled="submitting"
                 class="btn btn-primary"
               >
                 <span v-if="submitting" class="spinner w-4 h-4 mr-2"></span>
-                {{ submitting ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Relationship' : 'Create Relationship') }}
+                {{ submitButtonText }}
               </button>
               <router-link
                 to="/relationships"
@@ -250,6 +328,7 @@ import { useRelationshipTypeStore } from '@/stores/relationshipTypes'
 import { useNotificationStore } from '@/stores/notification'
 import { ciAPI, relationshipAPI } from '@/services/api'
 import RelationshipTypeSelect from '@/components/relationship/RelationshipTypeSelect.vue'
+import SearchableCISelect from '@/components/ci/SearchableCISelect.vue'
 
 interface Relationship {
   id: string
@@ -276,10 +355,11 @@ const notificationStore = useNotificationStore()
 const loading = ref(false)
 const submitting = ref(false)
 const error = ref('')
-const configurationItems = ref<CI[]>([])
 const existingRelationship = ref<Relationship | null>(null)
 const sourceCI = ref<CI | null>(null)
 const targetCI = ref<CI | null>(null)
+const bulkMode = ref<'none' | 'targets' | 'sources'>('none')
+const matrixMode = ref(false)
 
 // Check if we're editing an existing relationship
 const isEditing = computed(() => !!route.params.id)
@@ -289,7 +369,9 @@ const sourceId = computed(() => route.query.source_id as string || '')
 
 const form = ref({
   source_id: '',
+  source_ids: [] as string[],
   target_id: '',
+  target_ids: [] as string[],
   relationship_type: ''
 })
 
@@ -305,6 +387,28 @@ const relationshipTypeDetails = computed(() => {
   return relationshipTypeStore.getRelationshipTypeByName(existingRelationship.value.relationship_type)
 })
 
+const submitButtonText = computed(() => {
+  if (submitting.value) {
+    return isEditing.value ? 'Updating...' : 'Creating...'
+  }
+  if (isEditing.value) {
+    return 'Update Relationship'
+  }
+
+  const count = matrixMode.value
+    ? form.value.source_ids.length * form.value.target_ids.length
+    : bulkMode.value === 'targets'
+      ? form.value.target_ids.length
+      : bulkMode.value === 'sources'
+        ? form.value.source_ids.length
+        : 1
+
+  if (count > 1) {
+    return `Create ${count} Relationship${count > 1 ? 's' : ''}`
+  }
+  return 'Create Relationship'
+})
+
 const formatRelationshipType = (type: string) => {
   return type.split('_').map(word =>
     word.charAt(0).toUpperCase() + word.slice(1)
@@ -312,21 +416,93 @@ const formatRelationshipType = (type: string) => {
 }
 
 const handleRelationshipTypeChange = (type: any) => {
-  // Optional: Handle relationship type change if needed
   console.log('Relationship type changed:', type)
 }
 
-const loadConfigurationItems = async () => {
-  loading.value = true
-  try {
-    const response = await ciAPI.list({ limit: 1000 })
-    configurationItems.value = response.data.cis || []
-  } catch (err) {
-    console.error('Failed to load configuration items:', err)
-    error.value = 'Failed to load configuration items'
-  } finally {
-    loading.value = false
+const handleSourceChange = (ci: CI | null) => {
+  // Clear target if source changes to prevent self-referencing
+  if (ci && form.value.target_id === ci.id) {
+    form.value.target_id = ''
   }
+}
+
+const handleSourcesChange = (cis: CI[] | null) => {
+  // Clear any targets that are in the source list
+  if (cis) {
+    const sourceIds = cis.map(c => c.id)
+    if (bulkMode.value === 'sources') {
+      if (form.value.target_id && sourceIds.includes(form.value.target_id)) {
+        form.value.target_id = ''
+      }
+    } else if (matrixMode.value) {
+      form.value.target_ids = form.value.target_ids.filter(id => !sourceIds.includes(id))
+    }
+  }
+}
+
+const handleTargetChange = (ci: CI | null) => {
+  // Clear source if target changes to prevent self-referencing
+  if (ci) {
+    if (form.value.source_id === ci.id) {
+      form.value.source_id = ''
+    }
+    if (form.value.source_ids.includes(ci.id)) {
+      form.value.source_ids = form.value.source_ids.filter(id => id !== ci.id)
+    }
+  }
+}
+
+const handleTargetsChange = (cis: CI[] | null) => {
+  // Clear any sources that are in the target list
+  if (cis) {
+    const targetIds = cis.map(c => c.id)
+    if (bulkMode.value === 'targets') {
+      if (form.value.source_id && targetIds.includes(form.value.source_id)) {
+        form.value.source_id = ''
+      }
+    } else if (matrixMode.value) {
+      form.value.source_ids = form.value.source_ids.filter(id => !targetIds.includes(id))
+    }
+  }
+}
+
+// Helper functions to get exclude IDs for the searchable selects
+const getExcludeIdsForSources = () => {
+  const excludes: string[] = []
+  if (bulkMode.value === 'targets') {
+    // Single source mode, exclude selected target
+    if (form.value.target_id) {
+      excludes.push(form.value.target_id)
+    }
+  } else if (matrixMode.value) {
+    // Matrix mode, exclude all selected targets
+    excludes.push(...form.value.target_ids)
+  }
+  return excludes
+}
+
+const getExcludeIdsForTargets = () => {
+  const excludes: string[] = []
+  if (bulkMode.value === 'sources') {
+    // Single target mode, exclude selected sources
+    if (form.value.source_id) {
+      excludes.push(form.value.source_id)
+    }
+  } else if (matrixMode.value) {
+    // Matrix mode, exclude all selected sources
+    excludes.push(...form.value.source_ids)
+  } else if (bulkMode.value === 'targets') {
+    // Multiple targets mode, exclude selected source
+    if (form.value.source_id) {
+      excludes.push(form.value.source_id)
+    }
+  } else {
+    // Single mode, exclude selected source
+    if (form.value.source_id) {
+      excludes.push(form.value.source_id)
+    }
+  }
+  return excludes
 }
 
 const loadRelationship = async () => {
@@ -338,10 +514,12 @@ const loadRelationship = async () => {
     const response = await relationshipAPI.get(relationshipId)
     existingRelationship.value = response.data
 
-    // Populate form with existing data (for create mode compatibility)
+    // Populate form with existing data
     form.value = {
       source_id: response.data.source_id,
+      source_ids: [],
       target_id: response.data.target_id,
+      target_ids: [],
       relationship_type: response.data.relationship_type
     }
 
@@ -391,7 +569,7 @@ const removeAttribute = (index: number) => {
   }
 }
 
-const handleSubmit = async () => {
+const handleSubmit = async (andAddMore = false) => {
   const permissionRequired = isEditing.value ? 'relationship:update' : 'relationship:create'
   if (!hasPermission(permissionRequired)) {
     notificationStore.showError(`You do not have permission to ${isEditing.value ? 'update' : 'create'} relationships`)
@@ -400,14 +578,61 @@ const handleSubmit = async () => {
 
   // Validate form
   if (!isEditing.value) {
-    if (!form.value.source_id || !form.value.target_id || !form.value.relationship_type) {
-      notificationStore.showError('Please fill in all required fields')
+    if (!form.value.relationship_type) {
+      notificationStore.showError('Please select a relationship type')
       return
     }
 
-    if (form.value.source_id === form.value.target_id) {
-      notificationStore.showError('Source and target configuration items must be different')
-      return
+    // Validate based on mode
+    if (matrixMode.value) {
+      if (form.value.source_ids.length === 0) {
+        notificationStore.showError('Please select at least one source CI')
+        return
+      }
+      if (form.value.target_ids.length === 0) {
+        notificationStore.showError('Please select at least one target CI')
+        return
+      }
+    } else if (bulkMode.value === 'targets') {
+      if (!form.value.source_id) {
+        notificationStore.showError('Please select a source CI')
+        return
+      }
+      if (form.value.target_ids.length === 0) {
+        notificationStore.showError('Please select at least one target CI')
+        return
+      }
+      if (form.value.target_ids.includes(form.value.source_id)) {
+        notificationStore.showError('Source and target configuration items must be different')
+        return
+      }
+    } else if (bulkMode.value === 'sources') {
+      if (form.value.source_ids.length === 0) {
+        notificationStore.showError('Please select at least one source CI')
+        return
+      }
+      if (!form.value.target_id) {
+        notificationStore.showError('Please select a target CI')
+        return
+      }
+      if (form.value.source_ids.includes(form.value.target_id)) {
+        notificationStore.showError('Source and target configuration items must be different')
+        return
+      }
+    } else {
+      // Single mode
+      if (!form.value.source_id) {
+        notificationStore.showError('Please select a source CI')
+        return
+      }
+      if (!form.value.target_id) {
+        notificationStore.showError('Please select a target CI')
+        return
+      }
+      if (form.value.source_id === form.value.target_id) {
+        notificationStore.showError('Source and target configuration items must be different')
+        return
+      }
     }
   }
 
@@ -427,8 +652,48 @@ const handleSubmit = async () => {
         attributes: Object.keys(attributes).length > 0 ? attributes : undefined
       })
       notificationStore.showSuccess('Relationship updated successfully')
+    } else if (matrixMode.value) {
+      // Matrix create mode: multiple sources × multiple targets
+      const matrixData = {
+        source_ids: form.value.source_ids,
+        target_ids: form.value.target_ids,
+        relationship_type: form.value.relationship_type,
+        attributes: Object.keys(attributes).length > 0 ? attributes : undefined
+      }
+
+      const response = await relationshipAPI.createBulkMatrix(matrixData)
+      notificationStore.showSuccess(
+        `Successfully created ${response.data.total_created} relationship(s)`
+      )
+    } else if (bulkMode.value === 'targets') {
+      // Bulk create mode: one source → multiple targets (use existing createBulk if available)
+      for (const targetId of form.value.target_ids) {
+        const relationshipData = {
+          source_id: form.value.source_id,
+          target_id: targetId,
+          relationship_type: form.value.relationship_type,
+          attributes: Object.keys(attributes).length > 0 ? attributes : undefined
+        }
+        await relationshipAPI.create(relationshipData)
+      }
+      notificationStore.showSuccess(
+        `Successfully created ${form.value.target_ids.length} relationship(s)`
+      )
+    } else if (bulkMode.value === 'sources') {
+      // Bulk sources mode: multiple sources → one target
+      const bulkSourcesData = {
+        source_ids: form.value.source_ids,
+        target_id: form.value.target_id,
+        relationship_type: form.value.relationship_type,
+        attributes: Object.keys(attributes).length > 0 ? attributes : undefined
+      }
+
+      const response = await relationshipAPI.createBulkFromSources(bulkSourcesData)
+      notificationStore.showSuccess(
+        `Successfully created ${response.data.total_created} relationship(s)`
+      )
     } else {
-      // In create mode, create new relationship
+      // Single create mode
       const relationshipData = {
         source_id: form.value.source_id,
         target_id: form.value.target_id,
@@ -440,7 +705,16 @@ const handleSubmit = async () => {
       notificationStore.showSuccess('Relationship created successfully')
     }
 
-    router.push('/relationships')
+    if (andAddMore) {
+      // Reset form for adding more relationships
+      form.value.source_id = ''
+      form.value.source_ids = []
+      form.value.target_id = ''
+      form.value.target_ids = []
+      attributesList.value = [{ key: '', value: '' }]
+    } else {
+      router.push('/relationships')
+    }
   } catch (err: any) {
     console.error(`Failed to ${isEditing.value ? 'update' : 'create'} relationship:`, err)
     const message = err.response?.data?.error || `Failed to ${isEditing.value ? 'update' : 'create'} relationship`
@@ -450,13 +724,17 @@ const handleSubmit = async () => {
   }
 }
 
+const handleSubmitAndAddMore = async () => {
+  await handleSubmit(true)
+}
+
 onMounted(async () => {
   // Load relationship types
   if (relationshipTypeStore.relationshipTypes.length === 0) {
     try {
       await relationshipTypeStore.loadRelationshipTypes()
-    } catch (error) {
-      console.error('Failed to load relationship types:', error)
+    } catch (err) {
+      console.error('Failed to load relationship types:', err)
     }
   }
 
@@ -466,8 +744,6 @@ onMounted(async () => {
     router.push('/relationships')
     return
   }
-
-  await loadConfigurationItems()
 
   if (isEditing.value) {
     await loadRelationship()

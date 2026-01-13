@@ -438,6 +438,8 @@ func setupRouter(
 				r.Group(func(r chi.Router) {
 					r.Use(middleware.RBAC("relationship:create"))
 					r.Post("/", relationshipHandlers.CreateRelationship)
+					r.Post("/bulk-sources", relationshipHandlers.CreateRelationshipsFromSources)
+					r.Post("/bulk-matrix", relationshipHandlers.CreateRelationshipsMatrix)
 				})
 
 				r.Group(func(r chi.Router) {
