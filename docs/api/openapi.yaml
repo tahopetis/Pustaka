@@ -1,0 +1,1734 @@
+openapi: 3.0.3
+info:
+  title: Pustaka CMDB API
+  description: |
+    Configuration Management Database (CMDB) API for managing IT infrastructure components.
+
+    Pustaka provides flexible schema definition for configuration items, comprehensive relationship
+    management, and advanced search capabilities with JSONB attribute support.
+
+    ## Key Features
+    - **Dynamic CI Types**: Define custom schemas with validation rules
+    - **Flexible Attributes**: JSONB attributes with type-safe validation
+    - **Relationship Management**: Track dependencies and impacts
+    - **Advanced Search**: Search within CI attributes with type-specific filters
+    - **Audit Logging**: Complete change tracking and compliance
+    - **Graph Visualization**: Interactive relationship graphs
+    - **Role-Based Access Control**: Fine-grained permissions
+
+    ## Authentication
+    The API uses JWT (JSON Web Token) authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+
+    ## Rate Limiting
+    API requests are limited to 1000 requests per hour per user.
+
+    ## Pagination
+    List endpoints support pagination with the following parameters:
+    - `page` (int): Page number (default: 1)
+    - `limit` (int): Items per page (default: 20, max: 100)
+
+    Response format:
+    ```json
+    {
+      "data": [...],
+      "page": 1,
+      "limit": 20,
+      "total": 150,
+      "total_pages": 8
+    }
+    ```
+  version: 1.0.0
+  contact:
+    name: Pustaka Team
+    email: support@pustaka.dev
+    url: https://pustaka.dev
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: https://api.pustaka.dev/v1
+    description: Production server
+  - url: https://staging-api.pustaka.dev/v1
+    description: Staging server
+  - url: http://localhost:8080/api/v1
+    description: Development server
+tags:
+  - name: authentication
+    description: Authentication and token management
+  - name: users
+    description: User management operations
+  - name: ci-types
+    description: CI type schema management
+  - name: configuration-items
+    description: Configuration item CRUD operations
+  - name: relationships
+    description: CI relationship management
+  - name: graph
+    description: Graph visualization and exploration
+  - name: audit
+    description: Audit logging and compliance
+  - name: analytics
+    description: Usage analytics and insights
+
+paths:
+  # Authentication endpoints
+  /auth/login:
+    post:
+      tags:
+        - authentication
+      summary: Authenticate user
+      description: Authenticate with email and password to receive JWT tokens
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email address
+                password:
+                  type: string
+                  format: password
+                  description: User password
+              example:
+                email: admin@pustaka.dev
+                password: securePassword123
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: JWT access token
+                  refresh_token:
+                    type: string
+                    description: JWT refresh token
+                  expires_in:
+                    type: integer
+                    description: Token expiration time in seconds
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/refresh:
+    post:
+      tags:
+        - authentication
+      summary: Refresh access token
+      description: Use refresh token to get a new access token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  description: Valid refresh token
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # User management endpoints
+  /users:
+    get:
+      tags:
+        - users
+      summary: List users
+      description: Retrieve a paginated list of users
+      operationId: listUsers
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  total_pages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - users
+      summary: Create user
+      description: Create a new user account
+      operationId: createUser
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /users/{id}:
+    get:
+      tags:
+        - users
+      summary: Get user
+      description: Retrieve user details by ID
+      operationId: getUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - users
+      summary: Update user
+      description: Update user information
+      operationId: updateUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - users
+      summary: Delete user
+      description: Delete a user account
+      operationId: deleteUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204':
+          description: User deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # Current user endpoint
+  /me:
+    get:
+      tags:
+        - users
+      summary: Get current user
+      description: Retrieve the current authenticated user's profile
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # CI Type management endpoints
+  /ci-types:
+    get:
+      tags:
+        - ci-types
+      summary: List CI types
+      description: Retrieve a paginated list of CI type schemas
+      operationId: listCITypes
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: CI types retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ci_types:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CIType'
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  total_pages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - ci-types
+      summary: Create CI type
+      description: Create a new CI type schema with attribute definitions
+      operationId: createCIType
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCITypeRequest'
+      responses:
+        '201':
+          description: CI type created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CIType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /ci-types/{id}:
+    get:
+      tags:
+        - ci-types
+      summary: Get CI type
+      description: Retrieve CI type schema by ID
+      operationId: getCIType
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CITypeId'
+      responses:
+        '200':
+          description: CI type retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CIType'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - ci-types
+      summary: Update CI type
+      description: Update CI type schema
+      operationId: updateCIType
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CITypeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCITypeRequest'
+      responses:
+        '200':
+          description: CI type updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CIType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - ci-types
+      summary: Delete CI type
+      description: Delete a CI type schema
+      operationId: deleteCIType
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CITypeId'
+      responses:
+        '204':
+          description: CI type deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot delete CI type with existing CIs
+
+  # Configuration Item endpoints
+  /ci:
+    get:
+      tags:
+        - configuration-items
+      summary: List configuration items
+      description: Retrieve a paginated list of configuration items with advanced filtering
+      operationId: listCIs
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/CIType'
+        - $ref: '#/components/parameters/Tags'
+        - $ref: '#/components/parameters/Attributes'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          description: Configuration items retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cis:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConfigurationItem'
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  total_pages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - configuration-items
+      summary: Create configuration item
+      description: Create a new configuration item with validation against CI type schema
+      operationId: createCI
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCIRequest'
+      responses:
+        '201':
+          description: Configuration item created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Validation failed for CI attributes
+
+  /ci/{id}:
+    get:
+      tags:
+        - configuration-items
+      summary: Get configuration item
+      description: Retrieve configuration item details by ID
+      operationId: getCI
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CIId'
+      responses:
+        '200':
+          description: Configuration item retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - configuration-items
+      summary: Update configuration item
+      description: Update configuration item attributes and metadata
+      operationId: updateCI
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CIId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCIRequest'
+      responses:
+        '200':
+          description: Configuration item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Validation failed for CI attributes
+
+    delete:
+      tags:
+        - configuration-items
+      summary: Delete configuration item
+      description: Delete a configuration item
+      operationId: deleteCI
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CIId'
+      responses:
+        '204':
+          description: Configuration item deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ci/{id}/relationships:
+    get:
+      tags:
+        - configuration-items
+        - relationships
+      summary: Get CI relationships
+      description: Retrieve all relationships for a specific configuration item
+      operationId: getCIRelationships
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CIId'
+      responses:
+        '200':
+          description: CI relationships retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  relationships:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Relationship'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # Relationship endpoints
+  /relationships:
+    get:
+      tags:
+        - relationships
+      summary: List relationships
+      description: Retrieve a paginated list of CI relationships
+      operationId: listRelationships
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/SourceCI'
+        - $ref: '#/components/parameters/TargetCI'
+        - $ref: '#/components/parameters/RelationshipType'
+      responses:
+        '200':
+          description: Relationships retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  relationships:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Relationship'
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  total_pages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - relationships
+      summary: Create relationship
+      description: Create a new relationship between configuration items
+      operationId: createRelationship
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRelationshipRequest'
+      responses:
+        '201':
+          description: Relationship created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Relationship'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Source or target CI not found
+
+  /relationships/{id}:
+    get:
+      tags:
+        - relationships
+      summary: Get relationship
+      description: Retrieve relationship details by ID
+      operationId: getRelationship
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RelationshipId'
+      responses:
+        '200':
+          description: Relationship retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Relationship'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - relationships
+      summary: Update relationship
+      description: Update relationship details
+      operationId: updateRelationship
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RelationshipId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRelationshipRequest'
+      responses:
+        '200':
+          description: Relationship updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Relationship'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - relationships
+      summary: Delete relationship
+      description: Delete a relationship
+      operationId: deleteRelationship
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RelationshipId'
+      responses:
+        '204':
+          description: Relationship deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # Graph endpoints
+  /graph:
+    get:
+      tags:
+        - graph
+      summary: Get graph data
+      description: Retrieve graph visualization data for all configuration items
+      operationId: getGraphData
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Graph data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /graph/explore:
+    get:
+      tags:
+        - graph
+      summary: Explore graph
+      description: Interactive graph exploration starting from a specific CI
+      operationId: exploreGraph
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_id
+          in: query
+          description: Starting CI ID for exploration
+          schema:
+            type: string
+            format: uuid
+        - name: depth
+          in: query
+          description: Maximum depth of exploration (default: 2)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+        - name: relationship_types
+          in: query
+          description: Filter by relationship types
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: Graph exploration completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # Audit endpoints
+  /audit/logs:
+    get:
+      tags:
+        - audit
+      summary: List audit logs
+      description: Retrieve a paginated list of audit logs
+      operationId: listAuditLogs
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+        - name: action
+          in: query
+          description: Filter by action type
+          schema:
+            type: string
+            enum: [create, update, delete]
+        - name: resource_type
+          in: query
+          description: Filter by resource type
+          schema:
+            type: string
+            enum: [ci, ci_type, relationship, user]
+        - name: user_id
+          in: query
+          description: Filter by user ID
+          schema:
+            type: string
+            format: uuid
+        - name: start_date
+          in: query
+          description: Filter by start date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          description: Filter by end date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Audit logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  audit_logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  total_pages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /audit/logs/{id}:
+    get:
+      tags:
+        - audit
+      summary: Get audit log
+      description: Retrieve audit log details by ID
+      operationId: getAuditLog
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuditLogId'
+      responses:
+        '200':
+          description: Audit log retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - audit
+      summary: Delete audit log
+      description: Delete a specific audit log entry
+      operationId: deleteAuditLog
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuditLogId'
+      responses:
+        '204':
+          description: Audit log deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /audit/stats:
+    get:
+      tags:
+        - audit
+      summary: Get audit statistics
+      description: Retrieve audit statistics and metrics
+      operationId: getAuditStats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          description: Time period for statistics
+          schema:
+            type: string
+            enum: [day, week, month, year]
+            default: month
+      responses:
+        '200':
+          description: Audit statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /audit/export:
+    get:
+      tags:
+        - audit
+      summary: Export audit logs
+      description: Export audit logs in CSV format
+      operationId: exportAuditLogs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          description: Export start date (ISO 8601)
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          description: Export end date (ISO 8601)
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: format
+          in: query
+          description: Export format
+          schema:
+            type: string
+            enum: [csv, json]
+            default: csv
+      responses:
+        '200':
+          description: Audit logs exported successfully
+          content:
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # Health check endpoint
+  /health:
+    get:
+      tags:
+        - system
+      summary: Health check
+      description: Check API health status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  # Security schemes
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT authentication token
+
+  # Parameters
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Page number for pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Search:
+      name: search
+      in: query
+      description: Search query
+      schema:
+        type: string
+    CIType:
+      name: ci_type
+      in: query
+      description: Filter by CI type
+      schema:
+        type: string
+    Tags:
+      name: tags
+      in: query
+      description: Filter by tags (comma-separated)
+      schema:
+        type: string
+    Attributes:
+      name: attributes
+      in: query
+      description: Filter by attributes (JSON object)
+      schema:
+        type: string
+    Sort:
+      name: sort
+      in: query
+      description: Sort field
+      schema:
+        type: string
+        enum: [name, ci_type, created_at, updated_at]
+        default: name
+    Order:
+      name: order
+      in: query
+      description: Sort order
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    UserId:
+      name: id
+      in: path
+      description: User ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CIId:
+      name: id
+      in: path
+      description: Configuration Item ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CITypeId:
+      name: id
+      in: path
+      description: CI Type ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RelationshipId:
+      name: id
+      in: path
+      description: Relationship ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AuditLogId:
+      name: id
+      in: path
+      description: Audit Log ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SourceCI:
+      name: source_id
+      in: query
+      description: Source CI ID
+      schema:
+        type: string
+        format: uuid
+    TargetCI:
+      name: target_id
+      in: query
+      description: Target CI ID
+      schema:
+        type: string
+        format: uuid
+    RelationshipType:
+      name: relationship_type
+      in: query
+      description: Relationship type
+      schema:
+        type: string
+
+  # Schemas
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user, viewer]
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+      example:
+        id: "550e8400-e29b-41d4-a716-446655440000"
+        email: "admin@pustaka.dev"
+        name: "John Doe"
+        role: "admin"
+        is_active: true
+        created_at: "2023-01-01T00:00:00Z"
+        updated_at: "2023-01-01T00:00:00Z"
+        last_login: "2023-01-01T12:00:00Z"
+
+    CreateUserRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user, viewer]
+      example:
+        email: "newuser@pustaka.dev"
+        password: "securePassword123"
+        name: "Jane Smith"
+        role: "user"
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user, viewer]
+        is_active:
+          type: boolean
+      example:
+        name: "Jane Doe"
+        role: "admin"
+        is_active: true
+
+    CIType:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        required_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+        optional_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      example:
+        id: "550e8400-e29b-41d4-a716-446655440001"
+        name: "Server"
+        description: "Physical or virtual server"
+        required_attributes:
+          - name: "hostname"
+            type: "string"
+            description: "Server hostname"
+            validation:
+              min_length: 1
+              max_length: 255
+        optional_attributes:
+          - name: "cpu_cores"
+            type: "integer"
+            description: "Number of CPU cores"
+            validation:
+              min: 1
+              max: 128
+
+    CreateCITypeRequest:
+      type: object
+      required:
+        - name
+        - required_attributes
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        required_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+        optional_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+
+    UpdateCITypeRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        required_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+        optional_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+
+    AttributeDefinition:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [string, integer, boolean, array, object]
+        description:
+          type: string
+        validation:
+          $ref: '#/components/schemas/ValidationRules'
+      example:
+        name: "ip_address"
+        type: "string"
+        description: "Server IP address"
+        validation:
+          format: "ipv4"
+          pattern: "^192\\.168\\."
+
+    ValidationRules:
+      type: object
+      properties:
+        pattern:
+          type: string
+          description: Regular expression pattern for string validation
+        min_length:
+          type: integer
+          description: Minimum length for string attributes
+        max_length:
+          type: integer
+          description: Maximum length for string attributes
+        min:
+          type: integer
+          description: Minimum value for numeric attributes
+        max:
+          type: integer
+          description: Maximum value for numeric attributes
+        enum:
+          type: array
+          items:
+            type: string
+          description: Allowed values for enum validation
+        format:
+          type: string
+          enum: [email, url, ipv4, date, datetime]
+          description: Predefined format validation
+
+    ConfigurationItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        ci_type:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+          description: Flexible attributes based on CI type schema
+        tags:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+      example:
+        id: "550e8400-e29b-41d4-a716-446655440002"
+        name: "web-server-01"
+        ci_type: "Server"
+        attributes:
+          hostname: "web01.example.com"
+          cpu_cores: 8
+          memory_gb: 32
+          os_type: "Ubuntu"
+        tags:
+          - "production"
+          - "web"
+        created_at: "2023-01-01T00:00:00Z"
+        updated_at: "2023-01-01T00:00:00Z"
+
+    CreateCIRequest:
+      type: object
+      required:
+        - name
+        - ci_type
+        - attributes
+      properties:
+        name:
+          type: string
+        ci_type:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+        tags:
+          type: array
+          items:
+            type: string
+
+    UpdateCIRequest:
+      type: object
+      properties:
+        attributes:
+          type: object
+          additionalProperties: true
+        tags:
+          type: array
+          items:
+            type: string
+
+    Relationship:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source_ci:
+          $ref: '#/components/schemas/ConfigurationItem'
+        target_ci:
+          $ref: '#/components/schemas/ConfigurationItem'
+        relationship_type:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+
+    CreateRelationshipRequest:
+      type: object
+      required:
+        - source_id
+        - target_id
+        - relationship_type
+      properties:
+        source_id:
+          type: string
+          format: uuid
+        target_id:
+          type: string
+          format: uuid
+        relationship_type:
+          type: string
+        description:
+          type: string
+
+    UpdateRelationshipRequest:
+      type: object
+      properties:
+        relationship_type:
+          type: string
+        description:
+          type: string
+
+    GraphData:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphEdge'
+        metadata:
+          type: object
+          properties:
+            total_nodes:
+              type: integer
+            total_edges:
+              type: integer
+            layout:
+              type: string
+              enum: [force, hierarchical, circular]
+
+    GraphNode:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        group:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    GraphEdge:
+      type: object
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [create, update, delete]
+        resource_type:
+          type: string
+          enum: [ci, ci_type, relationship, user]
+        resource_id:
+          type: string
+          format: uuid
+        details:
+          type: object
+          additionalProperties: true
+        ip_address:
+          type: string
+          format: ipv4
+        user_agent:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AuditStats:
+      type: object
+      properties:
+        total_actions:
+          type: integer
+        actions_by_type:
+          type: object
+          additionalProperties:
+            type: integer
+        actions_by_resource:
+          type: object
+          additionalProperties:
+            type: integer
+        top_users:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id:
+                type: string
+                format: uuid
+              action_count:
+                type: integer
+        time_series:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
+
+  # Responses
+  responses:
+    BadRequest:
+      description: Bad request - Invalid input data
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              details:
+                type: object
+
+    Unauthorized:
+      description: Unauthorized - Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Unauthorized - Invalid or missing token"
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Forbidden - Insufficient permissions"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Resource not found"
+
+    Conflict:
+      description: Resource conflict - Already exists
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Resource already exists"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Internal server error"

@@ -1,0 +1,927 @@
+{
+	"info": {
+		"_postman_id": "pustaka-api-collection",
+		"name": "Pustaka CMDB API",
+		"description": "Complete API collection for Pustaka Configuration Management Database",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "pustaka-team"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@pustaka.dev\",\n  \"password\": \"your-password\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Authenticate with email and password to receive JWT tokens"
+					},
+					"response": [
+						{
+							"name": "Login Successful",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"admin@pustaka.dev\",\n  \"password\": \"your-password\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/login",
+									"host": ["{{baseUrl}}"],
+									"path": ["auth", "login"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"expires_in\": 900,\n  \"user\": {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"email\": \"admin@pustaka.dev\",\n    \"name\": \"John Doe\",\n    \"role\": \"admin\",\n    \"is_active\": true\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/refresh",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "refresh"]
+						},
+						"description": "Use refresh token to get a new access token"
+					}
+				}
+			],
+			"description": "Authentication endpoints for getting and refreshing JWT tokens"
+		},
+		{
+			"name": "User Management",
+			"item": [
+				{
+					"name": "List Users",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/users?page=1&limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["users"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Retrieve a paginated list of users"
+					}
+				},
+				{
+					"name": "Get User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "{{userId}}"]
+						},
+						"description": "Retrieve user details by ID"
+					}
+				},
+				{
+					"name": "Create User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"newuser@pustaka.dev\",\n  \"password\": \"securePassword123\",\n  \"name\": \"Jane Smith\",\n  \"role\": \"user\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users",
+							"host": ["{{baseUrl}}"],
+							"path": ["users"]
+						},
+						"description": "Create a new user account"
+					}
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Jane Doe\",\n  \"role\": \"admin\",\n  \"is_active\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "{{userId}}"]
+						},
+						"description": "Update user information"
+					}
+				},
+				{
+					"name": "Delete User",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "{{userId}}"]
+						},
+						"description": "Delete a user account"
+					}
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["me"]
+						},
+						"description": "Retrieve the current authenticated user's profile"
+					}
+				}
+			],
+			"description": "User management operations"
+		},
+		{
+			"name": "CI Types",
+			"item": [
+				{
+					"name": "List CI Types",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/ci-types?page=1&limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci-types"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Retrieve a paginated list of CI type schemas"
+					}
+				},
+				{
+					"name": "Get CI Type",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/ci-types/{{ciTypeId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci-types", "{{ciTypeId}}"]
+						},
+						"description": "Retrieve CI type schema by ID"
+					}
+				},
+				{
+					"name": "Create CI Type",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Server\",\n  \"description\": \"Physical or virtual server\",\n  \"required_attributes\": [\n    {\n      \"name\": \"hostname\",\n      \"type\": \"string\",\n      \"description\": \"Server hostname\",\n      \"validation\": {\n        \"min_length\": 1,\n        \"max_length\": 255,\n        \"pattern\": \"^[a-zA-Z0-9.-]+$\"\n      }\n    },\n    {\n      \"name\": \"ip_address\",\n      \"type\": \"string\",\n      \"description\": \"Primary IP address\",\n      \"validation\": {\n        \"format\": \"ipv4\"\n      }\n    }\n  ],\n  \"optional_attributes\": [\n    {\n      \"name\": \"cpu_cores\",\n      \"type\": \"integer\",\n      \"description\": \"Number of CPU cores\",\n      \"validation\": {\n        \"min\": 1,\n        \"max\": 128\n      }\n    },\n    {\n      \"name\": \"environment\",\n      \"type\": \"string\",\n      \"description\": \"Environment type\",\n      \"validation\": {\n        \"enum\": [\"development\", \"staging\", \"production\"]\n      }\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/ci-types",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci-types"]
+						},
+						"description": "Create a new CI type schema with attribute definitions"
+					}
+				},
+				{
+					"name": "Update CI Type",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"Updated server description\",\n  \"optional_attributes\": [\n    {\n      \"name\": \"cpu_cores\",\n      \"type\": \"integer\",\n      \"description\": \"Number of CPU cores\",\n      \"validation\": {\n        \"min\": 1,\n        \"max\": 256\n      }\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/ci-types/{{ciTypeId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci-types", "{{ciTypeId}}"]
+						},
+						"description": "Update CI type schema"
+					}
+				},
+				{
+					"name": "Delete CI Type",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/ci-types/{{ciTypeId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci-types", "{{ciTypeId}}"]
+						},
+						"description": "Delete a CI type schema"
+					}
+				}
+			],
+			"description": "CI type schema management"
+		},
+		{
+			"name": "Configuration Items",
+			"item": [
+				{
+					"name": "List CIs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/ci?page=1&limit=20&ci_type=Server&sort=created_at&order=desc",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "ci_type",
+									"value": "Server"
+								},
+								{
+									"key": "sort",
+									"value": "created_at"
+								},
+								{
+									"key": "order",
+									"value": "desc"
+								}
+							]
+						},
+						"description": "Retrieve a paginated list of configuration items with advanced filtering"
+					}
+				},
+				{
+					"name": "Search CIs by Attributes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/ci?attributes={\"cpu_cores\":{\"min\":8},\"environment\":\"production\"}&tags=critical,production",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci"],
+							"query": [
+								{
+									"key": "attributes",
+									"value": "{\"cpu_cores\":{\"min\":8},\"environment\":\"production\"}",
+									"description": "JSON-encoded attribute filters"
+								},
+								{
+									"key": "tags",
+									"value": "critical,production"
+								}
+							]
+						},
+						"description": "Search configuration items by attribute values"
+					}
+				},
+				{
+					"name": "Get CI",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/ci/{{ciId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci", "{{ciId}}"]
+						},
+						"description": "Retrieve configuration item details by ID"
+					}
+				},
+				{
+					"name": "Create CI",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"web-server-01\",\n  \"ci_type\": \"Server\",\n  \"attributes\": {\n    \"hostname\": \"web01.example.com\",\n    \"ip_address\": \"192.168.1.10\",\n    \"cpu_cores\": 8,\n    \"memory_gb\": 32,\n    \"environment\": \"production\"\n  },\n  \"tags\": [\"production\", \"web\", \"critical\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/ci",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci"]
+						},
+						"description": "Create a new configuration item with validation against CI type schema"
+					}
+				},
+				{
+					"name": "Update CI",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"attributes\": {\n    \"cpu_cores\": 16,\n    \"memory_gb\": 64\n  },\n  \"tags\": [\"production\", \"web\", \"critical\", \"upgraded\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/ci/{{ciId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci", "{{ciId}}"]
+						},
+						"description": "Update configuration item attributes and metadata"
+					}
+				},
+				{
+					"name": "Delete CI",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/ci/{{ciId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci", "{{ciId}}"]
+						},
+						"description": "Delete a configuration item"
+					}
+				},
+				{
+					"name": "Get CI Relationships",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/ci/{{ciId}}/relationships",
+							"host": ["{{baseUrl}}"],
+							"path": ["ci", "{{ciId}}", "relationships"]
+						},
+						"description": "Retrieve all relationships for a specific configuration item"
+					}
+				}
+			],
+			"description": "Configuration item CRUD operations"
+		},
+		{
+			"name": "Relationships",
+			"item": [
+				{
+					"name": "List Relationships",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/relationships?page=1&limit=20&source_id={{ciId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["relationships"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "source_id",
+									"value": "{{ciId}}"
+								}
+							]
+						},
+						"description": "Retrieve a paginated list of CI relationships"
+					}
+				},
+				{
+					"name": "Get Relationship",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/relationships/{{relationshipId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["relationships", "{{relationshipId}}"]
+						},
+						"description": "Retrieve relationship details by ID"
+					}
+				},
+				{
+					"name": "Create Relationship",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"source_id\": \"550e8400-e29b-41d4-a716-446655440002\",\n  \"target_id\": \"550e8400-e29b-41d4-a716-446655440003\",\n  \"relationship_type\": \"depends_on\",\n  \"description\": \"Web server depends on database server\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/relationships",
+							"host": ["{{baseUrl}}"],
+							"path": ["relationships"]
+						},
+						"description": "Create a new relationship between configuration items"
+					}
+				},
+				{
+					"name": "Update Relationship",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"relationship_type\": \"strongly_depends_on\",\n  \"description\": \"Web server strongly depends on database server\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/relationships/{{relationshipId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["relationships", "{{relationshipId}}"]
+						},
+						"description": "Update relationship details"
+					}
+				},
+				{
+					"name": "Delete Relationship",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/relationships/{{relationshipId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["relationships", "{{relationshipId}}"]
+						},
+						"description": "Delete a relationship"
+					}
+				}
+			],
+			"description": "CI relationship management"
+		},
+		{
+			"name": "Graph",
+			"item": [
+				{
+					"name": "Get Graph Data",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/graph?limit=100",
+							"host": ["{{baseUrl}}"],
+							"path": ["graph"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "100"
+								}
+							]
+						},
+						"description": "Retrieve graph visualization data for all configuration items"
+					}
+				},
+				{
+					"name": "Explore Graph",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/graph/explore?start_id={{ciId}}&depth=3&relationship_types=depends_on,hosts",
+							"host": ["{{baseUrl}}"],
+							"path": ["graph", "explore"],
+							"query": [
+								{
+									"key": "start_id",
+									"value": "{{ciId}}"
+								},
+								{
+									"key": "depth",
+									"value": "3"
+								},
+								{
+									"key": "relationship_types",
+									"value": "depends_on,hosts"
+								}
+							]
+						},
+						"description": "Interactive graph exploration starting from a specific CI"
+					}
+				}
+			],
+			"description": "Graph visualization and exploration"
+		},
+		{
+			"name": "Audit Logs",
+			"item": [
+				{
+					"name": "List Audit Logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/audit/logs?page=1&limit=50&action=create&resource_type=ci",
+							"host": ["{{baseUrl}}"],
+							"path": ["audit", "logs"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "50"
+								},
+								{
+									"key": "action",
+									"value": "create"
+								},
+								{
+									"key": "resource_type",
+									"value": "ci"
+								}
+							]
+						},
+						"description": "Retrieve a paginated list of audit logs"
+					}
+				},
+				{
+					"name": "Get Audit Log",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/audit/logs/{{auditLogId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["audit", "logs", "{{auditLogId}}"]
+						},
+						"description": "Retrieve audit log details by ID"
+					}
+				},
+				{
+					"name": "Get Audit Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/audit/stats?period=month",
+							"host": ["{{baseUrl}}"],
+							"path": ["audit", "stats"],
+							"query": [
+								{
+									"key": "period",
+									"value": "month"
+								}
+							]
+						},
+						"description": "Retrieve audit statistics and metrics"
+					}
+				},
+				{
+					"name": "Export Audit Logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/audit/export?start_date=2023-01-01T00:00:00Z&end_date=2023-01-31T23:59:59Z&format=csv",
+							"host": ["{{baseUrl}}"],
+							"path": ["audit", "export"],
+							"query": [
+								{
+									"key": "start_date",
+									"value": "2023-01-01T00:00:00Z"
+								},
+								{
+									"key": "end_date",
+									"value": "2023-01-31T23:59:59Z"
+								},
+								{
+									"key": "format",
+									"value": "csv"
+								}
+							]
+						},
+						"description": "Export audit logs in CSV format"
+					}
+				},
+				{
+					"name": "Delete Audit Log",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/audit/logs/{{auditLogId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["audit", "logs", "{{auditLogId}}"]
+						},
+						"description": "Delete a specific audit log entry"
+					}
+				}
+			],
+			"description": "Audit logging and compliance"
+		},
+		{
+			"name": "System",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Check API health status"
+					}
+				}
+			],
+			"description": "System health and status"
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string",
+			"description": "JWT access token obtained from login"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string",
+			"description": "JWT refresh token for obtaining new access tokens"
+		},
+		{
+			"key": "userId",
+			"value": "550e8400-e29b-41d4-a716-446655440000",
+			"type": "string",
+			"description": "Sample user ID for testing"
+		},
+		{
+			"key": "ciId",
+			"value": "550e8400-e29b-41d4-a716-446655440002",
+			"type": "string",
+			"description": "Sample configuration item ID for testing"
+		},
+		{
+			"key": "ciTypeId",
+			"value": "550e8400-e29b-41d4-a716-446655440001",
+			"type": "string",
+			"description": "Sample CI type ID for testing"
+		},
+		{
+			"key": "relationshipId",
+			"value": "550e8400-e29b-41d4-a716-446655440003",
+			"type": "string",
+			"description": "Sample relationship ID for testing"
+		},
+		{
+			"key": "auditLogId",
+			"value": "550e8400-e29b-41d4-a716-446655440004",
+			"type": "string",
+			"description": "Sample audit log ID for testing"
+		}
+	]
+}

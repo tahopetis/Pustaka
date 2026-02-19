@@ -1,0 +1,1027 @@
+openapi: 3.0.3
+info:
+  title: Pustaka CMDB - IT Asset Amortization API
+  description: RESTful API for managing IT asset amortization calculations and schedules
+  version: 1.0.0
+  contact:
+    name: Pustaka Development Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+
+paths:
+  /amortization/configuration-items:
+    get:
+      summary: List amortizable configuration items
+      description: Retrieve paginated list of CIs with amortization enabled
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: ci_type
+          in: query
+          schema:
+            type: string
+        - name: lifecycle_status
+          in: query
+          schema:
+            type: string
+        - name: amortization_behavior
+          in: query
+          schema:
+            type: string
+            enum: [pending, active, terminal]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, ci_type, purchase_cost, current_book_value, amort_start_date]
+            default: created_at
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Successfully retrieved amortizable CIs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizableCIListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /amortization/configuration-items/{ciId}:
+    get:
+      summary: Get amortization details for a CI
+      description: Retrieve detailed amortization information for a specific configuration item
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ciId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successfully retrieved amortization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationDetailsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      summary: Update amortization configuration for a CI
+      description: Update financial and amortization settings for a configuration item
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ciId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAmortizationRequest'
+      responses:
+        '200':
+          description: Successfully updated amortization configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationDetailsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /amortization/ledger:
+    get:
+      summary: Get amortization ledger entries
+      description: Retrieve paginated amortization ledger entries with filtering
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: ci_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: entry_type
+          in: query
+          schema:
+            type: string
+            enum: [monthly_depreciation, write_off, adjustment, correction]
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [entry_date, amount]
+            default: entry_date
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Successfully retrieved ledger entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /amortization/ledger/{entryId}:
+    get:
+      summary: Get specific ledger entry
+      description: Retrieve detailed information about a specific ledger entry
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successfully retrieved ledger entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerEntryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /amortization/adjustments:
+    post:
+      summary: Create amortization adjustment
+      description: Create an adjustment entry to correct amortization calculations
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdjustmentRequest'
+      responses:
+        '201':
+          description: Successfully created adjustment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerEntryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /amortization/runs:
+    get:
+      summary: Get amortization run history
+      description: Retrieve history of amortization processing runs
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [started, completed, failed, partial]
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Successfully retrieved run history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationRunListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Trigger manual amortization run
+      description: Manually trigger an amortization processing run
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run:
+                  type: boolean
+                  description: If true, only calculate without persisting changes
+                  default: false
+                ci_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Specific CI IDs to process (optional, processes all if not provided)
+                date_override:
+                  type: string
+                  format: date
+                  description: Override the processing date (defaults to today)
+      responses:
+        '202':
+          description: Amortization run initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [started]
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Another run is already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /amortization/runs/{runId}:
+    get:
+      summary: Get amortization run details
+      description: Retrieve detailed information about a specific amortization run
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successfully retrieved run details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationRunResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /amortization/summaries:
+    get:
+      summary: Get amortization summaries
+      description: Retrieve amortization summaries by CI type, department, or other dimensions
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: group_by
+          in: query
+          schema:
+            type: string
+            enum: [ci_type, lifecycle_status, age_bucket, depreciation_method]
+            default: ci_type
+        - name: date_as_of
+          in: query
+          schema:
+            type: string
+            format: date
+            description: Date for the summary snapshot (defaults to today)
+        - name: include_zero_value
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Successfully retrieved amortization summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summaries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AmortizationSummary'
+                  total_book_value:
+                    type: number
+                    format: decimal
+                    description: Total book value across all groups
+                  total_accumulated_depreciation:
+                    type: number
+                    format: decimal
+                    description: Total accumulated depreciation
+                  date_as_of:
+                    type: string
+                    format: date
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /amortization/reports/depreciation-schedule:
+    get:
+      summary: Generate depreciation schedule report
+      description: Generate a detailed depreciation schedule for specified time period
+      tags:
+        - Amortization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ci_ids
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          description: Specific CI IDs to include (optional)
+        - name: date_from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: Successfully generated depreciation schedule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report_id:
+                    type: string
+                    format: uuid
+                  date_range:
+                    type: object
+                    properties:
+                      start_date:
+                        type: string
+                        format: date
+                      end_date:
+                        type: string
+                        format: date
+                  schedule:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DepreciationScheduleEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AmortizableCIListResponse:
+      type: object
+      properties:
+        cis:
+          type: array
+          items:
+            $ref: '#/components/schemas/AmortizableCI'
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        total_pages:
+          type: integer
+          minimum: 0
+
+    AmortizableCI:
+      allOf:
+        - $ref: '#/components/schemas/BaseCI'
+        - type: object
+          properties:
+            purchase_cost:
+              type: number
+              format: decimal
+              description: Original purchase cost
+            salvage_value:
+              type: number
+              format: decimal
+              description: Estimated salvage value at end of useful life
+            amort_start_date:
+              type: string
+              format: date
+              description: Date when amortization begins
+            useful_life_months:
+              type: integer
+              minimum: 1
+              description: Expected useful life in months
+            current_book_value:
+              type: number
+              format: decimal
+              description: Current book value after depreciation
+            accumulated_depreciation:
+              type: number
+              format: decimal
+              description: Total depreciation accumulated to date
+            amortization_behavior:
+              type: string
+              enum: [pending, active, terminal]
+              description: Current amortization behavior based on lifecycle status
+
+    BaseCI:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        ci_type:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+        tags:
+          type: array
+          items:
+            type: string
+        lifecycle_status:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            display_name:
+              type: string
+            amortization_behavior:
+              type: string
+              enum: [pending, active, terminal]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AmortizationDetailsResponse:
+      allOf:
+        - $ref: '#/components/schemas/AmortizableCI'
+        - type: object
+          properties:
+            depreciation_method:
+              type: string
+              enum: [straight_line, declining_balance]
+              description: Method used for depreciation calculation
+            monthly_depreciation:
+              type: number
+              format: decimal
+              description: Monthly depreciation amount
+            remaining_life_months:
+              type: integer
+              minimum: 0
+              description: Remaining months in useful life
+            next_depreciation_date:
+              type: string
+              format: date
+              description: Date of next scheduled depreciation
+            recent_ledger_entries:
+              type: array
+              items:
+                $ref: '#/components/schemas/LedgerEntry'
+              description: Most recent ledger entries (last 10)
+
+    UpdateAmortizationRequest:
+      type: object
+      properties:
+        purchase_cost:
+          type: number
+          format: decimal
+          minimum: 0
+        salvage_value:
+          type: number
+          format: decimal
+          minimum: 0
+        amort_start_date:
+          type: string
+          format: date
+        useful_life_months:
+          type: integer
+          minimum: 1
+        depreciation_method:
+          type: string
+          enum: [straight_line, declining_balance]
+      required:
+        - purchase_cost
+        - useful_life_months
+
+    LedgerListResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerEntry'
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+        total:
+          type: integer
+          minimum: 0
+        total_pages:
+          type: integer
+          minimum: 0
+
+    LedgerEntryResponse:
+      allOf:
+        - $ref: '#/components/schemas/LedgerEntry'
+        - type: object
+          properties:
+            ci_details:
+              $ref: '#/components/schemas/BaseCI'
+
+    LedgerEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ci_id:
+          type: string
+          format: uuid
+        entry_type:
+          type: string
+          enum: [monthly_depreciation, write_off, adjustment, correction]
+        entry_date:
+          type: string
+          format: date
+        amount:
+          type: number
+          format: decimal
+          description: Depreciation amount (positive for depreciation, negative for corrections)
+        book_value_before:
+          type: number
+          format: decimal
+          description: Book value before this entry
+        book_value_after:
+          type: number
+          format: decimal
+          description: Book value after this entry
+        accumulated_depreciation_before:
+          type: number
+          format: decimal
+          description: Accumulated depreciation before this entry
+        accumulated_depreciation_after:
+          type: number
+          format: decimal
+          description: Accumulated depreciation after this entry
+        description:
+          type: string
+          description: Optional description for manual entries
+        reference_id:
+          type: string
+          format: uuid
+          description: Reference to related entry (for corrections)
+        amortization_run_id:
+          type: string
+          format: uuid
+          description: Reference to the amortization run that created this entry
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+
+    CreateAdjustmentRequest:
+      type: object
+      properties:
+        ci_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+          description: Adjustment amount (positive to increase depreciation, negative to decrease)
+        description:
+          type: string
+          maxLength: 500
+          description: Reason for the adjustment
+        effective_date:
+          type: string
+          format: date
+          description: Date the adjustment should be effective (defaults to today)
+      required:
+        - ci_id
+        - amount
+        - description
+
+    AmortizationRunListResponse:
+      type: object
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AmortizationRun'
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        total_pages:
+          type: integer
+          minimum: 0
+
+    AmortizationRunResponse:
+      allOf:
+        - $ref: '#/components/schemas/AmortizationRun'
+        - type: object
+          properties:
+            processed_items:
+              type: array
+              items:
+                type: object
+                properties:
+                  ci_id:
+                    type: string
+                    format: uuid
+                  ci_name:
+                    type: string
+                  status:
+                    type: string
+                    enum: [processed, skipped, failed]
+                  error_message:
+                    type: string
+                  depreciation_amount:
+                    type: number
+                    format: decimal
+
+    AmortizationRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [started, completed, failed, partial]
+        processing_date:
+          type: string
+          format: date
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        total_amortizable_cis:
+          type: integer
+          minimum: 0
+        processed_cis:
+          type: integer
+          minimum: 0
+        failed_cis:
+          type: integer
+          minimum: 0
+        skipped_cis:
+          type: integer
+          minimum: 0
+        total_depreciation:
+          type: number
+          format: decimal
+        error_summary:
+          type: string
+          description: Summary of errors if any
+        created_by:
+          type: string
+          format: uuid
+          description: User who triggered the run (null for scheduled runs)
+
+    AmortizationSummary:
+      type: object
+      properties:
+        group_key:
+          type: string
+          description: The value this group is summarized by (e.g., CI type name)
+        group_label:
+          type: string
+          description: Human-readable label for the group
+        ci_count:
+          type: integer
+          minimum: 0
+          description: Number of CIs in this group
+        total_purchase_cost:
+          type: number
+          format: decimal
+          description: Total purchase cost for CIs in this group
+        total_book_value:
+          type: number
+          format: decimal
+          description: Current total book value for CIs in this group
+        total_accumulated_depreciation:
+          type: number
+          format: decimal
+          description: Total accumulated depreciation for CIs in this group
+        depreciation_percentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+          description: Percentage of original cost depreciated
+
+    DepreciationScheduleEntry:
+      type: object
+      properties:
+        ci_id:
+          type: string
+          format: uuid
+        ci_name:
+          type: string
+        ci_type:
+          type: string
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        opening_book_value:
+          type: number
+          format: decimal
+        depreciation_amount:
+          type: number
+          format: decimal
+        closing_book_value:
+          type: number
+          format: decimal
+        accumulated_depreciation:
+          type: number
+          format: decimal
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    UnprocessableEntity:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  message:
+                    type: string
+                  validation_errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                        message:
+                          type: string
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Amortization
+    description: IT Asset Amortization Management APIs
