@@ -1763,7 +1763,7 @@ func (r *Repository) getApproachingEOLAssets(ctx context.Context, thresholdMonth
 // getAverageAge calculates the average age of all assets in months
 func (r *Repository) getAverageAge(ctx context.Context) (float64, error) {
 	query := `
-		SELECT AVG(EXTRACT(EPOCH FROM (NOW() - created_at)) / (30 * 86400)) AS avg_age_months
+		SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (NOW() - created_at)) / (30 * 86400)), 0) AS avg_age_months
 		FROM configuration_items
 		WHERE created_at IS NOT NULL
 	`
