@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,37 +30,60 @@ func NewService(db *Repository, neo4j *Neo4jService, redis *redis.Client, auditS
 	}
 }
 
+// Validation Helpers
+
+func (s *Service) validateCIType(ctx context.Context, ciTypeName string) (*CITypeDefinition, error) {
+	ciType, err := s.repo.GetCITypeByName(ctx, ciTypeName)
+	if err != nil {
+		return nil, fmt.Errorf("CI type '%s' does not exist", ciTypeName)
+	}
+	return ciType, nil
+}
+
+func (s *Service) validateCIAttributes(ciType *CITypeDefinition, attributes map[string]interface{}) error {
+	validationErrors := ciType.ValidateAttributes(attributes)
+	if len(validationErrors) > 0 {
+		return ServiceValidationError{
+			Message: "Attribute validation failed",
+			Errors:  validationErrors,
+		}
+	}
+	return nil
+}
+
+func (s *Service) checkCIDuplicate(ctx context.Context, name, ciType string) error {
+	existing, err := s.repo.GetCIByNameAndType(ctx, name, ciType)
+	if err == nil && existing != nil {
+		return fmt.Errorf("CI with name '%s' already exists for type '%s'", name, ciType)
+	}
+	return nil
+}
+
 // CI Operations
 
 func (s *Service) CreateCI(ctx context.Context, req *CreateCIRequest, userID uuid.UUID) (*ConfigurationItem, error) {
-	// Validate CI type exists
-	ciType, err := s.repo.GetCITypeByName(ctx, req.CIType)
+	// Validate CI type
+	ciType, err := s.validateCIType(ctx, req.CIType)
 	if err != nil {
 		s.logger.ErrorService("ci", "create_ci", err, map[string]interface{}{
 			"ci_type": req.CIType,
 			"user_id": userID,
 		})
-		return nil, fmt.Errorf("CI type '%s' does not exist", req.CIType)
+		return nil, err
 	}
 
 	// Validate attributes against schema
-	validationErrors := ciType.ValidateAttributes(req.Attributes)
-	if len(validationErrors) > 0 {
-		s.logger.ErrorService("ci", "CREATE_CI_VALIDATION_DETAIL", fmt.Errorf("validation errors"), map[string]interface{}{
+	if err := s.validateCIAttributes(ciType, req.Attributes); err != nil {
+		s.logger.ErrorService("ci", "CREATE_CI_VALIDATION_DETAIL", err, map[string]interface{}{
 			"ci_type": req.CIType,
 			"attributes": req.Attributes,
-			"validation_errors": validationErrors,
 		})
-		return nil, ServiceValidationError{
-			Message: "Attribute validation failed",
-			Errors:  validationErrors,
-		}
+		return nil, err
 	}
 
-	// Check for duplicate name within type
-	existing, err := s.repo.GetCIByNameAndType(ctx, req.Name, req.CIType)
-	if err == nil && existing != nil {
-		return nil, fmt.Errorf("CI with name '%s' already exists for type '%s'", req.Name, req.CIType)
+	// Check for duplicate name
+	if err := s.checkCIDuplicate(ctx, req.Name, req.CIType); err != nil {
+		return nil, err
 	}
 
 	// Create CI
@@ -82,7 +106,6 @@ func (s *Service) CreateCI(ctx context.Context, req *CreateCIRequest, userID uui
 		s.logger.ErrorService("neo4j", "sync_ci", err, map[string]interface{}{
 			"ci_id": result.ID,
 		})
-		// Log error but don't fail the operation
 	}
 
 	// Invalidate cache
@@ -132,10 +155,10 @@ func (s *Service) UpdateCI(ctx context.Context, id uuid.UUID, req *UpdateCIReque
 		return nil, err
 	}
 
-	// Get CI type for validation
-	ciType, err := s.repo.GetCITypeByName(ctx, current.CIType)
+	// Validate CI type
+	ciType, err := s.validateCIType(ctx, current.CIType)
 	if err != nil {
-		return nil, fmt.Errorf("CI type '%s' does not exist", current.CIType)
+		return nil, err
 	}
 
 	// Prepare updated attributes
@@ -145,12 +168,8 @@ func (s *Service) UpdateCI(ctx context.Context, id uuid.UUID, req *UpdateCIReque
 	}
 
 	// Validate attributes against schema
-	validationErrors := ciType.ValidateAttributes(updatedAttributes)
-	if len(validationErrors) > 0 {
-		return nil, ServiceValidationError{
-			Message: "Attribute validation failed",
-			Errors:  validationErrors,
-		}
+	if err := s.validateCIAttributes(ciType, updatedAttributes); err != nil {
+		return nil, err
 	}
 
 	// Update CI
@@ -164,16 +183,30 @@ func (s *Service) UpdateCI(ctx context.Context, id uuid.UUID, req *UpdateCIReque
 		s.logger.ErrorService("neo4j", "update_ci", err, map[string]interface{}{
 			"ci_id": result.ID,
 		})
-		// Log error but don't fail the operation
 	}
 
 	// Invalidate cache
 	s.invalidateCICache(ctx, id)
 
 	// Prepare audit details
+	details := s.prepareUpdateAuditDetails(result, req, current)
+
+	// Log audit event
+	s.logAuditEvent(ctx, "ci", id.String(), "update", userID.String(), details)
+
+	s.logger.InfoService("ci", "update_ci", map[string]interface{}{
+		"ci_id":   id,
+		"user_id": userID,
+	})
+
+	return result, nil
+}
+
+// Helper to prepare audit details for CI updates
+func (s *Service) prepareUpdateAuditDetails(updated *ConfigurationItem, req *UpdateCIRequest, current *ConfigurationItem) map[string]interface{} {
 	details := map[string]interface{}{
-		"ci_name": result.Name,
-		"ci_type": result.CIType,
+		"ci_name": updated.Name,
+		"ci_type": updated.CIType,
 		"changes": req,
 	}
 
@@ -185,15 +218,7 @@ func (s *Service) UpdateCI(ctx context.Context, id uuid.UUID, req *UpdateCIReque
 		}
 	}
 
-	// Log audit event
-	s.logAuditEvent(ctx, "ci", id.String(), "update", userID.String(), details)
-
-	s.logger.InfoService("ci", "update_ci", map[string]interface{}{
-		"ci_id":   id,
-		"user_id": userID,
-	})
-
-	return result, nil
+	return details
 }
 
 func (s *Service) DeleteCI(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {

@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { showToast } from '@/utils/toast'
+import { generateUUID } from '@/utils/uuid'
 
 // Create axios instance
 export const api = axios.create({
@@ -25,7 +26,7 @@ api.interceptors.request.use(
     }
 
     // Add request ID for tracking
-    config.headers['X-Request-ID'] = crypto.randomUUID()
+    config.headers['X-Request-ID'] = generateUUID()
 
     return config
   },

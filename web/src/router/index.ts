@@ -164,12 +164,6 @@ const router = createRouter({
       component: () => import('@/views/profile/ProfileView.vue'),
       meta: { requiresAuth: true }
     },
-    {
-      path: '/audit/debug',
-      name: 'AuditDebug',
-      component: () => import('@/views/audit/AuditViewDebug.vue'),
-      meta: { requiresAuth: true, requiresPermission: 'audit:read' }
-    },
     // Amortization Module Routes
     {
       path: '/amortization',

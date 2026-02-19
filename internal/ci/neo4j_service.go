@@ -102,7 +102,9 @@ func (s *Neo4jService) GetCINetwork(ctx context.Context, ciID uuid.UUID, depth i
 			record := cursor.Record()
 
 			// Extract nodes and relationships from path
-			// path := record.Values[0] // TODO: Process path to extract relationships
+			// Note: Edge extraction from Neo4j Path is not yet implemented
+			// The path contains relationship information that should be extracted
+			// to populate network.Edges. Currently only nodes are extracted.
 			relatedNode := record.Values[1]
 
 			// Process related node
@@ -126,8 +128,8 @@ func (s *Neo4jService) GetCINetwork(ctx context.Context, ciID uuid.UUID, depth i
 				}
 			}
 
-			// TODO: Process path to extract relationships - Neo4j Path API needs to be updated
-			// Note: This is commented out to avoid syntax issues
+			// Edge extraction from path needs to be implemented
+			// Relationships are available in record.Values[0] as a Neo4j Path
 		}
 
 		return network, nil

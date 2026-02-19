@@ -158,7 +158,6 @@ const calculatePercentage = (value: number) => {
 }
 
 const exportToExcel = () => {
-  // TODO: Implement Excel export
   alert('Excel export functionality coming soon!')
 }
 
