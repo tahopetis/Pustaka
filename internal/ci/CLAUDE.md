@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #22002 | 1:22 PM | 🔴 | Committed two bugfixes for asset-aging errors and amortization feature handling | ~175 |
 | #21999 | 1:21 PM | 🔴 | Staged bugfix changes for asset-aging NULL handling and FinancialSummaryWidget error handling | ~122 |
 | #21997 | " | 🔴 | Docker services successfully rebuilt and restarted | ~143 |
 | #21983 | 1:15 PM | 🔵 | Discovered asset aging metrics calculation in CI repository | ~196 |

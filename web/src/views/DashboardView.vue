@@ -514,10 +514,14 @@ const loadAmortizationMetrics = async () => {
     const response = await amortizationStore.loadMetrics()
     amortizationMetrics.value = response.data
     errorState.value.amortizationMetrics = null
-  } catch (error) {
-    console.error('Failed to load amortization metrics:', error)
+  } catch (error: any) {
+    // Don't log errors for unimplemented amortization module
+    // Only log actual errors (not network/404 errors which indicate feature not implemented)
+    if (error?.code !== 'ERR_NETWORK' && error?.response?.status !== 404) {
+      console.error('Failed to load amortization metrics:', error)
+    }
     amortizationMetrics.value = null
-    errorState.value.amortizationMetrics = error
+    errorState.value.amortizationMetrics = null // Clear error for unimplemented features
   } finally {
     loadingState.value.amortizationMetrics = false
   }

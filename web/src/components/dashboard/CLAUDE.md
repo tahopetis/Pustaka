@@ -7,6 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #22002 | 1:22 PM | 🔴 | Committed two bugfixes for asset-aging errors and amortization feature handling | ~175 |
+| #22001 | " | 🔴 | Committed graceful handling of unimplemented amortization module | ~178 |
 | #21999 | 1:21 PM | 🔴 | Staged bugfix changes for asset-aging NULL handling and FinancialSummaryWidget error handling | ~122 |
 | #21997 | " | 🔴 | Docker services successfully rebuilt and restarted | ~143 |
 | #21989 | 1:16 PM | ✅ | Added coming soon message to FinancialSummaryWidget empty state | ~154 |

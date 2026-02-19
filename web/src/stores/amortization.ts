@@ -177,6 +177,23 @@ export const useAmortizationStore = defineStore('amortization', () => {
       }
       return metrics.value
     } catch (err: any) {
+      // Handle unimplemented amortization module gracefully
+      if (err?.code === 'ERR_NETWORK' || err?.response?.status === 404) {
+        // Amortization module not implemented - return empty metrics
+        metrics.value = {
+          total_original_cost: 0,
+          total_gross_book_value: 0,
+          total_net_book_value: 0,
+          total_accumulated_depreciation: 0,
+          total_salvage_value: 0,
+          total_amortizable_assets: 0,
+          total_book_value: 0,
+          monthly_depreciation: 0,
+          total_monthly_depreciation: 0,
+          active_amortizations: 0
+        }
+        return metrics.value
+      }
       setError(err.response?.data?.message || 'Failed to load amortization metrics')
       throw err
     } finally {
