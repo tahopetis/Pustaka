@@ -106,6 +106,9 @@
       <p class="text-xs text-gray-600 mt-1">
         Add amortizable assets to see financial summaries
       </p>
+      <p v-if="!summary" class="text-xs text-blue-600 mt-2">
+        <span class="font-medium">Coming soon:</span> Amortization module under development
+      </p>
     </div>
   </DashboardWidget>
 </template>
@@ -172,8 +175,16 @@ const fetchFinancialSummary = async () => {
       }
     })
     summary.value = response.data
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'An error occurred'
+  } catch (err: any) {
+    // If the amortization module is not implemented (404 or connection error),
+    // show a "coming soon" message instead of an error
+    if (err?.code === 'ERR_NETWORK' || err?.response?.status === 404) {
+      // Feature not available - set empty summary to show "coming soon" state
+      summary.value = null
+      error.value = null
+    } else {
+      error.value = err instanceof Error ? err.message : 'An error occurred'
+    }
   } finally {
     loading.value = false
   }
