@@ -195,6 +195,7 @@ func main() {
 	// Create EA services
 	eaRepo := ea.NewRepository(postgresDB.Pool)
 	eaService := ea.NewService(ciService, ciRepo, eaRepo, neo4jService, redisDB.Client, auditService, logger)
+	eaImportService := ea.NewImportService(eaRepo, ciRepo, lifecycleStatusRepo, logger)
 
 	// Create adapters for CI service interfaces
 	ciAdapter := &amortization.CIServiceAdapter{
@@ -239,6 +240,7 @@ func main() {
 	auditHandlers := api.NewAuditHandlers(baseHandler, auditService)
 	amortizationHandlers := handlers.NewAmortizationHandler(amortizationService, logger)
 	eaHandlers := handlers.NewEAHandlers(eaService, logger)
+	importHandlers := handlers.NewImportHandlers(eaImportService, logger)
 
 	// Get base URL for QR codes (from server config or default)
 	baseURL := cfg.Server.BaseURL
@@ -250,7 +252,7 @@ func main() {
 	qrHandlers := api.NewQRHandlers(baseHandler, ciService, logger, baseURL)
 
 	// Setup router
-	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, amortizationHandlers, eaHandlers, qrHandlers, jwtService, rbacService)
+	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, amortizationHandlers, eaHandlers, importHandlers, qrHandlers, jwtService, rbacService)
 
 	// Start amortization scheduler in background
 	go func() {
@@ -316,6 +318,7 @@ func setupRouter(
 	auditHandlers *api.AuditHandlers,
 	amortizationHandlers *handlers.AmortizationHandler,
 	eaHandlers *handlers.EAHandlers,
+	importHandlers *handlers.ImportHandlers,
 	qrHandlers *api.QRHandlers,
 	jwtService *auth.JWTService,
 	rbacService *auth.RBACService,
@@ -616,6 +619,24 @@ func setupRouter(
 					r.Use(middleware.RBAC("ea:delete"))
 					r.Delete("/{id}", eaHandlers.DeleteEAEntity)
 				})
+			})
+
+			// EA Import routes
+			r.Route("/ea/import", func(r chi.Router) {
+				r.Use(middleware.RBAC("ea:create"))
+
+				// Template generation
+				r.Post("/template", importHandlers.GenerateImportTemplate)
+
+				// Import validation and execution
+				r.Post("/validate", importHandlers.ValidateImport)
+				r.Post("/execute", importHandlers.ExecuteImport)
+
+				// Error export
+				r.Post("/errors/download", importHandlers.DownloadErrorCSV)
+
+				// Import status (for async imports)
+				r.Get("/status/{batch_id}", importHandlers.GetImportStatus)
 			})
 
 			// Dashboard routes
