@@ -425,3 +425,268 @@ func CalculateDataQualityScore(validAttributes int, totalAttributes int, validat
 
 	return score
 }
+
+// ============================================================================
+// Entity Attribute Validation (Schema-based)
+// ============================================================================
+
+// ValidateEntityAttributes validates entity attributes against CI type schema
+func ValidateEntityAttributes(entity *EAEntity, ciType *CITypeDefinition) (*ValidationResult, error) {
+	result := &ValidationResult{
+		IsValid:          true,
+		Errors:           []ValidationError{},
+		DataQualityScore: 100,
+		ValidAttributes:  0,
+		TotalRequired:    len(ciType.RequiredAttributes),
+	}
+
+	// Validate required attributes
+	for _, attrDef := range ciType.RequiredAttributes {
+		value, exists := entity.Attributes[attrDef.Name]
+
+		if !exists || value == nil {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    attrDef.Name,
+				Message:  "Required attribute is missing",
+				Severity: "error",
+			})
+			result.IsValid = false
+			continue
+		}
+
+		// Validate data type
+		if err := validateAttributeType(attrDef.Name, attrDef.Type, value, attrDef.Validation); err != nil {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    attrDef.Name,
+				Message:  err.Error(),
+				Severity: "error",
+			})
+			result.IsValid = false
+			continue
+		}
+
+		result.ValidAttributes++
+	}
+
+	// Validate optional attributes if present
+	for _, attrDef := range ciType.OptionalAttributes {
+		if value, exists := entity.Attributes[attrDef.Name]; exists && value != nil {
+			if err := validateAttributeType(attrDef.Name, attrDef.Type, value, attrDef.Validation); err != nil {
+				result.Errors = append(result.Errors, ValidationError{
+					Field:    attrDef.Name,
+					Message:  err.Error(),
+					Severity: "warning", // Optional attributes are warnings
+				})
+			}
+		}
+	}
+
+	// Calculate data quality score
+	if result.TotalRequired > 0 {
+		result.DataQualityScore = float64(result.ValidAttributes*100) / float64(result.TotalRequired)
+	}
+
+	return result, nil
+}
+
+// validateAttributeType validates an attribute value against its type definition
+func validateAttributeType(name, attrType string, value interface{}, validation map[string]interface{}) error {
+	switch attrType {
+	case "string":
+		str, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("expected string, got %T", value)
+		}
+
+		// Validate string constraints
+		if validation != nil {
+			if minLen, ok := validation["min_length"].(float64); ok {
+				if len(str) < int(minLen) {
+					return fmt.Errorf("string too short (min %d characters)", int(minLen))
+				}
+			}
+			if maxLen, ok := validation["max_length"].(float64); ok {
+				if len(str) > int(maxLen) {
+					return fmt.Errorf("string too long (max %d characters)", int(maxLen))
+				}
+			}
+			if pattern, ok := validation["pattern"].(string); ok {
+				// Simple pattern matching (for production, use regex)
+				if !strings.Contains(str, pattern) && pattern != "" {
+					return fmt.Errorf("string does not match required pattern")
+				}
+			}
+		}
+
+	case "integer":
+		var num float64
+		switch v := value.(type) {
+		case float64:
+			num = v
+		case int:
+			num = float64(v)
+		case int64:
+			num = float64(v)
+		default:
+			return fmt.Errorf("expected integer, got %T", value)
+		}
+
+		// Validate numeric constraints
+		if validation != nil {
+			if min, ok := validation["min"].(float64); ok {
+				if num < min {
+					return fmt.Errorf("value too small (min %f)", min)
+				}
+			}
+			if max, ok := validation["max"].(float64); ok {
+				if num > max {
+					return fmt.Errorf("value too large (max %f)", max)
+				}
+			}
+		}
+
+	case "boolean":
+		if _, ok := value.(bool); !ok {
+			return fmt.Errorf("expected boolean, got %T", value)
+		}
+
+	case "date":
+		str, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("expected date string, got %T", value)
+		}
+
+		// Validate ISO 8601 date format
+		if _, err := time.Parse("2006-01-02", str); err != nil {
+			if _, err := time.Parse(time.RFC3339, str); err != nil {
+				return fmt.Errorf("invalid date format (expected YYYY-MM-DD or RFC3339)")
+			}
+		}
+
+	case "array":
+		arr, ok := value.([]interface{})
+		if !ok {
+			return fmt.Errorf("expected array, got %T", value)
+		}
+
+		// Validate array items if item_type is specified
+		if validation != nil {
+			if itemType, ok := validation["item_type"].(string); ok {
+				for i, item := range arr {
+					if err := validateAttributeType(fmt.Sprintf("%s[%d]", name, i), itemType, item, nil); err != nil {
+						return fmt.Errorf("array item %d: %w", i, err)
+					}
+				}
+			}
+		}
+
+	case "object":
+		obj, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("expected object, got %T", value)
+		}
+
+		// Objects are validated as valid JSON structure
+		if len(obj) == 0 {
+			return fmt.Errorf("object cannot be empty")
+		}
+
+	default:
+		return fmt.Errorf("unsupported attribute type: %s", attrType)
+	}
+
+	return nil
+}
+
+// ValidateCrossFieldRules validates EA domain-specific business rules
+func ValidateCrossFieldRules(entity *EAEntity, ciType *CITypeDefinition) []ValidationError {
+	var errors []ValidationError
+
+	// Extract EA domain from CI type
+	domain, err := ExtractEADomain(entity.CIType)
+	if err != nil {
+		return []ValidationError{{
+			Field:    "ci_type",
+			Message:  err.Error(),
+			Severity: "error",
+		}}
+	}
+
+	// Domain-specific validation
+	switch domain {
+	case EADomainBusiness:
+		if err := ValidateBusinessAttributes(entity.CIType, entity.Attributes); err != nil {
+			errors = append(errors, ValidationError{
+				Field:    "attributes",
+				Message:  err.Error(),
+				Severity: "error",
+			})
+		}
+
+	case EADomainApplication:
+		if err := ValidateApplicationAttributes(entity.CIType, entity.Attributes); err != nil {
+			errors = append(errors, ValidationError{
+				Field:    "attributes",
+				Message:  err.Error(),
+				Severity: "error",
+			})
+		}
+
+	case EADomainData:
+		if err := ValidateDataAttributes(entity.CIType, entity.Attributes); err != nil {
+			errors = append(errors, ValidationError{
+				Field:    "attributes",
+				Message:  err.Error(),
+				Severity: "error",
+			})
+		}
+
+	case EADomainTechnology:
+		if err := ValidateTechnologyAttributes(entity.CIType, entity.Attributes); err != nil {
+			errors = append(errors, ValidationError{
+				Field:    "attributes",
+				Message:  err.Error(),
+				Severity: "error",
+			})
+		}
+
+	case EADomainInfrastructure:
+		if err := ValidateInfrastructureAttributes(entity.CIType, entity.Attributes); err != nil {
+			errors = append(errors, ValidationError{
+				Field:    "attributes",
+				Message:  err.Error(),
+				Severity: "error",
+			})
+		}
+
+	case EADomainSecurity:
+		if err := ValidateSecurityAttributes(entity.CIType, entity.Attributes); err != nil {
+			errors = append(errors, ValidationError{
+				Field:    "attributes",
+				Message:  err.Error(),
+				Severity: "error",
+			})
+		}
+
+	case EADomainGovernance:
+		if err := ValidateGovernanceAttributes(entity.CIType, entity.Attributes); err != nil {
+			errors = append(errors, ValidationError{
+				Field:    "attributes",
+				Message:  err.Error(),
+				Severity: "error",
+			})
+		}
+
+	case EADomainStrategy:
+		if err := ValidateStrategyAttributes(entity.CIType, entity.Attributes); err != nil {
+			errors = append(errors, ValidationError{
+				Field:    "attributes",
+				Message:  err.Error(),
+				Severity: "error",
+			})
+		}
+	}
+
+	return errors
+}
+
