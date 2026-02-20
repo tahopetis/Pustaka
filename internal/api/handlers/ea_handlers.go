@@ -1,0 +1,293 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/pustaka/pustaka/internal/api/middleware"
+	"github.com/pustaka/pustaka/internal/ea"
+	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+)
+
+// EAHandlers handles EA entity HTTP requests
+type EAHandlers struct {
+	eaService *ea.Service
+	logger    *pustakaLogger.Logger
+}
+
+// NewEAHandlers creates a new EA handlers instance
+func NewEAHandlers(eaService *ea.Service, logger *pustakaLogger.Logger) *EAHandlers {
+	return &EAHandlers{
+		eaService: eaService,
+		logger:    logger,
+	}
+}
+
+// CreateEAEntity handles POST /api/v1/ea/entities
+func (h *EAHandlers) CreateEAEntity(w http.ResponseWriter, r *http.Request) {
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
+	var req ea.CreateEACIRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate request
+	if req.Name == "" {
+		h.writeError(w, http.StatusBadRequest, "Name is required")
+		return
+	}
+	if req.CIType == "" {
+		h.writeError(w, http.StatusBadRequest, "CI type is required")
+		return
+	}
+	if req.Owner == "" {
+		h.writeError(w, http.StatusBadRequest, "Owner (EA team) is required")
+		return
+	}
+
+	entity, err := h.eaService.CreateEntity(r.Context(), &req, userID)
+	if err != nil {
+		if err == ea.ErrValidationFailed {
+			h.writeError(w, http.StatusUnprocessableEntity, "Validation failed: "+err.Error())
+			return
+		}
+		h.logger.ErrorService("ea", "create_entity", err, map[string]interface{}{
+			"request": req,
+			"user_id": userID,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to create EA entity")
+		return
+	}
+
+	h.writeJSON(w, http.StatusCreated, entity)
+}
+
+// GetEAEntity handles GET /api/v1/ea/entities/{id}
+func (h *EAHandlers) GetEAEntity(w http.ResponseWriter, r *http.Request) {
+	id := extractIDParam(r)
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "Invalid entity ID")
+		return
+	}
+
+	entity, err := h.eaService.GetEntity(r.Context(), id)
+	if err != nil {
+		if err.Error() == "EA entity not found" {
+			h.writeError(w, http.StatusNotFound, "EA entity not found")
+			return
+		}
+		h.logger.ErrorService("ea", "get_entity", err, map[string]interface{}{
+			"entity_id": id,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to get EA entity")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, entity)
+}
+
+// UpdateEAEntity handles PUT /api/v1/ea/entities/{id}
+func (h *EAHandlers) UpdateEAEntity(w http.ResponseWriter, r *http.Request) {
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
+	id := extractIDParam(r)
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "Invalid entity ID")
+		return
+	}
+
+	var req ea.UpdateEACIRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	entity, err := h.eaService.UpdateEntity(r.Context(), id, &req, userID)
+	if err != nil {
+		if err == ea.ErrValidationFailed {
+			h.writeError(w, http.StatusUnprocessableEntity, "Validation failed: "+err.Error())
+			return
+		}
+		if err.Error() == "EA entity not found" {
+			h.writeError(w, http.StatusNotFound, "EA entity not found")
+			return
+		}
+		h.logger.ErrorService("ea", "update_entity", err, map[string]interface{}{
+			"entity_id": id,
+			"user_id":   userID,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to update EA entity")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, entity)
+}
+
+// DeleteEAEntity handles DELETE /api/v1/ea/entities/{id}
+func (h *EAHandlers) DeleteEAEntity(w http.ResponseWriter, r *http.Request) {
+	userIDStr, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "User not found in context")
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid user ID")
+		return
+	}
+
+	id := extractIDParam(r)
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "Invalid entity ID")
+		return
+	}
+
+	if err := h.eaService.DeleteEntity(r.Context(), id, userID); err != nil {
+		if err.Error() == "EA entity not found" {
+			h.writeError(w, http.StatusNotFound, "EA entity not found")
+			return
+		}
+		// Check for relationship dependency error
+		if containsString(err.Error(), "cannot delete EA entity with existing relationships") {
+			h.writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		h.logger.ErrorService("ea", "delete_entity", err, map[string]interface{}{
+			"entity_id": id,
+			"user_id":   userID,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to delete EA entity")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ListEAEntities handles GET /api/v1/ea/entities
+func (h *EAHandlers) ListEAEntities(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	filter := ea.EAFilter{
+		Domain:   r.URL.Query().Get("domain"),
+		CIType:   r.URL.Query().Get("ci_type"),
+		Search:   r.URL.Query().Get("search"),
+		Tags:     r.URL.Query()["tags"], // Multi-value query param
+		Page:     1,
+		PageSize: 25,
+	}
+
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if page, err := strconv.Atoi(pageStr); err == nil && page > 0 {
+			filter.Page = page
+		}
+	}
+
+	if pageSizeStr := r.URL.Query().Get("page_size"); pageSizeStr != "" {
+		if pageSize, err := strconv.Atoi(pageSizeStr); err == nil && pageSize > 0 && pageSize <= 100 {
+			filter.PageSize = pageSize
+		}
+	}
+
+	entities, total, err := h.eaService.ListEntities(r.Context(), filter)
+	if err != nil {
+		h.logger.ErrorService("ea", "list_entities", err, map[string]interface{}{
+			"filter": filter,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to list EA entities")
+		return
+	}
+
+	totalPages := int64(0)
+	if filter.PageSize > 0 {
+		totalInt64 := int64(total)
+		pageSizeInt64 := int64(filter.PageSize)
+		totalPages = (totalInt64 + pageSizeInt64 - 1) / pageSizeInt64
+	}
+
+	response := map[string]interface{}{
+		"entities": entities,
+		"page":     filter.Page,
+		"page_size": filter.PageSize,
+		"total":    total,
+		"total_pages": totalPages,
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// ValidateEAEntity handles GET /api/v1/ea/entities/{id}/validate
+func (h *EAHandlers) ValidateEAEntity(w http.ResponseWriter, r *http.Request) {
+	id := extractIDParam(r)
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "Invalid entity ID")
+		return
+	}
+
+	result, err := h.eaService.ValidateEntity(r.Context(), id)
+	if err != nil {
+		if err.Error() == "EA entity not found" {
+			h.writeError(w, http.StatusNotFound, "EA entity not found")
+			return
+		}
+		h.logger.ErrorService("ea", "validate_entity", err, map[string]interface{}{
+			"entity_id": id,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to validate EA entity")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, result)
+}
+
+// Helper functions
+
+func (h *EAHandlers) writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+func (h *EAHandlers) writeError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+func extractIDParam(r *http.Request) string {
+	return chi.URLParam(r, "id")
+}
+
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || indexOfString(s, substr) >= 0))
+}
+
+func indexOfString(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}

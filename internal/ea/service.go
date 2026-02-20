@@ -406,3 +406,310 @@ func (s *Service) DeleteTeam(ctx context.Context, id uuid.UUID, userID uuid.UUID
 
 	return nil
 }
+
+// ============================================================================
+// EA Entity CRUD with New Repository (direct database access)
+// ============================================================================
+
+// CreateEntity creates a new EA entity using the EA repository
+func (s *Service) CreateEntity(ctx context.Context, req *CreateEACIRequest, userID uuid.UUID) (*EAEntity, error) {
+	// 1. Validate EA domain from CI type
+	domain, err := ExtractEADomain(req.CIType)
+	if err != nil {
+		s.logger.Error().Err(err).Str("ci_type", req.CIType).Msg("Invalid EA CI type")
+		return nil, fmt.Errorf("invalid EA CI type: %w", err)
+	}
+
+	// 2. Verify EA team exists
+	team, err := s.repo.GetTeamByName(ctx, req.Owner)
+	if err != nil {
+		s.logger.Error().Err(err).Str("team_name", req.Owner).Msg("EA team not found")
+		return nil, fmt.Errorf("EA team not found: %w", err)
+	}
+
+	// 3. Get CI type definition for validation
+	ciType, err := s.repo.GetCITypeByName(ctx, req.CIType)
+	if err != nil {
+		s.logger.Error().Err(err).Str("ci_type", req.CIType).Msg("CI type not found")
+		return nil, fmt.Errorf("CI type not found: %w", err)
+	}
+
+	// 4. Prepare attributes with EA metadata
+	attributes := req.Attributes
+	if attributes == nil {
+		attributes = make(map[string]interface{})
+	}
+
+	// Add EA-specific metadata
+	attributes["ea_domain"] = string(domain)
+	attributes["ea_owner"] = req.Owner
+	attributes["ea_team_id"] = team.ID.String()
+
+	if req.Description != "" {
+		attributes["description"] = req.Description
+	}
+
+	// 5. Validate entity attributes
+	validationResult, err := ValidateEntityAttributes(&EAEntity{
+		Name:       req.Name,
+		CIType:     req.CIType,
+		Attributes: attributes,
+		Tags:       req.Tags,
+	}, ciType)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Validation error")
+		return nil, fmt.Errorf("validation error: %w", err)
+	}
+
+	// 6. Validate cross-field rules
+	crossFieldErrors := ValidateCrossFieldRules(&EAEntity{
+		Name:       req.Name,
+		CIType:     req.CIType,
+		Attributes: attributes,
+		Tags:       req.Tags,
+	}, ciType)
+
+	// Merge validation errors
+	for _, e := range crossFieldErrors {
+		validationResult.Errors = append(validationResult.Errors, e)
+	}
+	if len(crossFieldErrors) > 0 {
+		validationResult.IsValid = false
+	}
+
+	// 7. Handle admin override
+	if !req.OverrideValidation && !validationResult.IsValid {
+		// Return validation errors
+		s.logger.Warn().
+			Str("ea_domain", string(domain)).
+			Int("error_count", len(validationResult.Errors)).
+			Msg("EA entity validation failed")
+		return nil, ErrValidationFailed
+	}
+
+	// 8. Add EA domain tag
+	tags := req.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+	tags = append(tags, string(domain))
+
+	// 9. Create entity
+	entity := &EAEntity{
+		Name:              req.Name,
+		CIType:            req.CIType,
+		Attributes:        attributes,
+		Tags:              tags,
+		LifecycleStatusID: &req.LifecycleStatusID,
+		DataQualityScore:  validationResult.DataQualityScore,
+		CreatedBy:         userID,
+	}
+
+	result, err := s.repo.Create(ctx, entity)
+	if err != nil {
+		s.logger.Error().Err(err).Str("ea_domain", string(domain)).Msg("Failed to create EA entity")
+		return nil, fmt.Errorf("failed to create EA entity: %w", err)
+	}
+
+	// 10. Log audit event
+	s.auditService.CreateAuditLog(ctx, "ea", &result.ID, "create", userID, map[string]interface{}{
+		"ea_domain":         string(domain),
+		"ci_name":           req.Name,
+		"ci_type":           req.CIType,
+		"team":              team.Name,
+		"data_quality_score": validationResult.DataQualityScore,
+		"validation_errors": len(validationResult.Errors),
+	}, "", "")
+
+	s.logger.Info().
+		Str("ea_domain", string(domain)).
+		Str("ci_name", req.Name).
+		Str("ci_id", result.ID.String()).
+		Float64("data_quality_score", validationResult.DataQualityScore).
+		Msg("EA entity created successfully")
+
+	return result, nil
+}
+
+// GetEntity retrieves an EA entity by ID
+func (s *Service) GetEntity(ctx context.Context, id string) (*EAEntity, error) {
+	entity, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return entity, nil
+}
+
+// UpdateEntity updates an EA entity
+func (s *Service) UpdateEntity(ctx context.Context, id string, req *UpdateEACIRequest, userID uuid.UUID) (*EAEntity, error) {
+	// 1. Get existing entity
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Get CI type for validation
+	ciType, err := s.repo.GetCITypeByName(ctx, existing.CIType)
+	if err != nil {
+		return nil, fmt.Errorf("CI type not found: %w", err)
+	}
+
+	// 3. Prepare updated attributes
+	attributes := existing.Attributes
+	if req.Attributes != nil {
+		attributes = req.Attributes
+	}
+
+	// Update EA metadata
+	attributes["ea_last_updated_by"] = userID.String()
+
+	if req.Description != "" {
+		attributes["description"] = req.Description
+	}
+
+	if req.Owner != "" {
+		// Verify team exists
+		team, err := s.repo.GetTeamByName(ctx, req.Owner)
+		if err != nil {
+			return nil, fmt.Errorf("EA team not found: %w", err)
+		}
+		attributes["ea_owner"] = req.Owner
+		attributes["ea_team_id"] = team.ID.String()
+	}
+
+	// 4. Validate updated attributes
+	updatedEntity := &EAEntity{
+		ID:                existing.ID,
+		Name:              req.Name,
+		CIType:            existing.CIType,
+		Attributes:        attributes,
+		Tags:              req.Tags,
+		LifecycleStatusID: req.LifecycleStatusID,
+	}
+
+	validationResult, err := ValidateEntityAttributes(updatedEntity, ciType)
+	if err != nil {
+		return nil, fmt.Errorf("validation error: %w", err)
+	}
+
+	crossFieldErrors := ValidateCrossFieldRules(updatedEntity, ciType)
+	for _, e := range crossFieldErrors {
+		validationResult.Errors = append(validationResult.Errors, e)
+	}
+
+	// 5. Handle admin override
+	if !req.OverrideValidation && !validationResult.IsValid {
+		return nil, ErrValidationFailed
+	}
+
+	// 6. Update entity
+	entity := &EAEntity{
+		ID:                existing.ID,
+		Name:              req.Name,
+		CIType:            existing.CIType,
+		Attributes:        attributes,
+		Tags:              req.Tags,
+		LifecycleStatusID: req.LifecycleStatusID,
+		DataQualityScore:  validationResult.DataQualityScore,
+		UpdatedBy:         &userID,
+	}
+
+	if err := s.repo.Update(ctx, entity); err != nil {
+		return nil, fmt.Errorf("failed to update EA entity: %w", err)
+	}
+
+	// 7. Get updated entity
+	result, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// 8. Log audit event
+	domain, _ := ExtractEADomain(existing.CIType)
+	s.auditService.CreateAuditLog(ctx, "ea", &result.ID, "update", userID, map[string]interface{}{
+		"ea_domain":         string(domain),
+		"ci_name":           result.Name,
+		"data_quality_score": validationResult.DataQualityScore,
+	}, "", "")
+
+	s.logger.Info().
+		Str("ea_domain", string(domain)).
+		Str("ci_id", id).
+		Msg("EA entity updated successfully")
+
+	return result, nil
+}
+
+// DeleteEntity deletes an EA entity
+func (s *Service) DeleteEntity(ctx context.Context, id string, userID uuid.UUID) error {
+	// 1. Get existing entity for audit
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	domain, _ := ExtractEADomain(existing.CIType)
+
+	// 2. Check relationships (done in repo.Delete)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	// 3. Log audit event
+	s.auditService.CreateAuditLog(ctx, "ea", &existing.ID, "delete", userID, map[string]interface{}{
+		"ea_domain": string(domain),
+		"ci_name":   existing.Name,
+		"ci_type":   existing.CIType,
+	}, "", "")
+
+	s.logger.Info().
+		Str("ea_domain", string(domain)).
+		Str("ci_id", id).
+		Msg("EA entity deleted successfully")
+
+	return nil
+}
+
+// ListEntities retrieves EA entities with filtering and pagination
+func (s *Service) ListEntities(ctx context.Context, filter EAFilter) ([]EAEntity, int, error) {
+	entities, total, err := s.repo.List(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return entities, total, nil
+}
+
+// ValidateEntity validates an EA entity and returns validation result
+func (s *Service) ValidateEntity(ctx context.Context, id string) (*ValidationResult, error) {
+	// 1. Get entity
+	entity, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Get CI type
+	ciType, err := s.repo.GetCITypeByName(ctx, entity.CIType)
+	if err != nil {
+		return nil, fmt.Errorf("CI type not found: %w", err)
+	}
+
+	// 3. Validate attributes
+	result, err := ValidateEntityAttributes(entity, ciType)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Validate cross-field rules
+	crossFieldErrors := ValidateCrossFieldRules(entity, ciType)
+	for _, e := range crossFieldErrors {
+		result.Errors = append(result.Errors, e)
+	}
+	if len(crossFieldErrors) > 0 {
+		result.IsValid = false
+	}
+
+	return result, nil
+}
+

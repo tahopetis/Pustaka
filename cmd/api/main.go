@@ -23,6 +23,7 @@ import (
 	"github.com/pustaka/pustaka/internal/ci"
 	"github.com/pustaka/pustaka/internal/config"
 	"github.com/pustaka/pustaka/internal/database"
+	"github.com/pustaka/pustaka/internal/ea"
 	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
 )
 
@@ -191,6 +192,10 @@ func main() {
 	amortizationCalculator := amortization.NewCalculator(logger)
 	amortizationScheduler := amortization.NewScheduler(amortizationRepo, amortizationCache, logger)
 
+	// Create EA services
+	eaRepo := ea.NewRepository(postgresDB.Pool)
+	eaService := ea.NewService(ciService, ciRepo, eaRepo, neo4jService, redisDB.Client, auditService, logger)
+
 	// Create adapters for CI service interfaces
 	ciAdapter := &amortization.CIServiceAdapter{
 		Service: ciService,
@@ -233,6 +238,7 @@ func main() {
 	lifecycleStatusHandlers := handlers.NewLifecycleStatusHandler(lifecycleStatusService, rbacService, logger)
 	auditHandlers := api.NewAuditHandlers(baseHandler, auditService)
 	amortizationHandlers := handlers.NewAmortizationHandler(amortizationService, logger)
+	eaHandlers := handlers.NewEAHandlers(eaService, logger)
 
 	// Get base URL for QR codes (from server config or default)
 	baseURL := cfg.Server.BaseURL
@@ -244,7 +250,7 @@ func main() {
 	qrHandlers := api.NewQRHandlers(baseHandler, ciService, logger, baseURL)
 
 	// Setup router
-	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, amortizationHandlers, qrHandlers, jwtService, rbacService)
+	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, amortizationHandlers, eaHandlers, qrHandlers, jwtService, rbacService)
 
 	// Start amortization scheduler in background
 	go func() {
@@ -309,6 +315,7 @@ func setupRouter(
 	lifecycleStatusHandlers *handlers.LifecycleStatusHandler,
 	auditHandlers *api.AuditHandlers,
 	amortizationHandlers *handlers.AmortizationHandler,
+	eaHandlers *handlers.EAHandlers,
 	qrHandlers *api.QRHandlers,
 	jwtService *auth.JWTService,
 	rbacService *auth.RBACService,
@@ -587,6 +594,29 @@ func setupRouter(
 
 			// Current user profile
 			r.Get("/me", authHandler.GetCurrentUser)
+
+			// EA Entity routes
+			r.Route("/ea/entities", func(r chi.Router) {
+				r.Use(middleware.RBAC("ea:read"))
+				r.Get("/", eaHandlers.ListEAEntities)
+				r.Get("/{id}", eaHandlers.GetEAEntity)
+				r.Get("/{id}/validate", eaHandlers.ValidateEAEntity)
+
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("ea:create"))
+					r.Post("/", eaHandlers.CreateEAEntity)
+				})
+
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("ea:update"))
+					r.Put("/{id}", eaHandlers.UpdateEAEntity)
+				})
+
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RBAC("ea:delete"))
+					r.Delete("/{id}", eaHandlers.DeleteEAEntity)
+				})
+			})
 
 			// Dashboard routes
 			r.Route("/dashboard", func(r chi.Router) {
