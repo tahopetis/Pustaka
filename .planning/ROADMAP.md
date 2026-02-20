@@ -51,10 +51,10 @@ Plans:
 **Plans**: 4 plans (Wave 1: 02-01 | Wave 2: 02-02 | Wave 3: 02-03, 02-04)
 
 Plans:
-- [ ] 02-01-PLAN.md — Build EA entity CRUD HTTP handlers and endpoints with validation, RBAC, relationship checking, and audit logging
-- [ ] 02-02-PLAN.md — Create frontend entity management views with dynamic form builder, ag-grid integration, and per-domain navigation
-- [ ] 02-03-PLAN.md — Implement bulk CSV import workflow with template download, validation, dual error display, and progress tracking
-- [ ] 02-04-PLAN.md — Build data quality dashboard with stat cards, pie charts, drill-down navigation, and manual refresh
+- [x] 02-01-PLAN.md — Build EA entity CRUD HTTP handlers and endpoints with validation, RBAC, relationship checking, and audit logging ✅ COMPLETED 2026-02-20
+- [x] 02-02-PLAN.md — Create frontend entity management views with dynamic form builder, ag-grid integration, and per-domain navigation ✅ COMPLETED 2026-02-20
+- [x] 02-03-PLAN.md — Implement bulk CSV import workflow with template download, validation, dual error display, and progress tracking ✅ COMPLETED 2026-02-20
+- [x] 02-04-PLAN.md — Build data quality dashboard with stat cards, pie charts, drill-down navigation, and manual refresh ✅ COMPLETED 2026-02-20
 
 ### Phase 3: Relationships & Impact
 **Goal**: Users can model cross-domain relationships and visualize 1-hop impact analysis
@@ -89,5 +89,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete | 2026-02-20 |
-| 2. Entity Management | 0/4 | Ready for execution | - |
+| 2. Entity Management | 4/4 | Complete | 2026-02-20 |
 | 3. Relationships & Impact | 0/7 | Not started | - |
