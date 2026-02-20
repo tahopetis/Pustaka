@@ -456,3 +456,133 @@ VALUES
 )
 
 ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================================
+-- SECTION 4: Validation Queries
+-- ============================================================================
+
+-- Validate EA teams created
+DO $$
+BEGIN
+    ASSERT (SELECT COUNT(*) FROM ea_teams) = 8, 'Expected 8 EA teams to be created';
+    RAISE NOTICE 'EA teams validation passed: 8 teams created';
+END $$;
+
+-- Validate EA CI types created
+DO $$
+DECLARE
+    ea_ci_type_count INT;
+BEGIN
+    SELECT COUNT(*) INTO ea_ci_type_count FROM ci_type_definitions WHERE name LIKE 'EA.%';
+    ASSERT ea_ci_type_count >= 60, format('Expected at least 60 EA CI types, got %s', ea_ci_type_count);
+    RAISE NOTICE 'EA CI types validation passed: %s types created', ea_ci_type_count;
+END $$;
+
+-- Validate EA relationship types created
+DO $$
+DECLARE
+    ea_rel_type_count INT;
+BEGIN
+    SELECT COUNT(*) INTO ea_rel_type_count FROM relationship_types WHERE name IN (
+        'supports', 'depends_on', 'realizes', 'flows_to', 'assigned_to',
+        'aggregates', 'composes', 'accesses', 'associated_with',
+        'deployed_on', 'runs_on', 'uses', 'implements', 'validates',
+        'mitigates', 'enforces', 'assesses', 'governs', 'aligned_with',
+        'conforms_to', 'derived_from', 'decomposes', 'triggers'
+    );
+    ASSERT ea_rel_type_count >= 20, format('Expected at least 20 EA relationship types, got %s', ea_rel_type_count);
+    RAISE NOTICE 'EA relationship types validation passed: %s types created', ea_rel_type_count;
+END $$;
+
+-- Validate referential integrity for EA teams
+DO $$
+DECLARE
+    invalid_teams INT;
+BEGIN
+    SELECT COUNT(*) INTO invalid_teams FROM ea_teams WHERE created_by IS NULL;
+    ASSERT invalid_teams = 0, 'All EA teams must have a creator';
+    RAISE NOTICE 'EA teams referential integrity passed';
+END $$;
+
+-- Validate EA CI types have creator
+DO $$
+DECLARE
+    invalid_ci_types INT;
+BEGIN
+    SELECT COUNT(*) INTO invalid_ci_types FROM ci_type_definitions WHERE name LIKE 'EA.%' AND created_by IS NULL;
+    ASSERT invalid_ci_types = 0, 'All EA CI types must have a creator';
+    RAISE NOTICE 'EA CI types referential integrity passed';
+END $$;
+
+-- Validate EA relationship types have creator
+DO $$
+DECLARE
+    invalid_rel_types INT;
+BEGIN
+    SELECT COUNT(*) INTO invalid_rel_types FROM relationship_types WHERE name IN (
+        'supports', 'depends_on', 'realizes', 'flows_to', 'assigned_to',
+        'aggregates', 'composes', 'accesses', 'associated_with',
+        'deployed_on', 'runs_on', 'uses', 'implements', 'validates',
+        'mitigates', 'enforces', 'assesses', 'governs', 'aligned_with',
+        'conforms_to', 'derived_from', 'decomposes', 'triggers'
+    ) AND created_by IS NULL;
+    ASSERT invalid_rel_types = 0, 'All EA relationship types must have a creator';
+    RAISE NOTICE 'EA relationship types referential integrity passed';
+END $$;
+
+-- Display summary
+SELECT
+    'EA Teams' as item, COUNT(*) as count FROM ea_teams
+UNION ALL
+SELECT
+    'EA CI Types', COUNT(*) FROM ci_type_definitions WHERE name LIKE 'EA.%'
+UNION ALL
+SELECT
+    'EA Relationship Types', COUNT(*) FROM relationship_types WHERE name IN (
+        'supports', 'depends_on', 'realizes', 'flows_to', 'assigned_to',
+        'aggregates', 'composes', 'accesses', 'associated_with',
+        'deployed_on', 'runs_on', 'uses', 'implements', 'validates',
+        'mitigates', 'enforces', 'assesses', 'governs', 'aligned_with',
+        'conforms_to', 'derived_from', 'decomposes', 'triggers'
+    );
+
+-- ============================================================================
+-- SECTION 5: EA RBAC Permissions
+-- ============================================================================
+
+-- EA entity permissions
+INSERT INTO permissions (name, description, resource_type) VALUES
+    ('ea:read', 'Read EA entities', 'ea'),
+    ('ea:create', 'Create EA entities', 'ea'),
+    ('ea:update', 'Update EA entities', 'ea'),
+    ('ea:delete', 'Delete EA entities', 'ea')
+ON CONFLICT (name) DO NOTHING;
+
+-- Grant all EA permissions to admin role
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT
+    (SELECT id FROM roles WHERE name = 'admin'),
+    p.id
+FROM permissions p
+WHERE p.name LIKE 'ea:%'
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Grant EA read permission to editor and viewer roles
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT
+    r.id,
+    (SELECT id FROM permissions WHERE name = 'ea:read')
+FROM roles r
+WHERE r.name IN ('editor', 'viewer')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Verify permissions created
+DO $$
+BEGIN
+    ASSERT (SELECT COUNT(*) FROM permissions WHERE name LIKE 'ea:%') = 4, 'Expected 4 EA permissions (ea:read, ea:create, ea:update, ea:delete)';
+    RAISE NOTICE 'EA permissions created successfully';
+END $$;
+
+-- ============================================================================
+-- Migration 009_add_ea_metamodel complete
+-- ============================================================================
