@@ -48,15 +48,13 @@ Plans:
   5. System enforces EA-specific RBAC permissions (ea:read, ea:create, ea:update, ea:delete) and tracks all changes in audit log
   6. System provides data quality dashboard showing completeness, staleness, and validation errors
   7. EA entities maintain lifecycle status (proposed, active, deprecated, retired)
-**Plans**: TBD
+**Plans**: 4 plans (Wave 1: 02-01 | Wave 2: 02-02 | Wave 3: 02-03, 02-04)
 
 Plans:
-- [ ] 02-01: Build EA entity CRUD HTTP handlers and endpoints
-- [ ] 02-02: Create frontend entity management views for each EA domain
-- [ ] 02-03: Implement search, filtering, and pagination with ag-grid-vue3
-- [ ] 02-04: Build bulk CSV import with validation (gocsv backend, PapaParse frontend)
-- [ ] 02-05: Extend RBAC with EA permissions and enforce access control
-- [ ] 02-06: Implement data quality dashboard and lifecycle status management
+- [ ] 02-01-PLAN.md — Build EA entity CRUD HTTP handlers and endpoints with validation, RBAC, relationship checking, and audit logging
+- [ ] 02-02-PLAN.md — Create frontend entity management views with dynamic form builder, ag-grid integration, and per-domain navigation
+- [ ] 02-03-PLAN.md — Implement bulk CSV import workflow with template download, validation, dual error display, and progress tracking
+- [ ] 02-04-PLAN.md — Build data quality dashboard with stat cards, pie charts, drill-down navigation, and manual refresh
 
 ### Phase 3: Relationships & Impact
 **Goal**: Users can model cross-domain relationships and visualize 1-hop impact analysis
@@ -90,6 +88,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 3/4 | Gap closure in progress | 2026-02-20 |
-| 2. Entity Management | 0/6 | Not started | - |
+| 1. Foundation | 4/4 | Complete | 2026-02-20 |
+| 2. Entity Management | 0/4 | Ready for execution | - |
 | 3. Relationships & Impact | 0/7 | Not started | - |
