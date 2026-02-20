@@ -28,12 +28,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. EA service layer skeleton exists and wraps existing CI service with composition pattern
   4. Database migration successfully seeds EA types without breaking existing CMDB functionality
   5. EA entities are queryable through existing CI infrastructure with domain-specific validation framework
-**Plans**: 3 plans (Wave 1: 01-01, 01-02 | Wave 2: 01-03)
+**Plans**: 4 plans (Wave 1: 01-01, 01-02 | Wave 2: 01-03 | Gap Closure: 01-04)
 
 Plans:
 - [x] 01-01-PLAN.md — Define EA metamodel specifications (60+ CI types, 20-25 relationship types, cross-domain validation rules, data ownership model) ✅ COMPLETED 2026-02-20
 - [x] 01-02-PLAN.md — Create database migration for EA CI type and relationship type seeding (ea_teams table, validation queries, RBAC permissions) ✅ COMPLETED 2026-02-20
-- [ ] 01-03-PLAN.md — Build EA service layer skeleton with CI service composition (base service, repository, validation, 8 domain services)
+- [x] 01-03-PLAN.md — Build EA service layer skeleton with CI service composition (base service, repository, validation, 8 domain services) ✅ COMPLETED 2026-02-20
+- [ ] 01-04-PLAN.md — Fix migration 009 JSON syntax and column names (UAT gap closure)
 
 ### Phase 2: Entity Management
 **Goal**: Users can create, edit, search, and import EA entities with governance and data quality controls
@@ -89,6 +90,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 2/3 | In progress | 2026-02-20 |
+| 1. Foundation | 3/4 | Gap closure in progress | 2026-02-20 |
 | 2. Entity Management | 0/6 | Not started | - |
 | 3. Relationships & Impact | 0/7 | Not started | - |
