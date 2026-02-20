@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS ea_teams (
 );
 
 -- Create index on name for lookups
-CREATE INDEX idx_ea_teams_name ON ea_teams(name);
+CREATE INDEX IF NOT EXISTS idx_ea_teams_name ON ea_teams(name);
 
 -- Add comment
 COMMENT ON TABLE ea_teams IS 'EA teams for team-based ownership of EA entities';
@@ -39,8 +39,13 @@ VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Add update trigger for ea_teams
-CREATE TRIGGER update_ea_teams_updated_at BEFORE UPDATE ON ea_teams
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_ea_teams_updated_at') THEN
+        CREATE TRIGGER update_ea_teams_updated_at BEFORE UPDATE ON ea_teams
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
 
 -- ============================================================================
 -- SECTION 2: EA CI Type Definitions
@@ -66,7 +71,7 @@ VALUES
     ('EA.Business-Function', 'Business function representing cohesive business activity', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"parent_process_id","type":"uuid"},{"name":"criticality","type":"string","enum":["mission_critical","important","standard","support"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Business-Interaction', 'Business interaction between roles', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"interaction_type","type":"string","enum":["synchronous","asynchronous"]},{"name":"trigger","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Business-Event', 'Business event triggering processes', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"event_type","type":"string","enum":["external","internal","temporal"]},{"name":"frequency","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Business-Service', 'Business service delivered to customers', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"service_level","type":"string","enum":["gold","silver","bronze"]},{"name="sla_target","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Business-Service', 'Business service delivered to customers', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"service_level","type":"string","enum":["gold","silver","bronze"]},{"name":"sla_target","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Business-Actor', 'Business actor (person or organization)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"actor_type","type":"string","enum":["person","role","organization"]},{"name":"contact_info","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Business-Role', 'Business role defining responsibilities', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"permissions","type":"array"},{"name":"assigned_to","type":"array"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Business-Collaboration', 'Business collaboration between actors', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"collaboration_type","type":"string","enum":["permanent","temporary","project_based"]},{"name":"duration","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
@@ -105,8 +110,8 @@ VALUES
     ('EA.Technology-Artifact', 'Technology artifact or deployment unit', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"artifact_type","type":"string","enum":["jar","war","dll","exe","docker_image","npm_package"]},{"name":"checksum","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Technology-Resource', 'Technology resource or capability', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"resource_type","type":"string","enum":["compute","storage","network","license"]},{"name":"capacity","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Technology-Capability', 'Technology capability or feature', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"maturity_level","type":"string","enum":["emerging","growing","mature","declining"]},{"name":"adoption_status","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Technology-Function', 'Technology function or API', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"function_type","type":"string","enum":["api","library","service","utility"]},{"name="signature","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Technology-Service', 'Technology service or utility', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"service_model","type":"string","enum":["saas","paas","iaas","on_premise"]},{"name="availability_sla","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Technology-Function', 'Technology function or API', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"function_type","type":"string","enum":["api","library","service","utility"]},{"name":"signature","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Technology-Service', 'Technology service or utility', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"service_model","type":"string","enum":["saas","paas","iaas","on_premise"]},{"name":"availability_sla","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Technology-Path', 'Technology path or communication channel', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"path_type","type":"string","enum":["network","bus","queue","topic"]},{"name":"bandwidth","type":"string"},{"name":"latency","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
 ON CONFLICT (name) DO NOTHING;
 
