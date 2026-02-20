@@ -199,6 +199,12 @@ const router = createRouter({
       component: () => import('@/views/ea/EntityFormView.vue'),
       meta: { requiresAuth: true, requiresPermission: 'ea:update' }
     },
+    {
+      path: '/entities/import',
+      name: 'ImportEAEntities',
+      component: () => import('@/views/ea/ImportWizardView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'ea:create' }
+    },
     // Amortization Module Routes
     {
       path: '/amortization',
