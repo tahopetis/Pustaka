@@ -40,29 +40,21 @@ func (s *SecurityService) CreateSecurityPolicy(ctx context.Context, req *CreateE
 }
 
 // ListSecurityControls retrieves all Security Controls
-func (s *SecurityService) ListSecurityControls(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *SecurityService) ListSecurityControls(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Security-Control"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }
 
 // ListSecurityPolicies retrieves all Security Policies
-func (s *SecurityService) ListSecurityPolicies(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *SecurityService) ListSecurityPolicies(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Security-Policy"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }

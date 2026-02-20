@@ -41,29 +41,19 @@ func (s *ApplicationService) CreateApplicationInterface(ctx context.Context, req
 }
 
 // ListBusinessApplications retrieves all Business Applications
-func (s *ApplicationService) ListBusinessApplications(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *ApplicationService) ListBusinessApplications(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Application-BusinessApp"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
 }
 
 // ListApplicationComponents retrieves all Application Components
-func (s *ApplicationService) ListApplicationComponents(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *ApplicationService) ListApplicationComponents(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Application-Component"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
 }

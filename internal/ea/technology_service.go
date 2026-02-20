@@ -40,29 +40,21 @@ func (s *TechnologyService) CreateTechnologyPlatform(ctx context.Context, req *C
 }
 
 // ListTechnologyComponents retrieves all Technology Components
-func (s *TechnologyService) ListTechnologyComponents(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *TechnologyService) ListTechnologyComponents(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Technology-Component"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }
 
 // ListTechnologyPlatforms retrieves all Technology Platforms
-func (s *TechnologyService) ListTechnologyPlatforms(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *TechnologyService) ListTechnologyPlatforms(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Technology-Platform"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }

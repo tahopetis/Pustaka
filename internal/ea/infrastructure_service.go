@@ -40,29 +40,21 @@ func (s *InfrastructureService) CreateInfrastructureNetwork(ctx context.Context,
 }
 
 // ListInfrastructureNodes retrieves all Infrastructure Nodes
-func (s *InfrastructureService) ListInfrastructureNodes(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *InfrastructureService) ListInfrastructureNodes(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Infrastructure-Node"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }
 
 // ListInfrastructureNetworks retrieves all Infrastructure Networks
-func (s *InfrastructureService) ListInfrastructureNetworks(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *InfrastructureService) ListInfrastructureNetworks(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Infrastructure-Network"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }

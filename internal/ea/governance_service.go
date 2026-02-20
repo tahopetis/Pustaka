@@ -40,29 +40,21 @@ func (s *GovernanceService) CreateComplianceRequirement(ctx context.Context, req
 }
 
 // ListGovernancePolicies retrieves all Governance Policies
-func (s *GovernanceService) ListGovernancePolicies(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *GovernanceService) ListGovernancePolicies(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Governance-Policy"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }
 
 // ListComplianceRequirements retrieves all Compliance Requirements
-func (s *GovernanceService) ListComplianceRequirements(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *GovernanceService) ListComplianceRequirements(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Governance-Compliance"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }

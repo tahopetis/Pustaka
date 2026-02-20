@@ -43,29 +43,21 @@ func (s *StrategyService) CreateStrategyInitiative(ctx context.Context, req *Cre
 }
 
 // ListStrategyObjectives retrieves all Strategy Objectives
-func (s *StrategyService) ListStrategyObjectives(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *StrategyService) ListStrategyObjectives(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Strategy-Objective"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }
 
 // ListStrategyInitiatives retrieves all Strategy Initiatives
-func (s *StrategyService) ListStrategyInitiatives(ctx context.Context) ([]*ci.ConfigurationItem, error) {
+func (s *StrategyService) ListStrategyInitiatives(ctx context.Context) ([]ci.ConfigurationItem, error) {
 	response, err := s.ciService.ListCIs(ctx, ci.ListCIFilters{CIType: "EA.Strategy-Initiative"}, 1, 1000)
 	if err != nil {
 		return nil, err
 	}
-	// Convert value types to pointers
-	result := make([]*ci.ConfigurationItem, len(response.CIs))
-	for i := range response.CIs {
-		result[i] = &response.CIs[i]
-	}
-	return result, nil
+	return response.CIs, nil
+
 }
