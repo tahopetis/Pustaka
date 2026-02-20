@@ -24,6 +24,7 @@ import (
 	"github.com/pustaka/pustaka/internal/config"
 	"github.com/pustaka/pustaka/internal/database"
 	"github.com/pustaka/pustaka/internal/ea"
+	"github.com/pustaka/pustaka/internal/repository"
 	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
 )
 
@@ -197,6 +198,9 @@ func main() {
 	eaService := ea.NewService(ciService, ciRepo, eaRepo, neo4jService, redisDB.Client, auditService, logger)
 	eaImportService := ea.NewImportService(eaRepo, ciRepo, lifecycleStatusRepo, logger)
 
+	// Create EA data quality repository
+	qualityRepo := repository.NewEADataQualityRepository(postgresDB.Pool, logger)
+
 	// Create adapters for CI service interfaces
 	ciAdapter := &amortization.CIServiceAdapter{
 		Service: ciService,
@@ -241,6 +245,7 @@ func main() {
 	amortizationHandlers := handlers.NewAmortizationHandler(amortizationService, logger)
 	eaHandlers := handlers.NewEAHandlers(eaService, logger)
 	importHandlers := handlers.NewImportHandlers(eaImportService, logger)
+	dataQualityHandlers := handlers.NewDataQualityHandlers(qualityRepo, logger)
 
 	// Get base URL for QR codes (from server config or default)
 	baseURL := cfg.Server.BaseURL
@@ -252,7 +257,7 @@ func main() {
 	qrHandlers := api.NewQRHandlers(baseHandler, ciService, logger, baseURL)
 
 	// Setup router
-	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, amortizationHandlers, eaHandlers, importHandlers, qrHandlers, jwtService, rbacService)
+	router := setupRouter(cfg, logger, authHandler, userHandler, ciHandlers, ciTypeHandlers, relationshipHandlers, relationshipTypeHandlers, lifecycleStatusHandlers, auditHandlers, amortizationHandlers, eaHandlers, importHandlers, dataQualityHandlers, qrHandlers, jwtService, rbacService)
 
 	// Start amortization scheduler in background
 	go func() {
@@ -319,6 +324,7 @@ func setupRouter(
 	amortizationHandlers *handlers.AmortizationHandler,
 	eaHandlers *handlers.EAHandlers,
 	importHandlers *handlers.ImportHandlers,
+	dataQualityHandlers *handlers.DataQualityHandlers,
 	qrHandlers *api.QRHandlers,
 	jwtService *auth.JWTService,
 	rbacService *auth.RBACService,
@@ -637,6 +643,15 @@ func setupRouter(
 
 				// Import status (for async imports)
 				r.Get("/status/{batch_id}", importHandlers.GetImportStatus)
+			})
+
+			// EA Data Quality routes
+			r.Route("/ea/data-quality", func(r chi.Router) {
+				r.Use(middleware.RBAC("ea:read"))
+				r.Get("/", dataQualityHandlers.GetDataQualityMetrics)
+				r.Get("/stale", dataQualityHandlers.GetStaleEntities)
+				r.Get("/errors", dataQualityHandlers.GetEntitiesWithErrors)
+				r.Get("/lifecycle", dataQualityHandlers.GetLifecycleBreakdown)
 			})
 
 			// Dashboard routes
