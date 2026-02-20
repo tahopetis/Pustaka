@@ -205,6 +205,16 @@ const router = createRouter({
       component: () => import('@/views/ea/ImportWizardView.vue'),
       meta: { requiresAuth: true, requiresPermission: 'ea:create' }
     },
+    {
+      path: '/ea/data-quality',
+      name: 'EADataQuality',
+      component: () => import('@/views/ea/DataQualityDashboard.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'ea:read' }
+    },
+    {
+      path: '/entities/data-quality',
+      redirect: '/ea/data-quality'
+    },
     // Amortization Module Routes
     {
       path: '/amortization',
