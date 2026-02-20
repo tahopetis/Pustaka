@@ -17,12 +17,12 @@ Requirements for initial EA module release. Each maps to roadmap phases.
 
 ### Entity Management
 
-- [ ] **ENT-01**: User can create EA entities manually through forms for all 8 domains
-- [ ] **ENT-02**: User can edit existing EA entities with validation
+- [x] **ENT-01**: User can create EA entities manually through forms for all 8 domains
+- [x] **ENT-02**: User can edit existing EA entities with validation
 - [ ] **ENT-03**: User can delete EA entities with relationship dependency checking
-- [ ] **ENT-04**: User can view EA entity details with all attributes and relationships
-- [ ] **ENT-05**: User can search EA entities by domain, type, name, and attributes
-- [ ] **ENT-06**: User can filter and paginate EA entity lists (handles 10K+ entities)
+- [x] **ENT-04**: User can view EA entity details with all attributes and relationships
+- [x] **ENT-05**: User can search EA entities by domain, type, name, and attributes
+- [x] **ENT-06**: User can filter and paginate EA entity lists (handles 10K+ entities)
 - [ ] **ENT-07**: User can import EA entities in bulk from CSV files with validation
 - [ ] **ENT-08**: System validates EA entity data against type-specific rules before saving
 - [ ] **ENT-09**: System tracks all EA entity changes in audit log (reuse existing audit_logs table)
@@ -50,7 +50,7 @@ Requirements for initial EA module release. Each maps to roadmap phases.
 ### Governance & Security
 
 - [ ] **GOV-01**: EA entities respect existing RBAC system with extended permissions
-- [ ] **GOV-02**: System enforces `ea:read` permission for viewing EA entities
+- [x] **GOV-02**: System enforces `ea:read` permission for viewing EA entities
 - [ ] **GOV-03**: System enforces `ea:create` permission for creating EA entities
 - [ ] **GOV-04**: System enforces `ea:update` permission for editing EA entities
 - [ ] **GOV-05**: System enforces `ea:delete` permission for deleting EA entities
@@ -120,12 +120,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | META-03 | Phase 1 | Complete |
 | META-04 | Phase 1 | Complete |
 | META-05 | Phase 1 | Complete |
-| ENT-01 | Phase 2 | Pending |
-| ENT-02 | Phase 2 | Pending |
+| ENT-01 | Phase 2 | Complete |
+| ENT-02 | Phase 2 | Complete |
 | ENT-03 | Phase 2 | Pending |
-| ENT-04 | Phase 2 | Pending |
-| ENT-05 | Phase 2 | Pending |
-| ENT-06 | Phase 2 | Pending |
+| ENT-04 | Phase 2 | Complete |
+| ENT-05 | Phase 2 | Complete |
+| ENT-06 | Phase 2 | Complete |
 | ENT-07 | Phase 2 | Pending |
 | ENT-08 | Phase 2 | Pending |
 | ENT-09 | Phase 2 | Pending |
@@ -144,7 +144,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IMP-05 | Phase 3 | Pending |
 | IMP-06 | Phase 3 | Pending |
 | GOV-01 | Phase 2 | Pending |
-| GOV-02 | Phase 2 | Pending |
+| GOV-02 | Phase 2 | Complete |
 | GOV-03 | Phase 2 | Pending |
 | GOV-04 | Phase 2 | Pending |
 | GOV-05 | Phase 2 | Pending |
