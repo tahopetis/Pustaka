@@ -12,7 +12,7 @@ Requirements for initial EA module release. Each maps to roadmap phases.
 - [x] **META-01**: Define 60+ EA CI types across 8 domains (Strategy, Business, Application, Data, Technology, Infrastructure, Security, Governance) following ArchiMate 3.x patterns
 - [x] **META-02**: Define 20-25 core relationship types supporting critical use cases (supports, depends_on, deployed_on, flows_to, assigned_to, etc.)
 - [x] **META-03**: Create database migration seeding EA CI type definitions and relationship type definitions
-- [ ] **META-04**: Establish EA service layer skeleton with CI service composition pattern
+- [x] **META-04**: Establish EA service layer skeleton with CI service composition pattern
 - [x] **META-05**: Define data ownership rules and validation framework for EA entities
 
 ### Entity Management
@@ -118,7 +118,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | META-01 | Phase 1 | Complete |
 | META-02 | Phase 1 | Complete |
 | META-03 | Phase 1 | Complete |
-| META-04 | Phase 1 | Pending |
+| META-04 | Phase 1 | Complete |
 | META-05 | Phase 1 | Complete |
 | ENT-01 | Phase 2 | Pending |
 | ENT-02 | Phase 2 | Pending |
