@@ -9,11 +9,11 @@ Requirements for initial EA module release. Each maps to roadmap phases.
 
 ### Metamodel & Data Foundation
 
-- [ ] **META-01**: Define 60+ EA CI types across 8 domains (Strategy, Business, Application, Data, Technology, Infrastructure, Security, Governance) following ArchiMate 3.x patterns
-- [ ] **META-02**: Define 20-25 core relationship types supporting critical use cases (supports, depends_on, deployed_on, flows_to, assigned_to, etc.)
-- [ ] **META-03**: Create database migration seeding EA CI type definitions and relationship type definitions
+- [x] **META-01**: Define 60+ EA CI types across 8 domains (Strategy, Business, Application, Data, Technology, Infrastructure, Security, Governance) following ArchiMate 3.x patterns
+- [x] **META-02**: Define 20-25 core relationship types supporting critical use cases (supports, depends_on, deployed_on, flows_to, assigned_to, etc.)
+- [x] **META-03**: Create database migration seeding EA CI type definitions and relationship type definitions
 - [ ] **META-04**: Establish EA service layer skeleton with CI service composition pattern
-- [ ] **META-05**: Define data ownership rules and validation framework for EA entities
+- [x] **META-05**: Define data ownership rules and validation framework for EA entities
 
 ### Entity Management
 
@@ -59,11 +59,11 @@ Requirements for initial EA module release. Each maps to roadmap phases.
 
 ### CMDB Integration
 
-- [ ] **INT-01**: EA entities modeled as CI Types within existing CMDB taxonomy (unified data model)
+- [x] **INT-01**: EA entities modeled as CI Types within existing CMDB taxonomy (unified data model)
 - [ ] **INT-02**: EA entities link to existing infrastructure CIs (e.g., Application → Server)
 - [ ] **INT-03**: Infrastructure CIs link to EA entities (e.g., Server → deployed Applications)
 - [ ] **INT-04**: EA relationship queries return both EA and CMDB entities in unified graph
-- [ ] **INT-05**: EA entities leverage existing CI infrastructure (PostgreSQL, Neo4j, Redis, audit logging)
+- [x] **INT-05**: EA entities leverage existing CI infrastructure (PostgreSQL, Neo4j, Redis, audit logging)
 
 ## v2 Requirements
 
@@ -115,11 +115,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| META-01 | Phase 1 | Pending |
-| META-02 | Phase 1 | Pending |
-| META-03 | Phase 1 | Pending |
+| META-01 | Phase 1 | Complete |
+| META-02 | Phase 1 | Complete |
+| META-03 | Phase 1 | Complete |
 | META-04 | Phase 1 | Pending |
-| META-05 | Phase 1 | Pending |
+| META-05 | Phase 1 | Complete |
 | ENT-01 | Phase 2 | Pending |
 | ENT-02 | Phase 2 | Pending |
 | ENT-03 | Phase 2 | Pending |
@@ -150,11 +150,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GOV-05 | Phase 2 | Pending |
 | GOV-06 | Phase 2 | Pending |
 | GOV-07 | Phase 2 | Pending |
-| INT-01 | Phase 1 | Pending |
+| INT-01 | Phase 1 | Complete |
 | INT-02 | Phase 3 | Pending |
 | INT-03 | Phase 3 | Pending |
 | INT-04 | Phase 3 | Pending |
-| INT-05 | Phase 1 | Pending |
+| INT-05 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 46 total

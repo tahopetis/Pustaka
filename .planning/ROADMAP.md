@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Define EA metamodel specifications (60+ CI types, 20-25 relationship types, cross-domain validation rules, data ownership model) ✅ COMPLETED 2026-02-20
-- [ ] 01-02-PLAN.md — Create database migration for EA CI type and relationship type seeding (ea_teams table, validation queries, RBAC permissions)
+- [x] 01-02-PLAN.md — Create database migration for EA CI type and relationship type seeding (ea_teams table, validation queries, RBAC permissions) ✅ COMPLETED 2026-02-20
 - [ ] 01-03-PLAN.md — Build EA service layer skeleton with CI service composition (base service, repository, validation, 8 domain services)
 
 ### Phase 2: Entity Management
@@ -89,6 +89,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 1/3 | In progress | 2026-02-20 |
+| 1. Foundation | 2/3 | In progress | 2026-02-20 |
 | 2. Entity Management | 0/6 | Not started | - |
 | 3. Relationships & Impact | 0/7 | Not started | - |
