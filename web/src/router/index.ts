@@ -164,6 +164,41 @@ const router = createRouter({
       component: () => import('@/views/profile/ProfileView.vue'),
       meta: { requiresAuth: true }
     },
+    // EA (Enterprise Architecture) Entity Routes
+    {
+      path: '/entities',
+      redirect: '/entities/business'
+    },
+    {
+      path: '/entities/:domain',
+      name: 'EAEntities',
+      component: () => import('@/views/ea/EntityListView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'ea:read' }
+    },
+    {
+      path: '/entities/:domain/create',
+      name: 'CreateEAEntity',
+      component: () => import('@/views/ea/EntityFormView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'ea:create' }
+    },
+    {
+      path: '/entities/:domain/:ciType/create',
+      name: 'CreateEAEntityWithType',
+      component: () => import('@/views/ea/EntityFormView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'ea:create' }
+    },
+    {
+      path: '/entities/:domain/:id',
+      name: 'EADetails',
+      component: () => import('@/views/ea/EntityDetailsView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'ea:read' }
+    },
+    {
+      path: '/entities/:domain/:id/edit',
+      name: 'EditEAEntity',
+      component: () => import('@/views/ea/EntityFormView.vue'),
+      meta: { requiresAuth: true, requiresPermission: 'ea:update' }
+    },
     // Amortization Module Routes
     {
       path: '/amortization',
