@@ -48,7 +48,12 @@ func (s *StrategyService) ListStrategyObjectives(ctx context.Context) ([]*ci.Con
 	if err != nil {
 		return nil, err
 	}
-	return response.CIs, nil
+	// Convert value types to pointers
+	result := make([]*ci.ConfigurationItem, len(response.CIs))
+	for i := range response.CIs {
+		result[i] = &response.CIs[i]
+	}
+	return result, nil
 }
 
 // ListStrategyInitiatives retrieves all Strategy Initiatives
@@ -57,5 +62,10 @@ func (s *StrategyService) ListStrategyInitiatives(ctx context.Context) ([]*ci.Co
 	if err != nil {
 		return nil, err
 	}
-	return response.CIs, nil
+	// Convert value types to pointers
+	result := make([]*ci.ConfigurationItem, len(response.CIs))
+	for i := range response.CIs {
+		result[i] = &response.CIs[i]
+	}
+	return result, nil
 }

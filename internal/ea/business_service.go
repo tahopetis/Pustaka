@@ -95,9 +95,15 @@ func (s *BusinessService) ListBusinessCapabilities(ctx context.Context) ([]*ci.C
 		return nil, err
 	}
 
-	// Merge results
-	capabilities := append(l1Response.CIs, l2Response.CIs...)
-	return capabilities, nil
+	// Convert value types to pointers and merge results
+	result := make([]*ci.ConfigurationItem, 0, len(l1Response.CIs)+len(l2Response.CIs))
+	for i := range l1Response.CIs {
+		result = append(result, &l1Response.CIs[i])
+	}
+	for i := range l2Response.CIs {
+		result = append(result, &l2Response.CIs[i])
+	}
+	return result, nil
 }
 
 // ListBusinessProcesses retrieves all Business Processes
@@ -106,5 +112,10 @@ func (s *BusinessService) ListBusinessProcesses(ctx context.Context) ([]*ci.Conf
 	if err != nil {
 		return nil, err
 	}
-	return response.CIs, nil
+	// Convert value types to pointers
+	result := make([]*ci.ConfigurationItem, len(response.CIs))
+	for i := range response.CIs {
+		result[i] = &response.CIs[i]
+	}
+	return result, nil
 }

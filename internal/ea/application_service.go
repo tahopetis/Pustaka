@@ -46,7 +46,12 @@ func (s *ApplicationService) ListBusinessApplications(ctx context.Context) ([]*c
 	if err != nil {
 		return nil, err
 	}
-	return response.CIs, nil
+	// Convert value types to pointers
+	result := make([]*ci.ConfigurationItem, len(response.CIs))
+	for i := range response.CIs {
+		result[i] = &response.CIs[i]
+	}
+	return result, nil
 }
 
 // ListApplicationComponents retrieves all Application Components
@@ -55,5 +60,10 @@ func (s *ApplicationService) ListApplicationComponents(ctx context.Context) ([]*
 	if err != nil {
 		return nil, err
 	}
-	return response.CIs, nil
+	// Convert value types to pointers
+	result := make([]*ci.ConfigurationItem, len(response.CIs))
+	for i := range response.CIs {
+		result[i] = &response.CIs[i]
+	}
+	return result, nil
 }
