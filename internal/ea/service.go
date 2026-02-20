@@ -114,10 +114,17 @@ func (s *Service) CreateEACI(ctx context.Context, req *CreateEACIRequest, userID
 	tags = append(tags, string(domain))
 
 	// 8. Convert to CI request and create via CI service
+	// Note: CreateCIRequest doesn't have Description field, store in attributes
+	if req.Attributes == nil {
+		req.Attributes = make(map[string]interface{})
+	}
+	if req.Description != "" {
+		req.Attributes["description"] = req.Description
+	}
+
 	ciReq := &ci.CreateCIRequest{
 		Name:              req.Name,
 		CIType:            req.CIType,
-		Description:       req.Description,
 		Attributes:        req.Attributes,
 		Tags:              tags,
 		LifecycleStatusID: &req.LifecycleStatusID,
@@ -209,21 +216,29 @@ func (s *Service) UpdateEACI(ctx context.Context, id uuid.UUID, req *UpdateEACIR
 		}
 	}
 
-	// 4. Update metadata
-	if req.Attributes != nil {
-		eaMetadata := EAMetadata{
-			Source:           "manual",
-			LastUpdatedBy:    userID.String(),
-			DataQualityScore: 0, // Will recalculate
-			ValidationErrors: validationErrors,
-		}
-		req.Attributes["metadata"] = eaMetadata
+	// 4. Update metadata and handle name/description in attributes
+	if req.Attributes == nil {
+		req.Attributes = make(map[string]interface{})
+	}
+	eaMetadata := EAMetadata{
+		Source:           "manual",
+		LastUpdatedBy:    userID.String(),
+		DataQualityScore: 0, // Will recalculate
+		ValidationErrors: validationErrors,
+	}
+	req.Attributes["metadata"] = eaMetadata
+
+	// Note: UpdateCIRequest doesn't have Name or Description fields
+	// Store them in attributes if provided
+	if req.Name != "" {
+		req.Attributes["name"] = req.Name
+	}
+	if req.Description != "" {
+		req.Attributes["description"] = req.Description
 	}
 
 	// 5. Convert to CI request and update via CI service
 	ciReq := &ci.UpdateCIRequest{
-		Name:              req.Name,
-		Description:       req.Description,
 		Attributes:        req.Attributes,
 		Tags:              req.Tags,
 		LifecycleStatusID: req.LifecycleStatusID,
