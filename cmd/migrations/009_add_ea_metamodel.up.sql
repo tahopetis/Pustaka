@@ -150,7 +150,7 @@ ON CONFLICT (name) DO NOTHING;
 -- SECTION 3: EA Relationship Type Definitions
 -- ============================================================================
 
-INSERT INTO relationship_types (name, description, forward_label, backward_label, source_types, target_types, cardinality_source, cardinality_target, bidirectional, attributes, created_by)
+INSERT INTO relationship_types (name, description, forward_label, reverse_label, allowed_source_types, allowed_target_types, cardinality_source, cardinality_target, bidirectional, attributes, created_by)
 VALUES
 -- Core ArchiMate relationships
 (
