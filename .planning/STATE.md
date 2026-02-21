@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 Phase: 2 of 3 (Entity Management)
 Plan: 7 of 7
 Status: Complete
-Last activity: 2026-02-21 04:32 — Completed Plan 02-07 (CSV Import and Warn-But-Allow Validation Verification)
+Last activity: 2026-02-21 - Completed quick task 1: make all migrations applied when deploy the app in docker
 
 Progress: [████████████████████] 100%
 
@@ -90,6 +90,12 @@ None yet.
 ### Blockers/Concerns
 
 None yet.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | make all migrations applied when deploy the app in docker | 2026-02-21 | 07b9ba5 | [1-make-all-migrations-applied-when-deploy-](./quick/1-make-all-migrations-applied-when-deploy-/) |
 
 ## Session Continuity
 
