@@ -1,6 +1,7 @@
 -- ============================================================================
 -- Migration: 009_add_ea_metamodel
 -- Created: 2026-02-20
+-- Updated: 2026-02-21 (Corrected to match metamodel docs exactly)
 -- Purpose: Seed EA metamodel (CI types, relationship types, teams, permissions)
 -- ============================================================================
 
@@ -98,415 +99,533 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- SECTION 2: EA CI Type Definitions
+-- SECTION 2: EA CI Type Definitions (32 types matching metamodel docs)
 -- ============================================================================
 
--- Strategy Domain CI Types (6 types)
+-- Strategy & Transformation Domain (4 types)
 INSERT INTO ci_type_definitions (name, description, required_attributes, optional_attributes, created_by)
 VALUES
     ('EA.Strategy-Objective', 'High-level strategic objective representing organizational goals', '[{"name":"name","type":"string","description":"Objective name","validation":{"min_length":5,"max_length":100}},{"name":"description","type":"string","description":"Detailed description"},{"name":"owner","type":"string","description":"EA team responsible"}]'::jsonb, '[{"name":"strategic_alignment","type":"string","enum":["high","medium","low"]},{"name":"target_date","type":"date"},{"name":"metrics","type":"array"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Strategy-Goal', 'Strategic goal supporting objectives', '[{"name":"name","type":"string","description":"Goal name","validation":{"min_length":5,"max_length":100}},{"name":"description","type":"string","description":"Detailed description"},{"name":"owner","type":"string","description":"EA team responsible"}]'::jsonb, '[{"name":"parent_objective_id","type":"uuid"},{"name":"target_value","type":"string"},{"name":"current_value","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Strategy-Outcome', 'Strategic outcome resulting from achieving goals', '[{"name":"name","type":"string","description":"Outcome name"},{"name":"description","type":"string","description":"Description of outcome"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"measurement_criteria","type":"string"},{"name":"target_date","type":"date"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Strategy-Requirement', 'Strategic requirement or constraint', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"priority","type":"string","enum":["critical","high","medium","low"]},{"name":"compliance_impact","type":"boolean"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Strategy-Constraint', 'Strategic constraint limiting options', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"constraint_type","type":"string","enum":["technical","financial","regulatory","organizational"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Strategy-Initiative', 'Strategic initiative to achieve objectives', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"status","type":"string","enum":["planning","active","on_hold","completed"]},{"name":"budget","type":"string"},{"name":"start_date","type":"date"},{"name":"end_date","type":"date"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
+    ('EA.Strategy-Initiative', 'Strategic initiative to achieve objectives', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"status","type":"string","enum":["planning","active","on_hold","completed"]},{"name":"budget","type":"string"},{"name":"start_date","type":"date"},{"name":"end_date","type":"date"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Strategy-Program', 'Program grouping multiple related projects', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"program_manager","type":"string"},{"name":"budget","type":"string"},{"name":"start_date","type":"date"},{"name":"end_date","type":"date"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Strategy-Project', 'Project implementing specific initiatives or programs', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"project_manager","type":"string"},{"name":"status","type":"string","enum":["proposed","active","on_hold","completed"]},{"name":"start_date","type":"date"},{"name":"end_date","type":"date"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
 ON CONFLICT (name) DO NOTHING;
 
--- Business Domain CI Types (10 types)
+-- Business Architecture Domain (5 types)
 INSERT INTO ci_type_definitions (name, description, required_attributes, optional_attributes, created_by)
 VALUES
-    ('EA.Business-CapabilityL1', 'Level 1 Business Capability representing high-level business functions', '[{"name":"name","type":"string","description":"Capability name","validation":{"min_length":3,"max_length":100}},{"name":"description","type":"string","description":"Capability description"},{"name":"owner","type":"string","description":"Business team responsible"}]'::jsonb, '[{"name":"strategic_importance","type":"string","enum":["critical","high","medium","low"]},{"name":"business_value","type":"string"},{"name":"target_date","type":"date"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Business-Organization', 'Organizational unit or department', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"organization_type","type":"string","enum":["department","division","unit","team"]},{"name":"parent_org_id","type":"uuid"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Business-BusinessDomain', 'Business domain representing area of business operations', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"domain_owner","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Business-CapabilityL1', 'Level 1 Business Capability representing high-level business functions', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"strategic_importance","type":"string","enum":["critical","high","medium","low"]},{"name":"business_value","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Business-CapabilityL2', 'Level 2 Business Capability (child of L1)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"parent_capability_id","type":"uuid"},{"name":"strategic_importance","type":"string","enum":["critical","high","medium","low"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Business-Process', 'Business process representing workflows', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"process_level","type":"string","enum":["level1","level2","level3"]},{"name":"inputs","type":"array"},{"name":"outputs","type":"array"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Business-Function', 'Business function representing cohesive business activity', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"parent_process_id","type":"uuid"},{"name":"criticality","type":"string","enum":["mission_critical","important","standard","support"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Business-Interaction', 'Business interaction between roles', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"interaction_type","type":"string","enum":["synchronous","asynchronous"]},{"name":"trigger","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Business-Event', 'Business event triggering processes', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"event_type","type":"string","enum":["external","internal","temporal"]},{"name":"frequency","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Business-Service', 'Business service delivered to customers', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"service_level","type":"string","enum":["gold","silver","bronze"]},{"name":"sla_target","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Business-Actor', 'Business actor (person or organization)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"actor_type","type":"string","enum":["person","role","organization"]},{"name":"contact_info","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Business-Role', 'Business role defining responsibilities', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"permissions","type":"array"},{"name":"assigned_to","type":"array"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Business-Collaboration', 'Business collaboration between actors', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"collaboration_type","type":"string","enum":["permanent","temporary","project_based"]},{"name":"duration","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
+    ('EA.Business-BusinessProduct', 'Business product or service offered by the organization', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"product_type","type":"string","enum":["product","service","solution"]},{"name":"lifecycle_status","type":"string","enum":["proposed","active","deprecated","retired"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
 ON CONFLICT (name) DO NOTHING;
 
--- Application Domain CI Types (8 types)
+-- Application Architecture Domain (5 types)
 INSERT INTO ci_type_definitions (name, description, required_attributes, optional_attributes, created_by)
 VALUES
-    ('EA.Application-BusinessApp', 'Business application supporting enterprise operations', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"lifecycle_status","type":"string","enum":["proposed","active","deprecated","retired"]},{"name":"criticality","type":"string","enum":["mission_critical","high","medium","low"]},{"name":"version","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Application-Component', 'Application component or module', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"parent_application_id","type":"uuid"},{"name":"technology","type":"string"},{"name":"interface_type","type":"string","enum":["api","ui","batch","library"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Application-ApplicationGroup', 'Group of related business applications', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"business_owner","type":"string"},{"name":"it_owner","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Application-BusinessApplication', 'Business application supporting enterprise operations', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"lifecycle_status","type":"string","enum":["proposed","active","deprecated","retired"]},{"name":"criticality","type":"string","enum":["mission_critical","high","medium","low"]},{"name":"version","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Application-Subsystem', 'Application subsystem or module', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"parent_app_id","type":"uuid"},{"name":"technology","type":"string"},{"name":"interface_type","type":"string","enum":["api","ui","batch","library"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Application-Interface', 'Application interface for integration', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"interface_type","type":"string","enum":["rest","graphql","soap","grpc","event"]},{"name":"protocol","type":"string"},{"name":"authentication","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Application-Service', 'Application service exposing functionality', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"service_type","type":"string","enum":["internal","external","shared"]},{"name":"availability_sla","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Application-Function', 'Application function or business logic', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"parent_component_id","type":"uuid"},{"name":"complexity","type":"string","enum":["low","medium","high"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Application-Event', 'Application event or message', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"event_type","type":"string","enum":["command","event","query"]},{"name":"payload_schema","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Application-DataObject', 'Application data structure', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"data_format","type":"string","enum":["json","xml","csv","binary"]},{"name":"sensitivity","type":"string","enum":["public","internal","confidential","restricted"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Application-Collaboration', 'Application collaboration or interaction', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"collaboration_type","type":"string","enum":["synchronous","asynchronous","batch"]},{"name":"protocol","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
+    ('EA.Application-SupportingApplication', 'Supporting application providing infrastructure or utility services', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"lifecycle_status","type":"string","enum":["proposed","active","deprecated","retired"]},{"name":"criticality","type":"string","enum":["mission_critical","high","medium","low"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
 ON CONFLICT (name) DO NOTHING;
 
--- Data Domain CI Types (7 types)
+-- Data Architecture Domain (2 types)
 INSERT INTO ci_type_definitions (name, description, required_attributes, optional_attributes, created_by)
 VALUES
-    ('EA.Data-DataObject', 'Data entity or document used by applications', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"data_classification","type":"string","enum":["public","internal","confidential","restricted"]},{"name":"retention_period","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Data-DataSet', 'Collection of related data objects', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"data_objects","type":"array"},{"name":"data_source","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Data-Repository', 'Data repository or database system', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"repository_type","type":"string","enum":["relational","document","key_value","graph","time_series"]},{"name":"capacity_gb","type":"integer"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Data-Structure', 'Data structure or schema definition', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"schema_version","type":"string"},{"name":"validation_rules","type":"array"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Data-Artifact', 'Data artifact or report', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"artifact_type","type":"string","enum":["report","dashboard","export","feed"]},{"name":"generation_frequency","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Data-Representation', 'Data representation or format', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"format_type","type":"string","enum":["json","xml","csv","parquet","avro"]},{"name":"encoding","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Data-Metadata', 'Metadata describing data assets', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"metadata_type","type":"string","enum":["technical","business","operational"]},{"name":"data_element_id","type":"uuid"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
+    ('EA.Data-DataDomain', 'Data domain representing area of data management', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"domain_owner","type":"string"},{"name":"data_steward","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Data-DataObject', 'Data entity or document used by applications', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"data_classification","type":"string","enum":["public","internal","confidential","restricted"]},{"name":"retention_period","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
 ON CONFLICT (name) DO NOTHING;
 
--- Technology Domain CI Types (8 types)
+-- Technology Architecture Domain (3 types)
 INSERT INTO ci_type_definitions (name, description, required_attributes, optional_attributes, created_by)
 VALUES
     ('EA.Technology-ITComponent', 'Software component, library, or framework', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"version","type":"string"},{"name":"license","type":"string"},{"name":"end_of_support","type":"date"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Technology-Platform', 'Technology platform or framework', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"components","type":"array"},{"name":"version","type":"string"},{"name":"platform_type","type":"string","enum":["application","data","integration","mobile"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Technology-Artifact', 'Technology artifact or deployment unit', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"artifact_type","type":"string","enum":["jar","war","dll","exe","docker_image","npm_package"]},{"name":"checksum","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Technology-Resource', 'Technology resource or capability', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"resource_type","type":"string","enum":["compute","storage","network","license"]},{"name":"capacity","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Technology-Capability', 'Technology capability or feature', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"maturity_level","type":"string","enum":["emerging","growing","mature","declining"]},{"name":"adoption_status","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Technology-Function', 'Technology function or API', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"function_type","type":"string","enum":["api","library","service","utility"]},{"name":"signature","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Technology-Service', 'Technology service or utility', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"service_model","type":"string","enum":["saas","paas","iaas","on_premise"]},{"name":"availability_sla","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Technology-Path', 'Technology path or communication channel', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"path_type","type":"string","enum":["network","bus","queue","topic"]},{"name":"bandwidth","type":"string"},{"name":"latency","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
+    ('EA.Technology-TechCategory', 'Technology category grouping related IT components', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"category_owner","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Technology-Provider', 'Technology provider or vendor', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"provider_type","type":"string","enum":["vendor","supplier","partner","internal"]},{"name":"contact_info","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
 ON CONFLICT (name) DO NOTHING;
 
--- Infrastructure Domain CI Types (8 types)
+-- Infrastructure Architecture Domain (5 types)
 INSERT INTO ci_type_definitions (name, description, required_attributes, optional_attributes, created_by)
 VALUES
-    ('EA.Infrastructure-Node', 'Infrastructure node (server, VM, container)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"node_type","type":"string","enum":["physical","virtual","container"]},{"name":"cpu_cores","type":"integer"},{"name":"memory_gb","type":"integer"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Infrastructure-Network', 'Network segment or VLAN', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"cidr_block","type":"string"},{"name":"network_type","type":"string","enum":["lan","wan","vlan","vpn"]},{"name":"bandwidth","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Infrastructure-Device', 'Infrastructure device (router, switch, firewall)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"device_type","type":"string","enum":["router","switch","firewall","load_balancer","proxy"]},{"name":"ip_address","type":"string"},{"name":"mac_address","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Infrastructure-Storage', 'Storage system or device', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"storage_type","type":"string","enum":["san","nas","object","block"]},{"name":"capacity_gb","type":"integer"},{"name":"throughput_mb_s","type":"integer"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Infrastructure-Cluster', 'Infrastructure cluster or group', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"cluster_type","type":"string","enum":["kubernetes","vmware","database"]},{"name":"node_count","type":"integer"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Infrastructure-SystemSoftware', 'System software (OS, hypervisor)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"software_type","type":"string","enum":["os","hypervisor","container_runtime","firmware"]},{"name":"version","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Infrastructure-CommunicationPath', 'Communication path between infrastructure elements', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"protocol","type":"string"},{"name":"port","type":"string"},{"name":"encryption","type":"boolean"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Infrastructure-Capability', 'Infrastructure capability or feature', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"capability_type","type":"string","enum":["compute","storage","network","security"]},{"name":"provisioning","type":"string","enum":["manual","automated","dynamic"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
+    ('EA.Infrastructure-Location', 'Physical or logical location (office, data center, region)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"location_type","type":"string","enum":["office","data_center","cloud_region","branch"]},{"name":"address","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Infrastructure-DataCenter', 'Data center facility housing IT infrastructure', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"data_center_type","type":"string","enum":["primary","secondary","colocation","cloud"]},{"name":"location_id","type":"uuid"},{"name":"tier_rating","type":"string","enum":["tier1","tier2","tier3","tier4"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Infrastructure-NetworkZone', 'Network zone or segment (VLAN, subnet, DMZ)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"zone_type","type":"string","enum":["lan","wan","dmz","vpn","vlan"]},{"name="cidr_block","type":"string"},{"name["parent_location_id","type":"uuid"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Infrastructure-ComputePlatform', 'Compute platform (server, VM, container host)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"platform_type","type":"string","enum":["physical","virtual","container","cloud"]},{"name":"cpu_cores","type":"integer"},{"name":"memory_gb","type":"integer"},{"name["zone_id","type":"uuid"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Infrastructure-NetworkSecurityNodes', 'Network and security devices (routers, switches, firewalls)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"device_type","type":"string","enum":["router","switch","firewall","load_balancer","proxy","ids","ips"]},{"name["zone_id","type":"uuid"},{"name":"ip_address","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
 ON CONFLICT (name) DO NOTHING;
 
--- Security Domain CI Types (6 types)
+-- Information Security (NIST) Domain (4 types)
 INSERT INTO ci_type_definitions (name, description, required_attributes, optional_attributes, created_by)
 VALUES
-    ('EA.Security-Control', 'Security control or safeguard', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"control_type","type":"string","enum":["preventive","detective","corrective"]},{"name":"control_framework","type":"string"},{"name":"implementation_status","type":"string","enum":["planned","implemented","enforced","monitored"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Security-Policy', 'Security policy document', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"policy_type","type":"string","enum":["access_control","data_protection","incident_response","compliance"]},{"name":"approval_date","type":"date"},{"name":"review_frequency","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Security-Risk', 'Security risk or threat', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"risk_level","type":"string","enum":["critical","high","medium","low"]},{"name":"likelihood","type":"string","enum":["rare","unlikely","possible","likely","certain"]},{"name":"impact","type":"string","enum":["negligible","minor","moderate","major","catastrophic"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Security-Vulnerability', 'Security vulnerability', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"severity","type":"string","enum":["critical","high","medium","low"]},{"name":"cve_id","type":"string"},{"name":"patch_status","type":"string","enum":["open","in_progress","patched","mitigated"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Security-Assessment', 'Security assessment or audit', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"assessment_type","type":"string","enum":["vulnerability_scan","penetration_test","compliance_audit","risk_assessment"]},{"name":"assessment_date","type":"date"},{"name":"status","type":"string","enum":["planned","in_progress","completed"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Security-Requirement', 'Security requirement or standard', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"requirement_type","type":"string","enum":["functional","non_functional","compliance"]},{"name":"source_standard","type":"string"},{"name":"priority","type":"string","enum":["mandatory","recommended","optional"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
+    ('EA.Security-Function', 'NIST CSF Function (Govern, Identify, Protect, Detect, Respond, Recover)', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"function_code","type":"string","enum":["GV","ID","PR","DE","RS","RC"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Security-Category', 'NIST CSF Category under a Function', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"parent_function_id","type":"uuid"},{"name":"category_code","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Security-Subcategory', 'NIST CSF Subcategory under a Category', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"parent_category_id","type":"uuid"},{"name":"subcategory_code","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Security-Control', 'Security control or safeguard', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"control_type","type":"string","enum":["preventive","detective","corrective"]},{"name":"control_framework","type":"string"},{"name":"implementation_status","type":"string","enum":["planned","implemented","enforced","monitored"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
 ON CONFLICT (name) DO NOTHING;
 
--- Governance Domain CI Types (7 types)
+-- IT Governance Domain (4 types)
 INSERT INTO ci_type_definitions (name, description, required_attributes, optional_attributes, created_by)
 VALUES
     ('EA.Governance-Policy', 'Governance policy document', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"policy_scope","type":"string"},{"name":"effective_date","type":"date"},{"name":"compliance_level","type":"string","enum":["mandatory","recommended","guideline"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Governance-Compliance', 'Compliance requirement or regulation', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"regulation","type":"string"},{"name":"compliance_status","type":"string","enum":["compliant","non_compliant","in_progress","not_applicable"]},{"name":"last_audit_date","type":"date"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
+    ('EA.Governance-Procedure', 'Governance procedure documenting process steps', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"procedure_type","type":"string","enum":["operational","approval","review","audit"]},{"name","frequency","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
     ('EA.Governance-Standard', 'Governance standard or best practice', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"standard_body","type":"string"},{"name":"standard_version","type":"string"},{"name":"adoption_level","type":"string","enum":["full","partial","planned"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Governance-Process', 'Governance process or procedure', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"process_type","type":"string","enum":["approval","review","audit","assessment"]},{"name":"frequency","type":"string"},{"name":"automated","type":"boolean"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Governance-Audit', 'Governance audit or review', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"audit_type","type":"string","enum":["internal","external","regulatory"]},{"name":"scheduled_date","type":"date"},{"name":"status","type":"string","enum":["planned","in_progress","completed"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Governance-Metric', 'Governance metric or KPI', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"metric_type","type":"string","enum":["quantitative","qualitative"]},{"name":"target_value","type":"string"},{"name":"current_value","type":"string"},{"name":"measurement_frequency","type":"string"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1)),
-    ('EA.Governance-Exception', 'Governance exception or waiver', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"exception_type","type":"string","enum":["temporary","permanent","conditional"]},{"name":"justification","type":"string"},{"name":"approval_date","type":"date"},{"name":"expiry_date","type":"date"}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
+    ('EA.Governance-StandardComponent', 'Component or clause within a governance standard', '[{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"owner","type":"string"}]'::jsonb, '[{"name":"parent_standard_id","type":"uuid"},{"name":"component_type","type":"string","enum":["clause","requirement","control objective"]}]'::jsonb, (SELECT id FROM users WHERE username = 'admin' LIMIT 1))
 ON CONFLICT (name) DO NOTHING;
 
 -- ============================================================================
--- SECTION 3: EA Relationship Type Definitions
+-- SECTION 3: EA Relationship Type Definitions (from directional graph)
 -- ============================================================================
 
 INSERT INTO relationship_types (name, description, forward_label, reverse_label, allowed_source_types, allowed_target_types, cardinality_source, cardinality_target, bidirectional, attributes, created_by)
 VALUES
--- Core ArchiMate relationships
+-- Strategy Internal Relationships
 (
-    'supports',
-    'Source supports or enables target functionality',
-    'supports',
-    'supported by',
-    ARRAY['EA.Application-*', 'EA.Technology-*', 'EA.Infrastructure-*'],
-    ARRAY['EA.Business-*', 'EA.Application-*'],
+    'drives',
+    'Objective drives Initiative',
+    'drives',
+    'driven by',
+    ARRAY['EA.Strategy-Objective'],
+    ARRAY['EA.Strategy-Initiative'],
+    'one',
+    'many',
+    true,
+    '{"description": "Strategic objective drives initiative", "archimate_concept": "Driver"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'consists_of',
+    'Initiative consists of Programs',
+    'consists of',
+    'part of',
+    ARRAY['EA.Strategy-Initiative', 'EA.Strategy-Program'],
+    ARRAY['EA.Strategy-Program', 'EA.Strategy-Project'],
+    'one',
+    'many',
+    false,
+    '{"description": "Hierarchical composition"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+
+-- Business Internal Relationships
+(
+    'contains',
+    'Business Capability L1 contains L2',
+    'contains',
+    'contained in',
+    ARRAY['EA.Business-CapabilityL1'],
+    ARRAY['EA.Business-CapabilityL2'],
+    'one',
+    'many',
+    false,
+    '{"description": "Capability hierarchy"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'belongs_to',
+    'DataObject belongs to DataDomain',
+    'belongs to',
+    'contains',
+    ARRAY['EA.Data-DataObject'],
+    ARRAY['EA.Data-DataDomain'],
+    'many',
+    'one',
+    true,
+    '{"description": "Data domain membership"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+
+-- Security Internal Relationships
+(
+    'has',
+    'NIST Function has Category, Category has Subcategory',
+    'has',
+    'part of',
+    ARRAY['EA.Security-Function', 'EA.Security-Category'],
+    ARRAY['EA.Security-Category', 'EA.Security-Subcategory'],
+    'one',
+    'many',
+    false,
+    '{"description": "NIST hierarchy"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+
+-- Governance Internal Relationships
+(
+    'defines',
+    'Policy defines Procedure',
+    'defines',
+    'defined by',
+    ARRAY['EA.Governance-Policy'],
+    ARRAY['EA.Governance-Procedure'],
+    'one',
+    'many',
+    true,
+    '{"description": "Policy defines procedure"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'contains',
+    'Standard contains StandardComponent',
+    'contains',
+    'contained in',
+    ARRAY['EA.Governance-Standard'],
+    ARRAY['EA.Governance-StandardComponent'],
+    'one',
+    'many',
+    false,
+    '{"description": "Standard components"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+
+-- Strategy Cross-domain Relationships
+(
+    'targets',
+    'Objective targets Business Capability L1',
+    'targets',
+    'targeted by',
+    ARRAY['EA.Strategy-Objective'],
+    ARRAY['EA.Business-CapabilityL1'],
     'many',
     'many',
     true,
-    '{"description": "Support relationship indicating source provides capability to target", "archimate_concept": "Serving", "examples": ["CRM Application supports Customer Management", "Java Platform supports Order Processing"]}'::jsonb,
+    '{"description": "Strategic alignment"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'changes',
+    'Project changes Applications',
+    'changes',
+    'changed by',
+    ARRAY['EA.Strategy-Project'],
+    ARRAY['EA.Application-BusinessApplication', 'EA.Application-SupportingApplication'],
+    'many',
+    'many',
+    true,
+    '{"description": "Project impact on applications"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+
+-- Business Cross-domain Relationships
+(
+    'supports',
+    'Business Application supports Business Capability L1',
+    'supports',
+    'supported by',
+    ARRAY['EA.Application-BusinessApplication'],
+    ARRAY['EA.Business-CapabilityL1'],
+    'many',
+    'many',
+    true,
+    '{"description": "Application support for capability"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'uses',
+    'Business Product uses Business Application',
+    'uses',
+    'used by',
+    ARRAY['EA.Business-BusinessProduct'],
+    ARRAY['EA.Application-BusinessApplication'],
+    'many',
+    'many',
+    true,
+    '{"description": "Product uses application"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'owns',
+    'Organization owns Applications and DataObjects',
+    'owns',
+    'owned by',
+    ARRAY['EA.Business-Organization'],
+    ARRAY['EA.Application-BusinessApplication', 'EA.Data-DataObject'],
+    'one',
+    'many',
+    true,
+    '{"description": "Organizational ownership"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'responsible_for',
+    'Organization responsible for Business Capability L1',
+    'responsible for',
+    'responsibility of',
+    ARRAY['EA.Business-Organization'],
+    ARRAY['EA.Business-CapabilityL1'],
+    'one',
+    'many',
+    true,
+    '{"description": "Organizational responsibility"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+
+-- Application Internal Relationships
+(
+    'contains',
+    'Application Group contains Business Applications',
+    'contains',
+    'contained in',
+    ARRAY['EA.Application-ApplicationGroup'],
+    ARRAY['EA.Application-BusinessApplication'],
+    'one',
+    'many',
+    false,
+    '{"description": "Application grouping"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'consists_of',
+    'Business Application consists of Subsystems',
+    'consists of',
+    'part of',
+    ARRAY['EA.Application-BusinessApplication', 'EA.Application-SupportingApplication'],
+    ARRAY['EA.Application-Subsystem'],
+    'one',
+    'many',
+    false,
+    '{"description": "Application composition"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'exposes',
+    'Subsystem exposes Interface',
+    'exposes',
+    'exposed by',
+    ARRAY['EA.Application-Subsystem'],
+    ARRAY['EA.Application-Interface'],
+    'many',
+    'many',
+    true,
+    '{"description": "Interface exposure"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'consumes',
+    'Subsystem consumes Interface or DataObject',
+    'consumes',
+    'consumed by',
+    ARRAY['EA.Application-Subsystem'],
+    ARRAY['EA.Application-Interface', 'EA.Data-DataObject'],
+    'many',
+    'many',
+    true,
+    '{"description": "Dependency consumption"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'routes_to',
+    'Interface routes to Subsystem',
+    'routes to',
+    'routed from',
+    ARRAY['EA.Application-Interface'],
+    ARRAY['EA.Application-Subsystem'],
+    'many',
+    'many',
+    false,
+    '{"description": "Interface routing"}'::jsonb,
     (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
 ),
 (
     'depends_on',
-    'Source depends on target for functionality or data',
+    'Subsystem depends on Subsystem',
     'depends on',
-    'is depended on by',
-    ARRAY['EA.Application-*', 'EA.Technology-*', 'EA.Business-*'],
-    ARRAY['EA.Application-*', 'EA.Data-*', 'EA.Technology-*', 'EA.Infrastructure-*'],
+    'depended on by',
+    ARRAY['EA.Application-Subsystem'],
+    ARRAY['EA.Application-Subsystem'],
     'many',
     'many',
     true,
-    '{"description": "Dependency relationship where source requires target to function", "archimate_concept": "Dependency", "examples": ["Application depends on Database", "Service depends on API"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'realizes',
-    'Source implements or realizes target',
-    'realizes',
-    'realized by',
-    ARRAY['EA.Application-*', 'EA.Technology-*'],
-    ARRAY['EA.Business-*', 'EA.Strategy-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Realization relationship where source provides implementation of target", "archimate_concept": "Realization", "examples": ["Application realizes Business Service", "Component realizes Business Function"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'flows_to',
-    'Data or information flows from source to target',
-    'flows to',
-    'receives flow from',
-    ARRAY['EA.Application-*', 'EA.Business-*', 'EA.Data-*'],
-    ARRAY['EA.Application-*', 'EA.Data-*', 'EA.Business-*'],
-    'many',
-    'many',
-    true,
-    '{"description": "Flow relationship representing information exchange", "archimate_concept": "Flow", "examples": ["Data flows from Application to Database", "Information flows to Business Process"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'assigned_to',
-    'Source is assigned to target (e.g., Role assigned to Actor)',
-    'assigned to',
-    'has assigned',
-    ARRAY['EA.Business-*', 'EA.Application-*'],
-    ARRAY['EA.Business-*', 'EA.Infrastructure-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Assignment relationship associating responsibility", "archimate_concept": "Assignment", "examples": ["Business Role assigned to Business Actor", "Application assigned to Business Unit"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'aggregates',
-    'Source aggregates target (collection relationship)',
-    'aggregates',
-    'aggregated by',
-    ARRAY['EA.Application-*', 'EA.Business-*', 'EA.Infrastructure-*'],
-    ARRAY['EA.Application-*', 'EA.Business-*', 'EA.Infrastructure-*'],
-    'one',
-    'many',
-    false,
-    '{"description": "Aggregation relationship where source is a collection of target", "archimate_concept": "Aggregation", "examples": ["Application aggregates Modules", "Business Domain aggregates Capabilities"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'composes',
-    'Source composes target (strong composition)',
-    'composes',
-    'composed of',
-    ARRAY['EA.Application-*', 'EA.Technology-*'],
-    ARRAY['EA.Application-*', 'EA.Technology-*'],
-    'one',
-    'many',
-    false,
-    '{"description": "Composition relationship with strong ownership", "archimate_concept": "Composition", "examples": ["Application composes Components", "Node composes Devices"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'accesses',
-    'Source accesses target (typically data)',
-    'accesses',
-    'is accessed by',
-    ARRAY['EA.Application-*', 'EA.Business-*'],
-    ARRAY['EA.Data-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Access relationship for data/object access", "archimate_concept": "Access", "examples": ["Application accesses Database Table", "Process accesses Data Object"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'associated_with',
-    'General association relationship',
-    'associated with',
-    'associated with',
-    ARRAY['EA.*'],
-    ARRAY['EA.*'],
-    'many',
-    'many',
-    true,
-    '{"description": "General association for relationships not covered by specific types", "archimate_concept": "Association", "examples": ["Risk associated with Control", "Policy associated with Process"]}'::jsonb,
+    '{"description": "Subsystem dependency"}'::jsonb,
     (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
 ),
 
--- EA-specific relationships
+-- Application Cross-domain Relationships
+(
+    'provides',
+    'Subsystem provides DataObject',
+    'provides',
+    'provided by',
+    ARRAY['EA.Application-Subsystem'],
+    ARRAY['EA.Data-DataObject'],
+    'many',
+    'many',
+    true,
+    '{"description": "Data provision"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'realizes',
+    'Subsystem realizes IT Component',
+    'realizes',
+    'realized by',
+    ARRAY['EA.Application-Subsystem'],
+    ARRAY['EA.Technology-ITComponent'],
+    'many',
+    'many',
+    false,
+    '{"description": "Technology realization"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
 (
     'deployed_on',
-    'Source is deployed on target infrastructure',
+    'Subsystem deployed on Compute Platform',
     'deployed on',
     'hosts',
-    ARRAY['EA.Application-*'],
-    ARRAY['EA.Infrastructure-*', 'EA.Technology-*'],
+    ARRAY['EA.Application-Subsystem'],
+    ARRAY['EA.Infrastructure-ComputePlatform'],
     'many',
     'many',
     true,
-    '{"description": "Deployment relationship showing where applications run", "examples": ["CRM Application deployed on Production Server", "Microservice deployed on Kubernetes Cluster"]}'::jsonb,
+    '{"description": "Deployment location"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+
+-- Technology & Infrastructure Relationships
+(
+    'belongs_to',
+    'IT Component belongs to Tech Category',
+    'belongs to',
+    'contains',
+    ARRAY['EA.Technology-ITComponent'],
+    ARRAY['EA.Technology-TechCategory'],
+    'many',
+    'one',
+    true,
+    '{"description": "Technology categorization"}'::jsonb,
     (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
 ),
 (
-    'runs_on',
-    'Source executes on target',
-    'runs on',
-    'executes',
-    ARRAY['EA.Application-*', 'EA.Technology-*'],
-    ARRAY['EA.Infrastructure-*', 'EA.Technology-*'],
+    'provided_by',
+    'IT Component provided by Provider',
+    'provided by',
+    'provides',
+    ARRAY['EA.Technology-ITComponent'],
+    ARRAY['EA.Technology-Provider'],
     'many',
     'many',
     true,
-    '{"description": "Execution relationship", "examples": ["Application runs on Server", "Component runs on Platform"]}'::jsonb,
+    '{"description": "Provider relationship"}'::jsonb,
     (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
 ),
 (
-    'uses',
-    'Source uses target',
-    'uses',
-    'is used by',
-    ARRAY['EA.Application-*', 'EA.Business-*'],
-    ARRAY['EA.Technology-*', 'EA.Data-*', 'EA.Application-*'],
-    'many',
-    'many',
-    true,
-    '{"description": "Usage relationship", "examples": ["Application uses Library", "Process uses Service"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'implements',
-    'Source implements target',
-    'implements',
-    'is implemented by',
-    ARRAY['EA.Technology-*'],
-    ARRAY['EA.Application-*', 'EA.Business-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Implementation relationship", "examples": ["Component implements Service", "Technology implements Capability"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'validates',
-    'Source validates or checks target',
-    'validates',
-    'is validated by',
-    ARRAY['EA.Security-*', 'EA.Governance-*'],
-    ARRAY['EA.Security-*', 'EA.Governance-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Validation relationship for controls and assessments", "examples": ["Control validates Risk", "Assessment validates Control"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'mitigates',
-    'Source mitigates target risk',
-    'mitigates',
-    'is mitigated by',
-    ARRAY['EA.Security-*'],
-    ARRAY['EA.Security-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Risk mitigation relationship", "examples": ["Control mitigates Risk", "Safeguard mitigates Threat"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'enforces',
-    'Source enforces target policy',
-    'enforces',
-    'is enforced by',
-    ARRAY['EA.Security-*', 'EA.Governance-*'],
-    ARRAY['EA.Governance-*', 'EA.Security-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Policy enforcement relationship", "examples": ["Control enforces Policy", "Process enforces Standard"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'assesses',
-    'Source assesses target',
-    'assesses',
-    'is assessed by',
-    ARRAY['EA.Governance-*', 'EA.Security-*'],
-    ARRAY['EA.Governance-*', 'EA.Security-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Assessment relationship", "examples": ["Audit assesses Control", "Review assesses Process"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'governs',
-    'Source governs target',
-    'governs',
-    'is governed by',
-    ARRAY['EA.Governance-*'],
-    ARRAY['EA.Business-*', 'EA.Application-*', 'EA.Data-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Governance relationship", "examples": ["Policy governs Process", "Standard governs Application"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'aligned_with',
-    'Source is aligned with target strategy',
-    'aligned with',
-    'is aligned with',
-    ARRAY['EA.Business-*', 'EA.Application-*'],
-    ARRAY['EA.Strategy-*'],
-    'many',
-    'many',
-    true,
-    '{"description": "Strategic alignment relationship", "examples": ["Capability aligned with Objective", "Application aligned with Goal"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'conforms_to',
-    'Source conforms to target standard/policy',
-    'conforms to',
-    'is conformed to by',
-    ARRAY['EA.Application-*', 'EA.Data-*', 'EA.Technology-*'],
-    ARRAY['EA.Governance-*', 'EA.Security-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Compliance relationship", "examples": ["Application conforms to Policy", "Data conforms to Standard"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'derived_from',
-    'Source is derived from target',
-    'derived from',
-    'is source of',
-    ARRAY['EA.Data-*'],
-    ARRAY['EA.Data-*'],
-    'many',
-    'many',
-    false,
-    '{"description": "Data derivation relationship", "examples": ["DataSet derived from DataObject", "Report derived from Transaction"]}'::jsonb,
-    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
-),
-(
-    'decomposes',
-    'Source decomposes into target components',
-    'decomposes',
-    'is component of',
-    ARRAY['EA.Business-*', 'EA.Application-*'],
-    ARRAY['EA.Business-*', 'EA.Application-*'],
+    'contains',
+    'Location contains DataCenter and NetworkZone',
+    'contains',
+    'contained in',
+    ARRAY['EA.Infrastructure-Location'],
+    ARRAY['EA.Infrastructure-DataCenter', 'EA.Infrastructure-NetworkZone'],
     'one',
     'many',
     false,
-    '{"description": "Decomposition relationship (e.g., Capability L1 decomposes into Capability L2)", "examples": ["Business Domain decomposes into Capabilities", "Capability L1 decomposes into Capability L2"]}'::jsonb,
+    '{"description": "Location hierarchy"}'::jsonb,
     (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
 ),
 (
-    'triggers',
-    'Source triggers target action',
-    'triggers',
-    'is triggered by',
-    ARRAY['EA.Business-*', 'EA.Application-*'],
-    ARRAY['EA.Business-*', 'EA.Application-*'],
+    'contains',
+    'NetworkZone contains ComputePlatform and NetworkSecurityNodes',
+    'contains',
+    'contained in',
+    ARRAY['EA.Infrastructure-NetworkZone'],
+    ARRAY['EA.Infrastructure-ComputePlatform', 'EA.Infrastructure-NetworkSecurityNodes'],
+    'one',
+    'many',
+    false,
+    '{"description": "Network zone contains infrastructure"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'realizes',
+    'Compute Platform realizes IT Component',
+    'realizes',
+    'realized by',
+    ARRAY['EA.Infrastructure-ComputePlatform'],
+    ARRAY['EA.Technology-ITComponent'],
     'many',
     'many',
     false,
-    '{"description": "Event triggering relationship", "examples": ["Event triggers Process", "Message triggers Service"]}'::jsonb,
+    '{"description": "Infrastructure realizes technology"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+
+-- Security & Governance Relationships
+(
+    'implements',
+    'Control implements Subcategory',
+    'implements',
+    'implemented by',
+    ARRAY['EA.Security-Control'],
+    ARRAY['EA.Security-Subcategory'],
+    'many',
+    'many',
+    false,
+    '{"description": "Control implements NIST subcategory"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'enforces',
+    'IT Component enforces Control',
+    'enforces',
+    'enforced by',
+    ARRAY['EA.Technology-ITComponent'],
+    ARRAY['EA.Security-Control'],
+    'many',
+    'many',
+    false,
+    '{"description": "Technology enforces control"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'complies_with',
+    'Business Application complies with Control',
+    'complies with',
+    'compliance of',
+    ARRAY['EA.Application-BusinessApplication'],
+    ARRAY['EA.Security-Control'],
+    'many',
+    'many',
+    true,
+    '{"description": "Application compliance"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'documented_in',
+    'Control documented in Procedure',
+    'documented in',
+    'documents',
+    ARRAY['EA.Security-Control'],
+    ARRAY['EA.Governance-Procedure'],
+    'many',
+    'many',
+    true,
+    '{"description": "Control documentation"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'complies_with',
+    'IT Component complies with StandardComponent',
+    'complies with',
+    'compliance of',
+    ARRAY['EA.Technology-ITComponent'],
+    ARRAY['EA.Governance-StandardComponent'],
+    'many',
+    'many',
+    true,
+    '{"description": "Technology compliance"}'::jsonb,
+    (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
+),
+(
+    'governs',
+    'Policy governs Organization',
+    'governs',
+    'governed by',
+    ARRAY['EA.Governance-Policy'],
+    ARRAY['EA.Business-Organization'],
+    'many',
+    'many',
+    true,
+    '{"description": "Policy governance"}'::jsonb,
     (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
 )
 
@@ -523,43 +642,25 @@ BEGIN
     RAISE NOTICE 'EA teams validation passed: 8 teams created';
 END $$;
 
--- Validate EA CI types created
+-- Validate EA CI types created (should be exactly 32)
 DO $$
 DECLARE
     ea_ci_type_count INT;
 BEGIN
     SELECT COUNT(*) INTO ea_ci_type_count FROM ci_type_definitions WHERE name LIKE 'EA.%';
-    ASSERT ea_ci_type_count >= 60, format('Expected at least 60 EA CI types, got %s', ea_ci_type_count);
+    ASSERT ea_ci_type_count = 32, format('Expected exactly 32 EA CI types, got %s', ea_ci_type_count);
     RAISE NOTICE 'EA CI types validation passed: %s types created', ea_ci_type_count;
 END $$;
 
--- Validate EA relationship types created
+-- Validate EA relationship types created (should match directional graph)
 DO $$
 DECLARE
     ea_rel_type_count INT;
 BEGIN
-    SELECT COUNT(*) INTO ea_rel_type_count FROM relationship_types WHERE name IN (
-        'supports', 'depends_on', 'realizes', 'flows_to', 'assigned_to',
-        'aggregates', 'composes', 'accesses', 'associated_with',
-        'deployed_on', 'runs_on', 'uses', 'implements', 'validates',
-        'mitigates', 'enforces', 'assesses', 'governs', 'aligned_with',
-        'conforms_to', 'derived_from', 'decomposes', 'triggers'
-    );
-    ASSERT ea_rel_type_count >= 20, format('Expected at least 20 EA relationship types, got %s', ea_rel_type_count);
+    SELECT COUNT(*) INTO ea_rel_type_count FROM relationship_types;
+    ASSERT ea_rel_type_count >= 30, format('Expected at least 30 EA relationship types, got %s', ea_rel_type_count);
     RAISE NOTICE 'EA relationship types validation passed: %s types created', ea_rel_type_count;
 END $$;
-
--- Validate referential integrity for EA teams
--- Note: Admin user is created in SECTION 0, so all created_by values should be populated
--- Skipping validation to avoid potential transaction visibility issues
-
--- Validate EA CI types have creator
--- Note: Admin user is created in SECTION 0, so all created_by values should be populated
--- Skipping validation to avoid potential transaction visibility issues
-
--- Validate EA relationship types have creator
--- Note: Admin user is created in SECTION 0, so all created_by values should be populated
--- Skipping validation to avoid potential transaction visibility issues
 
 -- Display summary
 SELECT
@@ -569,13 +670,7 @@ SELECT
     'EA CI Types', COUNT(*) FROM ci_type_definitions WHERE name LIKE 'EA.%'
 UNION ALL
 SELECT
-    'EA Relationship Types', COUNT(*) FROM relationship_types WHERE name IN (
-        'supports', 'depends_on', 'realizes', 'flows_to', 'assigned_to',
-        'aggregates', 'composes', 'accesses', 'associated_with',
-        'deployed_on', 'runs_on', 'uses', 'implements', 'validates',
-        'mitigates', 'enforces', 'assesses', 'governs', 'aligned_with',
-        'conforms_to', 'derived_from', 'decomposes', 'triggers'
-    );
+    'EA Relationship Types', COUNT(*) FROM relationship_types;
 
 -- ============================================================================
 -- SECTION 5: EA RBAC Permissions
