@@ -603,16 +603,16 @@ VALUES
     (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
 ),
 (
-    'complies_with',
-    'IT Component complies with StandardComponent',
-    'complies with',
-    'compliance of',
+    'conforms_to',
+    'IT Component conforms to StandardComponent',
+    'conforms to',
+    'conformance of',
     ARRAY['EA.Technology-ITComponent'],
     ARRAY['EA.Governance-StandardComponent'],
     'many',
     'many',
     true,
-    '{"description": "Technology compliance"}'::jsonb,
+    '{"description": "Technology conformance to standards"}'::jsonb,
     (SELECT id FROM users WHERE username = 'admin' LIMIT 1)
 ),
 (
