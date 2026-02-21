@@ -49,11 +49,11 @@ Requirements for initial EA module release. Each maps to roadmap phases.
 
 ### Governance & Security
 
-- [ ] **GOV-01**: EA entities respect existing RBAC system with extended permissions
+- [x] **GOV-01**: EA entities respect existing RBAC system with extended permissions
 - [x] **GOV-02**: System enforces `ea:read` permission for viewing EA entities
-- [ ] **GOV-03**: System enforces `ea:create` permission for creating EA entities
-- [ ] **GOV-04**: System enforces `ea:update` permission for editing EA entities
-- [ ] **GOV-05**: System enforces `ea:delete` permission for deleting EA entities
+- [x] **GOV-03**: System enforces `ea:create` permission for creating EA entities
+- [x] **GOV-04**: System enforces `ea:update` permission for editing EA entities
+- [x] **GOV-05**: System enforces `ea:delete` permission for deleting EA entities
 - [ ] **GOV-06**: EA entities maintain lifecycle status (proposed, active, deprecated, retired)
 - [ ] **GOV-07**: System provides data quality dashboard showing completeness, staleness, and validation errors
 
@@ -143,11 +143,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IMP-04 | Phase 3 | Pending |
 | IMP-05 | Phase 3 | Pending |
 | IMP-06 | Phase 3 | Pending |
-| GOV-01 | Phase 2 | Pending |
+| GOV-01 | Phase 2 | Complete |
 | GOV-02 | Phase 2 | Complete |
-| GOV-03 | Phase 2 | Pending |
-| GOV-04 | Phase 2 | Pending |
-| GOV-05 | Phase 2 | Pending |
+| GOV-03 | Phase 2 | Complete |
+| GOV-04 | Phase 2 | Complete |
+| GOV-05 | Phase 2 | Complete |
 | GOV-06 | Phase 2 | Pending |
 | GOV-07 | Phase 2 | Pending |
 | INT-01 | Phase 1 | Complete |

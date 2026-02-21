@@ -42,6 +42,7 @@ Progress: [████████████████████] 100%
 | Phase 02-entity-management P02-02 | 22 min | 3 tasks | 13 files |
 | Phase 02-entity-management P02-03 | 16 min | 3 tasks | 10 files |
 | Phase 02-entity-management P02-04 | 22 min | 3 tasks | 8 files |
+| Phase 02 P02-06 | 12 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,9 @@ Recent decisions affecting current work:
 - Domain Extraction: Used PostgreSQL SUBSTRING() to extract EA domain from CI type name (no schema changes)
 - Staleness Definition: 90-day threshold OR incomplete entities (data_quality_score < 100)
 - Detail Tables: Optional display based on data availability (cleaner dashboard when quality is good)
+- [Phase 02]: EA RBAC permissions verified: 4 permissions seeded, correctly assigned to admin/editor/viewer roles
+- [Phase 02]: All EA routes protected with RBAC middleware: JWT → Activity → Audit → RBAC chain verified
+- [Phase 02]: Integration tests and manual testing guide created for comprehensive RBAC verification
 
 ### Pending Todos
 
