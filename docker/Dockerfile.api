@@ -34,6 +34,7 @@ WORKDIR /app
 
 # Copy binary from builder stage
 COPY --from=builder /app/main .
+# Copy migrations directory - required for automatic migration execution on startup
 COPY --from=builder /app/cmd/migrations ./cmd/migrations
 
 # Change ownership to appuser
