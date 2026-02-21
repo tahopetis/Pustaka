@@ -610,6 +610,7 @@ func setupRouter(
 				r.Get("/", eaHandlers.ListEAEntities)
 				r.Get("/{id}", eaHandlers.GetEAEntity)
 				r.Get("/{id}/validate", eaHandlers.ValidateEAEntity)
+				r.Get("/{id}/audit", eaHandlers.GetEAEntityAuditLogs)
 
 				r.Group(func(r chi.Router) {
 					r.Use(middleware.RBAC("ea:create"))

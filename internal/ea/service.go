@@ -713,3 +713,40 @@ func (s *Service) ValidateEntity(ctx context.Context, id string) (*ValidationRes
 	return result, nil
 }
 
+// GetEntityAuditLogs retrieves audit logs for an EA entity with user information
+func (s *Service) GetEntityAuditLogs(ctx context.Context, entityID uuid.UUID, page, pageSize int) ([]map[string]interface{}, int64, error) {
+	// Get audit logs from audit service
+	filters := ci.AuditLogFilters{
+		EntityType: "ea",
+		EntityID:   &entityID,
+		Page:       page,
+		Limit:      pageSize,
+		Sort:       "timestamp",
+		Order:      "DESC",
+	}
+
+	response, err := s.auditService.ListAuditLogs(ctx, filters)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Enrich audit logs with user information
+	auditLogsWithUsers := make([]map[string]interface{}, len(response.AuditLogs))
+	for i, log := range response.AuditLogs {
+		auditLogsWithUsers[i] = map[string]interface{}{
+			"id":          log.ID,
+			"timestamp":   log.Timestamp,
+			"action":      log.Action,
+			"user_id":     log.PerformedBy,
+			"details":     log.Details,
+			"ip_address":  log.IPAddress,
+			"user_agent":  log.UserAgent,
+		}
+
+		// Try to get user name (this will be filled by the handler if user service is available)
+		// For now, we'll just return the user_id
+	}
+
+	return auditLogsWithUsers, response.Pagination.Total, nil
+}
+

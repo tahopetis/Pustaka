@@ -4,7 +4,8 @@ import type {
   EACreateRequest,
   EAUpdateRequest,
   EAFilter,
-  PaginationMeta
+  PaginationMeta,
+  AuditLogsResponse
 } from '@/types/ea'
 
 export interface EntityListResponse {
@@ -78,5 +79,17 @@ export const eaApi = {
    * GET /api/v1/ea/ci-types/{name}
    */
   getCiType: (name: string) =>
-    api.get(`/ea/ci-types/${name}`)
+    api.get(`/ea/ci-types/${name}`),
+
+  /**
+   * Get audit logs for an EA entity
+   * GET /api/v1/ea/entities/{id}/audit
+   */
+  getEntityAuditLogs: (id: string, params?: { page?: number; page_size?: number }) => {
+    const queryParams: Record<string, any> = {}
+    if (params?.page) queryParams.page = params.page
+    if (params?.page_size) queryParams.page_size = params.page_size
+
+    return api.get<AuditLogsResponse>(`/ea/entities/${id}/audit`, { params: queryParams })
+  }
 }

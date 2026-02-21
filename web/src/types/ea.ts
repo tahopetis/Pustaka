@@ -86,3 +86,22 @@ export interface CITypeDefinition {
   required_attributes: AttributeSchema[]
   optional_attributes: AttributeSchema[]
 }
+
+export interface AuditLog {
+  id: string
+  timestamp: string
+  action: string
+  user_id: string
+  user_name?: string
+  details: Record<string, any>
+  ip_address?: string
+  user_agent?: string
+}
+
+export interface AuditLogsResponse {
+  audit_logs: AuditLog[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}

@@ -200,9 +200,116 @@
       <div v-else-if="activeTab === 'audit'" class="space-y-6">
         <div class="bg-white shadow rounded-lg p-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Audit History</h3>
-          <p class="text-sm text-gray-500 mb-4">
-            Audit log viewing is coming in a future phase. Stay tuned for comprehensive audit trail capabilities.
-          </p>
+
+          <!-- Loading State -->
+          <div v-if="auditLoading" class="text-center py-8">
+            <div class="spinner w-8 h-8 mx-auto mb-4"></div>
+            <p class="text-gray-500">Loading audit logs...</p>
+          </div>
+
+          <!-- Error State -->
+          <div v-else-if="auditError" class="text-center py-8">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Error loading audit logs</h3>
+            <p class="mt-1 text-sm text-gray-500">{{ auditError }}</p>
+          </div>
+
+          <!-- Empty State -->
+          <div v-else-if="auditLogs.length === 0" class="text-center py-8">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No audit history</h3>
+            <p class="mt-1 text-sm text-gray-500">No audit logs available for this entity.</p>
+          </div>
+
+          <!-- Audit Logs List -->
+          <div v-else class="space-y-4">
+            <div
+              v-for="log in auditLogs"
+              :key="log.id"
+              class="border-l-4 border-gray-200 pl-4 py-2 hover:bg-gray-50 transition-colors"
+              :class="{
+                'border-green-500': log.action === 'create',
+                'border-blue-500': log.action === 'update',
+                'border-red-500': log.action === 'delete'
+              }"
+            >
+              <div class="flex items-start justify-between">
+                <div class="flex items-center space-x-3">
+                  <!-- Action Icon -->
+                  <div class="flex-shrink-0">
+                    <svg v-if="log.action === 'create'" class="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    <svg v-else-if="log.action === 'update'" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <svg v-else-if="log.action === 'delete'" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </div>
+
+                  <!-- Action Text -->
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">
+                      {{ getActionDisplayName(log.action) }}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                      {{ formatAuditTimestamp(log.timestamp) }}
+                    </p>
+                  </div>
+                </div>
+
+                <!-- User Info -->
+                <div class="text-right">
+                  <p class="text-sm text-gray-900">{{ log.user_name || log.user_id }}</p>
+                  <p class="text-xs text-gray-500">User ID: {{ log.user_id }}</p>
+                </div>
+              </div>
+
+              <!-- Details -->
+              <div v-if="log.details && Object.keys(log.details).length > 0" class="mt-3 ml-8">
+                <details class="text-sm">
+                  <summary class="cursor-pointer text-gray-600 hover:text-gray-900">
+                    View details
+                  </summary>
+                  <div class="mt-2 bg-gray-50 rounded p-3">
+                    <pre class="text-xs overflow-x-auto">{{ formatAuditDetails(log.details) }}</pre>
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <!-- Pagination -->
+            <div v-if="auditPagination.total_pages > 1" class="flex items-center justify-between mt-6 pt-6 border-t">
+              <div class="text-sm text-gray-700">
+                Showing <span class="font-medium">{{ (auditPagination.page - 1) * auditPagination.page_size + 1 }}</span>
+                to <span class="font-medium">{{ Math.min(auditPagination.page * auditPagination.page_size, auditPagination.total) }}</span>
+                of <span class="font-medium">{{ auditPagination.total }}</span> results
+              </div>
+              <div class="flex space-x-2">
+                <button
+                  @click="loadAuditLogs(auditPagination.page - 1)"
+                  :disabled="auditPagination.page === 1"
+                  class="btn btn-outline"
+                  :class="{ 'opacity-50 cursor-not-allowed': auditPagination.page === 1 }"
+                >
+                  Previous
+                </button>
+                <button
+                  @click="loadAuditLogs(auditPagination.page + 1)"
+                  :disabled="auditPagination.page === auditPagination.total_pages"
+                  class="btn btn-outline"
+                  :class="{ 'opacity-50 cursor-not-allowed': auditPagination.page === auditPagination.total_pages }"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -229,10 +336,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useEaStore } from '@/stores/ea'
+import { eaApi } from '@/services/eaApi'
+import type { AuditLog } from '@/types/ea'
 import FlexibleAttributeDisplay from '@/components/ci/FlexibleAttributeDisplay.vue'
 
 const route = useRoute()
@@ -244,6 +353,17 @@ const activeTab = ref('overview')
 const entityId = computed(() => route.params.id as string)
 
 const entity = computed(() => eaStore.currentEntity)
+
+// Audit logs state
+const auditLogs = ref<AuditLog[]>([])
+const auditLoading = ref(false)
+const auditError = ref<string | null>(null)
+const auditPagination = ref({
+  total: 0,
+  page: 1,
+  page_size: 50,
+  total_pages: 0
+})
 
 const domainDisplay = computed(() => {
   if (!entity.value) return 'Entity'
@@ -273,6 +393,65 @@ const hasPermission = (permission: string) => {
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString()
 }
+
+const formatAuditTimestamp = (dateString: string) => {
+  const date = new Date(dateString)
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+const getActionDisplayName = (action: string) => {
+  const actionMap: Record<string, string> = {
+    create: 'Created',
+    update: 'Updated',
+    delete: 'Deleted'
+  }
+  return actionMap[action] || action.charAt(0).toUpperCase() + action.slice(1)
+}
+
+const formatAuditDetails = (details: Record<string, any>) => {
+  return JSON.stringify(details, null, 2)
+}
+
+const loadAuditLogs = async (page: number = 1) => {
+  if (activeTab.value !== 'audit') return
+
+  try {
+    auditLoading.value = true
+    auditError.value = null
+
+    const response = await eaApi.getEntityAuditLogs(entityId.value, {
+      page,
+      page_size: 50
+    })
+
+    auditLogs.value = response.data.audit_logs
+    auditPagination.value = {
+      total: response.data.total,
+      page: response.data.page,
+      page_size: response.data.page_size,
+      total_pages: response.data.total_pages
+    }
+  } catch (err: any) {
+    console.error('Failed to load audit logs:', err)
+    auditError.value = err.response?.data?.error || 'Failed to load audit logs'
+  } finally {
+    auditLoading.value = false
+  }
+}
+
+// Watch for tab changes to load audit logs
+watch(activeTab, (newTab) => {
+  if (newTab === 'audit' && auditLogs.value.length === 0) {
+    loadAuditLogs(1)
+  }
+})
 
 const confirmDelete = async () => {
   try {

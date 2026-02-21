@@ -298,3 +298,60 @@ func indexOfString(s, substr string) int {
 	}
 	return -1
 }
+
+// GetEAEntityAuditLogs handles GET /api/v1/ea/entities/{id}/audit
+func (h *EAHandlers) GetEAEntityAuditLogs(w http.ResponseWriter, r *http.Request) {
+	id := extractIDParam(r)
+	if id == "" {
+		h.writeError(w, http.StatusBadRequest, "Invalid entity ID")
+		return
+	}
+
+	// Parse pagination parameters
+	page := 1
+	pageSize := 50
+
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if pageSizeStr := r.URL.Query().Get("page_size"); pageSizeStr != "" {
+		if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 && ps <= 100 {
+			pageSize = ps
+		}
+	}
+
+	// Parse entity ID as UUID
+	entityID, err := uuid.Parse(id)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid entity ID format")
+		return
+	}
+
+	// Get audit logs from service
+	auditLogs, total, err := h.eaService.GetEntityAuditLogs(r.Context(), entityID, page, pageSize)
+	if err != nil {
+		h.logger.ErrorService("ea", "get_entity_audit_logs", err, map[string]interface{}{
+			"entity_id": id,
+		})
+		h.writeError(w, http.StatusInternalServerError, "Failed to get audit logs")
+		return
+	}
+
+	totalPages := int64(0)
+	if pageSize > 0 {
+		totalPages = (total + int64(pageSize) - 1) / int64(pageSize)
+	}
+
+	response := map[string]interface{}{
+		"audit_logs":  auditLogs,
+		"total":       total,
+		"page":        page,
+		"page_size":   pageSize,
+		"total_pages": totalPages,
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}
