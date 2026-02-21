@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 ## Current Position
 
-Phase: 2 of 3 (Entity Management)
-Plan: 7 of 7
+Phase: 02.1 (EA Metamodel Verification)
+Plan: 1 of 1
 Status: Complete
-Last activity: 2026-02-21 - Completed quick task 1: make all migrations applied when deploy the app in docker
+Last activity: 2026-02-22 - Completed Plan 02.1-01: EA Metamodel Verification and Correction
 
 Progress: [████████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 14.7 min
-- Total execution time: 1.72 hours
+- Total plans completed: 8
+- Average duration: 15.4 min
+- Total execution time: 2.06 hours
 
 **By Phase:**
 
@@ -29,6 +29,7 @@ Progress: [████████████████████] 100%
 |-------|-------|----------|----------|
 | 1 (Foundation) | 4 | 4 | 11 min |
 | 2 (Entity Management) | 5 | 7 | 17 min |
+| 2.1 (EA Metamodel Verification) | 1 | 1 | 37 min |
 | 3 (Relationships & Impact) | 0 | TBD | - |
 
 **Recent Trend:**
@@ -44,6 +45,8 @@ Progress: [████████████████████] 100%
 | Phase 02-entity-management P02-04 | 22 min | 3 tasks | 8 files |
 | Phase 02-entity-management P02-05 | 33 min | 3 tasks | 10 files |
 | Phase 02-entity-management P02-07 | 6 min | 3 tasks | 6 files |
+| Phase 02.1-verification P02.1-01 | 37 min | 3 tasks | 3 files |
+| Phase 02.1 P02.1-01 | 2209 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -83,17 +86,28 @@ Recent decisions affecting current work:
 - Force Delete Pattern: Two-phase delete (relationship count → confirmation → force delete) provides visibility while allowing intentional deletion
 - Lifecycle Status Names: Use display names (Proposed, Active, etc.) as transition keys for database independence
 
+**Plan 02.1-01 Decisions (2026-02-22):**
+- Metamodel Documentation as Authority: docs/01-metamodel-structure.md and docs/02-metamodel-relationships.md define the authoritative specification
+- CI Type Count: Migration 009 must contain exactly 32 entity types (not 52+ generic ArchiMate types)
+- CI Type Naming: Use format EA.{Domain}-{EntityType} matching the 8-domain tree hierarchy
+- Relationship Specificity: Use specific directional relationships (drives, consists_of, contains, targets) instead of generic ArchiMate relationships (aggregates, composes, accesses)
+- Infrastructure Preservation: ea_teams table, admin creation, RBAC sections preserved during migration rewrite
+- [Phase 02.1]: Metamodel docs are authoritative; migration 009 corrected to 32 CI types; specific directional relationships replace generic ArchiMate relationships
+
 ### Roadmap Evolution
 
 - Phase 02.1 inserted after Phase 2: i think the implementation is not following the metamodel docs i provided in the docs folder (INSERTED)
 
 ### Pending Todos
 
-- Investigate EA metamodel documentation compliance (Phase 02.1)
+- Complete clean deployment and verification of corrected migration 009 (Docker rebuild required)
 
 ### Blockers/Concerns
 
-None yet.
+**Docker Image Caching Issue (2026-02-22):**
+- Docker build cache prevents corrected migration 009 from running on fresh deployment
+- Workaround: `docker compose down -v && docker compose up -d --build --no-cache`
+- Migration file is corrected (32 CI types, 30+ relationships) but database verification pending
 
 ### Quick Tasks Completed
 
@@ -103,6 +117,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-21 04:23
-Stopped at: Completed Plan 02-05 - Delete Confirmation, Audit History, and Lifecycle Transitions (3 tasks, 10 files, relationship-dependent deletion with confirmation dialog, complete audit trail visibility in Audit History tab, lifecycle transition state machine enforcement, Docker containers running)
-Resume file: .planning/phases/02-entity-management/02-05-SUMMARY.md
+Last session: 2026-02-22 00:29
+Stopped at: Completed Plan 02.1-01 - EA Metamodel Verification and Correction (3 tasks, 3 files, verification report created, migration 009 corrected to match metamodel docs with 32 CI types and 30+ relationships, JSON syntax errors fixed, awaiting clean deployment for final verification)
+Resume file: .planning/phases/02.1-i-think-the-implementation-is-not-following-the-metamodel-docs-i-provided-in-the-docs-folder/02.1-01-SUMMARY.md
