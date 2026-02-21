@@ -6,8 +6,53 @@
 
 -- NOTE: This migration assumes that:
 -- 1. All tables have been created by migrations 001-008
--- 2. Admin user exists (created by application startup before migrations run)
--- 3. Admin role exists (seeded in migration 001 or earlier)
+-- 2. Admin role exists (seeded in migration 001 or earlier)
+
+-- ============================================================================
+-- SECTION 0: Ensure Admin User Exists
+-- ============================================================================
+
+-- This migration references the admin user in created_by columns.
+-- If the admin user doesn't exist yet (fresh deployment), create it now.
+-- This ensures migration 009 works on both fresh and existing deployments.
+
+DO $$
+DECLARE
+    admin_user_id UUID;
+    admin_role_id UUID;
+BEGIN
+    -- Check if admin user exists
+    SELECT id INTO admin_user_id FROM users WHERE username = 'admin';
+
+    IF admin_user_id IS NULL THEN
+        -- Create admin user
+        admin_user_id := gen_random_uuid();
+        INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
+        VALUES (
+            admin_user_id,
+            'admin',
+            'admin@pustaka.local',
+            '$argon2id$v=19$m=65536,t=3,p=4$change-this-password-in-production-salt$change-this-password-in-production-hash',
+            true,
+            NOW(),
+            NOW()
+        );
+
+        RAISE NOTICE 'Created admin user for migration 009';
+    ELSE
+        RAISE NOTICE 'Admin user already exists, skipping creation';
+    END IF;
+
+    -- Ensure admin user has admin role
+    SELECT id INTO admin_role_id FROM roles WHERE name = 'admin';
+    IF admin_role_id IS NOT NULL THEN
+        INSERT INTO user_roles (user_id, role_id, created_at)
+        VALUES (admin_user_id, admin_role_id, NOW())
+        ON CONFLICT (user_id, role_id) DO NOTHING;
+
+        RAISE NOTICE 'Ensured admin user has admin role';
+    END IF;
+END $$;
 
 -- ============================================================================
 -- SECTION 1: EA Teams Table
