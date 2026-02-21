@@ -176,6 +176,16 @@ func (e *ErrRelationshipsExist) Error() string {
 	return fmt.Sprintf("cannot delete EA entity with existing relationships (%d relationships)", e.Count)
 }
 
+// ErrInvalidLifecycleTransition is returned when attempting an invalid lifecycle status transition
+type ErrInvalidLifecycleTransition struct {
+	Current string
+	New     string
+}
+
+func (e *ErrInvalidLifecycleTransition) Error() string {
+	return fmt.Sprintf("invalid lifecycle transition: %s → %s", e.Current, e.New)
+}
+
 // Errors
 var (
 	ErrInvalidEACIType  = fmt.Errorf("invalid EA CI type format")

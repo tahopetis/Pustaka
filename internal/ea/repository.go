@@ -559,6 +559,31 @@ func (r *Repository) CheckRelationships(ctx context.Context, id string) (int, er
 	return count, nil
 }
 
+// GetLifecycleStatusByID retrieves a lifecycle status by ID
+func (r *Repository) GetLifecycleStatusByID(ctx context.Context, id uuid.UUID) (*LifecycleStatus, error) {
+	status := &LifecycleStatus{}
+
+	query := `
+		SELECT id, name, display_name, description, color, icon
+		FROM lifecycle_statuses
+		WHERE id = $1
+	`
+
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&status.ID, &status.Name, &status.DisplayName, &status.Description,
+		&status.Color, &status.Icon,
+	)
+
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, fmt.Errorf("lifecycle status not found")
+		}
+		return nil, fmt.Errorf("failed to get lifecycle status: %w", err)
+	}
+
+	return status, nil
+}
+
 // Helper function to handle nil strings
 func getStringValue(s *string) string {
 	if s == nil {

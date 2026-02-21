@@ -555,7 +555,28 @@ func (s *Service) UpdateEntity(ctx context.Context, id string, req *UpdateEACIRe
 		return nil, fmt.Errorf("CI type not found: %w", err)
 	}
 
-	// 3. Prepare updated attributes
+	// 3. Validate lifecycle status transition if status is being changed
+	if req.LifecycleStatusID != nil && existing.LifecycleStatusID != nil {
+		// Get current and new lifecycle status names
+		currentStatus, err := s.repo.GetLifecycleStatusByID(ctx, *existing.LifecycleStatusID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current lifecycle status: %w", err)
+		}
+
+		newStatus, err := s.repo.GetLifecycleStatusByID(ctx, *req.LifecycleStatusID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get new lifecycle status: %w", err)
+		}
+
+		// Validate transition if status is actually changing
+		if currentStatus.ID != newStatus.ID {
+			if err := ValidateLifecycleTransition(currentStatus.Name, newStatus.Name); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// 4. Prepare updated attributes
 	attributes := existing.Attributes
 	if req.Attributes != nil {
 		attributes = req.Attributes
@@ -578,7 +599,7 @@ func (s *Service) UpdateEntity(ctx context.Context, id string, req *UpdateEACIRe
 		attributes["ea_team_id"] = team.ID.String()
 	}
 
-	// 4. Validate updated attributes
+	// 5. Validate updated attributes
 	updatedEntity := &EAEntity{
 		ID:                existing.ID,
 		Name:              req.Name,
@@ -598,12 +619,12 @@ func (s *Service) UpdateEntity(ctx context.Context, id string, req *UpdateEACIRe
 		validationResult.Errors = append(validationResult.Errors, e)
 	}
 
-	// 5. Handle admin override
+	// 6. Handle admin override
 	if !req.OverrideValidation && !validationResult.IsValid {
 		return nil, ErrValidationFailed
 	}
 
-	// 6. Update entity
+	// 7. Update entity
 	entity := &EAEntity{
 		ID:                existing.ID,
 		Name:              req.Name,
@@ -619,19 +640,31 @@ func (s *Service) UpdateEntity(ctx context.Context, id string, req *UpdateEACIRe
 		return nil, fmt.Errorf("failed to update EA entity: %w", err)
 	}
 
-	// 7. Get updated entity
+	// 8. Get updated entity
 	result, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	// 8. Log audit event
+	// 9. Log audit event
 	domain, _ := ExtractEADomain(existing.CIType)
-	s.auditService.CreateAuditLog(ctx, "ea", &result.ID, "update", userID, map[string]interface{}{
+
+	// Include lifecycle transition details in audit log
+	details := map[string]interface{}{
 		"ea_domain":         string(domain),
 		"ci_name":           result.Name,
 		"data_quality_score": validationResult.DataQualityScore,
-	}, "", "")
+	}
+
+	if req.LifecycleStatusID != nil && existing.LifecycleStatusID != nil {
+		currentStatus, _ := s.repo.GetLifecycleStatusByID(ctx, *existing.LifecycleStatusID)
+		newStatus, _ := s.repo.GetLifecycleStatusByID(ctx, *req.LifecycleStatusID)
+		if currentStatus.ID != newStatus.ID {
+			details["lifecycle_transition"] = fmt.Sprintf("%s → %s", currentStatus.Name, newStatus.Name)
+		}
+	}
+
+	s.auditService.CreateAuditLog(ctx, "ea", &result.ID, "update", userID, details, "", "")
 
 	s.logger.Info().
 		Str("ea_domain", string(domain)).

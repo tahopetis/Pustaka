@@ -427,6 +427,52 @@ func CalculateDataQualityScore(validAttributes int, totalAttributes int, validat
 }
 
 // ============================================================================
+// Lifecycle Transition State Machine
+// ============================================================================
+
+// ValidateLifecycleTransition validates that a lifecycle status transition is allowed
+func ValidateLifecycleTransition(currentStatus, newStatus string) error {
+	// Define valid transitions (current status -> allowed next statuses)
+	validTransitions := map[string][]string{
+		"Proposed":   {"Active", "Deprecated"},
+		"Active":     {"Deprecated", "Retired"},
+		"Deprecated": {"Retired"},
+		"Retired":    {}, // Terminal state - no transitions allowed
+	}
+
+	// Check if current status is valid
+	allowed, exists := validTransitions[currentStatus]
+	if !exists {
+		return fmt.Errorf("invalid current lifecycle status: %s", currentStatus)
+	}
+
+	// If same status, transition is valid (no-op)
+	if currentStatus == newStatus {
+		return nil
+	}
+
+	// If terminal state, no transitions allowed
+	if len(allowed) == 0 {
+		return &ErrInvalidLifecycleTransition{
+			Current: currentStatus,
+			New:     newStatus,
+		}
+	}
+
+	// Check if transition is allowed
+	for _, status := range allowed {
+		if status == newStatus {
+			return nil // Valid transition
+		}
+	}
+
+	return &ErrInvalidLifecycleTransition{
+		Current: currentStatus,
+		New:     newStatus,
+	}
+}
+
+// ============================================================================
 // Entity Attribute Validation (Schema-based)
 // ============================================================================
 
