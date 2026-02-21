@@ -275,12 +275,31 @@ const formatDate = (dateString: string) => {
 }
 
 const confirmDelete = async () => {
-  if (confirm(`Are you sure you want to delete "${entity.value?.name}"? This action cannot be undone.`)) {
-    try {
-      await eaStore.deleteEntity(entityId.value)
-      router.push(`/entities/${entity.value?.domain || 'business'}`)
-    } catch (error: any) {
-      console.error('Failed to delete entity:', error)
+  try {
+    // First attempt to delete - this will check for relationships
+    await eaStore.deleteEntity(entityId.value)
+    // If successful, navigate back
+    router.push(`/entities/${entity.value?.domain || 'business'}`)
+  } catch (error: any) {
+    console.error('Failed to delete entity:', error)
+
+    // Check if it's a relationship dependency error
+    if (error.response?.status === 400 && error.response?.data?.relationship_count !== undefined) {
+      const count = error.response.data.relationship_count
+      const confirmed = confirm(
+        `This entity has ${count} ${count === 1 ? 'relationship' : 'relationships'}. Deleting will affect all connected entities. Delete anyway?`
+      )
+
+      if (confirmed) {
+        try {
+          // Retry with force=true flag
+          await eaStore.deleteEntity(entityId.value, true)
+          router.push(`/entities/${entity.value?.domain || 'business'}`)
+        } catch (retryError: any) {
+          alert(retryError.response?.data?.error || 'Failed to delete entity')
+        }
+      }
+    } else {
       alert(error.response?.data?.error || 'Failed to delete entity')
     }
   }

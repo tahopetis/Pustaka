@@ -167,6 +167,15 @@ func extractDomainFromString(s string) string {
 	return s
 }
 
+// ErrRelationshipsExist is returned when attempting to delete an entity with relationships
+type ErrRelationshipsExist struct {
+	Count int
+}
+
+func (e *ErrRelationshipsExist) Error() string {
+	return fmt.Sprintf("cannot delete EA entity with existing relationships (%d relationships)", e.Count)
+}
+
 // Errors
 var (
 	ErrInvalidEACIType  = fmt.Errorf("invalid EA CI type format")

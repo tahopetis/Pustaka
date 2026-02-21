@@ -391,7 +391,7 @@ func (r *Repository) Update(ctx context.Context, entity *EAEntity) error {
 }
 
 // Delete soft deletes an EA entity
-func (r *Repository) Delete(ctx context.Context, id string) error {
+func (r *Repository) Delete(ctx context.Context, id string, forceDelete bool) error {
 	entityID, err := uuid.Parse(id)
 	if err != nil {
 		return fmt.Errorf("invalid entity ID: %w", err)
@@ -403,8 +403,8 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to check relationships: %w", err)
 	}
 
-	if relationshipCount > 0 {
-		return fmt.Errorf("cannot delete EA entity with existing relationships (%d relationships)", relationshipCount)
+	if relationshipCount > 0 && !forceDelete {
+		return &ErrRelationshipsExist{Count: relationshipCount}
 	}
 
 	query := `DELETE FROM configuration_items WHERE id = $1 AND ci_type LIKE 'EA.%'`

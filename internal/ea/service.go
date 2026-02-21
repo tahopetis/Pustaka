@@ -642,7 +642,7 @@ func (s *Service) UpdateEntity(ctx context.Context, id string, req *UpdateEACIRe
 }
 
 // DeleteEntity deletes an EA entity
-func (s *Service) DeleteEntity(ctx context.Context, id string, userID uuid.UUID) error {
+func (s *Service) DeleteEntity(ctx context.Context, id string, userID uuid.UUID, forceDelete bool) error {
 	// 1. Get existing entity for audit
 	existing, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -652,7 +652,7 @@ func (s *Service) DeleteEntity(ctx context.Context, id string, userID uuid.UUID)
 	domain, _ := ExtractEADomain(existing.CIType)
 
 	// 2. Check relationships (done in repo.Delete)
-	if err := s.repo.Delete(ctx, id); err != nil {
+	if err := s.repo.Delete(ctx, id, forceDelete); err != nil {
 		return err
 	}
 

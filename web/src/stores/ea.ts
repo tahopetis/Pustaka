@@ -165,12 +165,12 @@ export const useEaStore = defineStore('ea', () => {
     }
   }
 
-  const deleteEntity = async (id: string) => {
+  const deleteEntity = async (id: string, force: boolean = false) => {
     try {
       loading.value = true
       error.value = null
 
-      await eaApi.deleteEntity(id)
+      await eaApi.deleteEntity(id, force)
 
       // Remove from local state
       entities.value = entities.value.filter(e => e.id !== id)

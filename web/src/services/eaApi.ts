@@ -37,9 +37,10 @@ export const eaApi = {
   /**
    * Delete an EA entity
    * DELETE /api/v1/ea/entities/{id}
+   * @param force - Set to true to bypass relationship check after confirmation
    */
-  deleteEntity: (id: string) =>
-    api.delete(`/ea/entities/${id}`),
+  deleteEntity: (id: string, force: boolean = false) =>
+    api.delete(`/ea/entities/${id}${force ? '?force=true' : ''}`),
 
   /**
    * List EA entities with filtering and pagination
