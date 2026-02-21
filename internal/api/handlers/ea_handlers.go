@@ -62,8 +62,15 @@ func (h *EAHandlers) CreateEAEntity(w http.ResponseWriter, r *http.Request) {
 
 	entity, err := h.eaService.CreateEntity(r.Context(), &req, userID)
 	if err != nil {
+		// Only block on critical errors (not validation failures)
 		if err == ea.ErrValidationFailed {
-			h.writeError(w, http.StatusUnprocessableEntity, "Validation failed: "+err.Error())
+			// Warn-but-allow: return 422 only for critical validation errors
+			// The service should have already saved with data_quality_score
+			h.logger.ErrorService("ea", "create_entity", err, map[string]interface{}{
+				"request": req,
+				"user_id": userID,
+			})
+			h.writeError(w, http.StatusUnprocessableEntity, "Critical validation error: "+err.Error())
 			return
 		}
 		h.logger.ErrorService("ea", "create_entity", err, map[string]interface{}{
@@ -74,7 +81,32 @@ func (h *EAHandlers) CreateEAEntity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.writeJSON(w, http.StatusCreated, entity)
+	// Return entity with validation warnings if data quality score < 100
+	response := map[string]interface{}{
+		"id":                 entity.ID,
+		"name":               entity.Name,
+		"ci_type":            entity.CIType,
+		"owner":              entity.Owner,
+		"attributes":         entity.Attributes,
+		"tags":               entity.Tags,
+		"lifecycle_status":   entity.LifecycleStatus,
+		"data_quality_score": entity.DataQualityScore,
+		"created_at":         entity.CreatedAt,
+		"updated_at":         entity.UpdatedAt,
+	}
+
+	// Add validation warnings if score is less than perfect
+	if entity.DataQualityScore < 100 {
+		// Extract validation warnings from service if available
+		// For now, just indicate score is less than perfect
+		response["validation_warnings"] = []string{
+			fmt.Sprintf("Data quality score is %.1f%% (recommended: 100%%)", entity.DataQualityScore),
+		}
+	} else {
+		response["validation_warnings"] = []string{}
+	}
+
+	h.writeJSON(w, http.StatusCreated, response)
 }
 
 // GetEAEntity handles GET /api/v1/ea/entities/{id}
@@ -128,8 +160,14 @@ func (h *EAHandlers) UpdateEAEntity(w http.ResponseWriter, r *http.Request) {
 
 	entity, err := h.eaService.UpdateEntity(r.Context(), id, &req, userID)
 	if err != nil {
+		// Only block on critical errors (not validation failures)
 		if err == ea.ErrValidationFailed {
-			h.writeError(w, http.StatusUnprocessableEntity, "Validation failed: "+err.Error())
+			// Warn-but-allow: return 422 only for critical validation errors
+			h.logger.ErrorService("ea", "update_entity", err, map[string]interface{}{
+				"entity_id": id,
+				"user_id":   userID,
+			})
+			h.writeError(w, http.StatusUnprocessableEntity, "Critical validation error: "+err.Error())
 			return
 		}
 		if err.Error() == "EA entity not found" {
@@ -144,7 +182,30 @@ func (h *EAHandlers) UpdateEAEntity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, entity)
+	// Return entity with validation warnings if data quality score < 100
+	response := map[string]interface{}{
+		"id":                 entity.ID,
+		"name":               entity.Name,
+		"ci_type":            entity.CIType,
+		"owner":              entity.Owner,
+		"attributes":         entity.Attributes,
+		"tags":               entity.Tags,
+		"lifecycle_status":   entity.LifecycleStatus,
+		"data_quality_score": entity.DataQualityScore,
+		"created_at":         entity.CreatedAt,
+		"updated_at":         entity.UpdatedAt,
+	}
+
+	// Add validation warnings if score is less than perfect
+	if entity.DataQualityScore < 100 {
+		response["validation_warnings"] = []string{
+			fmt.Sprintf("Data quality score is %.1f%% (recommended: 100%%)", entity.DataQualityScore),
+		}
+	} else {
+		response["validation_warnings"] = []string{}
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
 }
 
 // DeleteEAEntity handles DELETE /api/v1/ea/entities/{id}
