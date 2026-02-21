@@ -59,6 +59,15 @@ Plans:
 - [ ] 02-06-PLAN.md — Verify RBAC permission enforcement for all EA operations (gap closure: GOV-01, GOV-03, GOV-04, GOV-05)
 - [ ] 02-07-PLAN.md — Verify CSV import and warn-but-allow validation behavior (gap closure: ENT-07, ENT-08)
 
+### Phase 02.1: i think the implementation is not following the metamodel docs i provided in the docs folder (INSERTED)
+
+**Goal:** Migration 009 EA metamodel implementation matches documentation exactly (28 entity types across 8 domains, correct relationship types from directional graph)
+**Depends on:** Phase 2
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02.1-01-PLAN.md — Verify EA metamodel compliance and correct migration 009 to match docs (verification report, corrected migration with 28 CI types, post-migration validation)
+
 ### Phase 3: Relationships & Impact
 **Goal**: Users can model cross-domain relationships and visualize 1-hop impact analysis
 **Depends on**: Phase 2
