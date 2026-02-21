@@ -4,6 +4,11 @@
 -- Purpose: Seed EA metamodel (CI types, relationship types, teams, permissions)
 -- ============================================================================
 
+-- NOTE: This migration assumes that:
+-- 1. All tables have been created by migrations 001-008
+-- 2. Admin user exists (created by application startup before migrations run)
+-- 3. Admin role exists (seeded in migration 001 or earlier)
+
 -- ============================================================================
 -- SECTION 1: EA Teams Table
 -- ============================================================================

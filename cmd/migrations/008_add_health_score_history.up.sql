@@ -47,3 +47,40 @@ COMMENT ON COLUMN health_score_history.complete_cis IS 'Number of CIs with all r
 COMMENT ON COLUMN health_score_history.current_cis IS 'Number of CIs updated in the last 90 days';
 
 COMMENT ON COLUMN health_score_history.compliant_cis IS 'Number of CIs following naming standards';
+
+-- ============================================================================
+-- Create Admin User (needed by migration 009)
+-- ============================================================================
+-- This creates the admin user that migration 009 (EA metamodel) requires.
+-- The admin role is already created by migration 001.
+-- The password hash is for "Admin@123"
+
+-- Create admin user if not exists (using generated UUID)
+INSERT INTO users (username, email, password_hash, is_active, created_at, updated_at)
+VALUES (
+    'admin',
+    'admin@pustaka.local',
+    '$argon2id$v=19$m=65536,t=3,p=4$y5XhcR4fSJK6YqL8cJZx6g$W9wKjXKmYLqKo4XhNXpGvQXLvLHqRqJqLZhBKDqYQYE',
+    true,
+    NOW(),
+    NOW()
+)
+ON CONFLICT (username) DO UPDATE SET
+    email = EXCLUDED.email,
+    password_hash = EXCLUDED.password_hash,
+    updated_at = NOW();
+
+-- Assign admin role to admin user (role created in migration 001)
+INSERT INTO user_roles (user_id, role_id, assigned_at, created_at)
+SELECT
+    (SELECT id FROM users WHERE username = 'admin'),
+    (SELECT id FROM roles WHERE name = 'admin'),
+    NOW(),
+    NOW()
+WHERE EXISTS (SELECT 1 FROM users WHERE username = 'admin')
+  AND EXISTS (SELECT 1 FROM roles WHERE name = 'admin')
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE user_id = (SELECT id FROM users WHERE username = 'admin')
+      AND role_id = (SELECT id FROM roles WHERE name = 'admin')
+  );
