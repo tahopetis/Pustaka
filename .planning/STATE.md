@@ -83,9 +83,13 @@ Recent decisions affecting current work:
 - Force Delete Pattern: Two-phase delete (relationship count → confirmation → force delete) provides visibility while allowing intentional deletion
 - Lifecycle Status Names: Use display names (Proposed, Active, etc.) as transition keys for database independence
 
+### Roadmap Evolution
+
+- Phase 02.1 inserted after Phase 2: i think the implementation is not following the metamodel docs i provided in the docs folder (INSERTED)
+
 ### Pending Todos
 
-None yet.
+- Investigate EA metamodel documentation compliance (Phase 02.1)
 
 ### Blockers/Concerns
 
