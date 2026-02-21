@@ -1,0 +1,11 @@
+Name,CI_Type,Domain,Lifecycle_Status,Owner,Team,Tags,Attributes
+Customer Portal,EA.Application-BusinessApp,Application,Active,Business Architecture,Enterprise Architecture,customer-facing,web,"{""criticality"":""high"",""description"":""Main customer portal""}"
+Order Management,EA.Application-BusinessApp,Application,Active,Business Architecture,Enterprise Architecture,critical,backend,"{""criticality"":""critical"",""description"":""Order processing system""}"
+Payment Gateway,EA.Application-BusinessApp,Application,Active,Business Architecture,Enterprise Architecture,payment,external,"{""criticality"":""critical"",""description"":""Payment processing integration""}"
+Inventory System,EA.Application-BusinessApp,Application,Active,Business Architecture,Enterprise Architecture,internal,logistics,"{""criticality"":""high"",""description"":""Inventory management""}"
+User Authentication,EA.Application-BusinessApp,Application,Active,Business Architecture,Enterprise Infrastructure,security,auth,"{""criticality"":""critical"",""description"":""Identity and access management""}"
+Reporting Service,EA.Application-BusinessApp,Application,Active,Business Architecture,Enterprise Infrastructure,analytics,reporting,"{""criticality"":""medium"",""description"":""Business reporting service""}"
+Notification Service,EA.Application-BusinessApp,Application,Active,Business Architecture,Enterprise Infrastructure,messaging,notifications,"{""criticality"":""medium"",""description"":""Email and SMS notifications""}"
+Data Warehouse,EA.Application-BusinessApp,Application,Active,Data Architecture,Enterprise Infrastructure,data,analytics,"{""criticality"":""high"",""description"":""Central data warehouse""}"
+API Gateway,EA.Application-BusinessApp,Application,Active,Technical Architecture,Enterprise Infrastructure,api,gateway,"{""criticality"":""critical"",""description"":""API management gateway""}"
+Admin Console,EA.Application-BusinessApp,Application,Active,Business Architecture,Enterprise Infrastructure,admin,internal,"{""criticality"":""medium"",""description"":""Administrative interface""}"
