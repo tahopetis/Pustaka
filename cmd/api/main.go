@@ -120,7 +120,7 @@ func main() {
 
 	// Run database migrations
 	logger.Info().Msg("Running database migrations...")
-	migrationsPath := "file://cmd/migrations"
+	migrationsPath := "cmd/migrations"
 	if err := database.RunMigrations(cfg.Database.URL, migrationsPath, logger); err != nil {
 		logger.Fatal().Err(err).Msg("Failed to run database migrations")
 	}
