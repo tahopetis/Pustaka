@@ -118,15 +118,7 @@ func main() {
 		Str("environment", cfg.Env).
 		Msg("Starting Pustaka API Server")
 
-	// Run database migrations
-	logger.Info().Msg("Running database migrations...")
-	migrationsPath := "cmd/migrations"
-	if err := database.RunMigrations(cfg.Database.URL, migrationsPath, logger); err != nil {
-		logger.Fatal().Err(err).Msg("Failed to run database migrations")
-	}
-	logger.Info().Msg("Database migrations completed successfully")
-
-	// Initialize databases
+	// Initialize databases first (needed for admin user creation)
 	postgresDB, err := database.NewPostgresDB(
 		cfg.Database.URL,
 		cfg.Database.MaxOpenConns,
@@ -138,6 +130,27 @@ func main() {
 	}
 	defer postgresDB.Close()
 
+	// Initialize minimal services needed for admin user creation
+	passwordService := auth.NewPasswordService()
+	rbacService := auth.NewRBACService(postgresDB.Pool)
+
+	// Initialize admin user before running migrations
+	// This is required because migration 009 references the admin user
+	logger.Info().Msg("Initializing admin user...")
+	if err := initializeAdminUser(postgresDB.Pool, rbacService, passwordService, cfg.Admin, logger); err != nil {
+		logger.Fatal().Err(err).Msg("Failed to initialize admin user")
+	}
+	logger.Info().Msg("Admin user initialized successfully")
+
+	// Run database migrations (now that admin user exists)
+	logger.Info().Msg("Running database migrations...")
+	migrationsPath := "cmd/migrations"
+	if err := database.RunMigrations(cfg.Database.URL, migrationsPath, logger); err != nil {
+		logger.Fatal().Err(err).Msg("Failed to run database migrations")
+	}
+	logger.Info().Msg("Database migrations completed successfully")
+
+	// Initialize remaining databases
 	neo4jDB, err := database.NewNeo4jDB(
 		cfg.Neo4j.URI,
 		cfg.Neo4j.Username,
@@ -172,10 +185,6 @@ func main() {
 		cfg.JWT.RefreshTokenTTL,
 		"pustaka",
 	)
-
-	passwordService := auth.NewPasswordService()
-
-	rbacService := auth.NewRBACService(postgresDB.Pool)
 
 	// Create CI services
 	ciRepo := ci.NewRepository(postgresDB.Pool, logger)
@@ -234,11 +243,6 @@ func main() {
 		lifecycleAdapter,
 		logger,
 	)
-
-	// Initialize admin user
-	if err := initializeAdminUser(postgresDB.Pool, rbacService, passwordService, cfg.Admin, logger); err != nil {
-		logger.Error().Err(err).Msg("Failed to initialize admin user")
-	}
 
 	// Initialize handlers
 	baseHandler := api.NewHandler(logger)
