@@ -118,6 +118,14 @@ func main() {
 		Str("environment", cfg.Env).
 		Msg("Starting Pustaka API Server")
 
+	// Run database migrations
+	logger.Info().Msg("Running database migrations...")
+	migrationsPath := "file://cmd/migrations"
+	if err := database.RunMigrations(cfg.Database.URL, migrationsPath, logger); err != nil {
+		logger.Fatal().Err(err).Msg("Failed to run database migrations")
+	}
+	logger.Info().Msg("Database migrations completed successfully")
+
 	// Initialize databases
 	postgresDB, err := database.NewPostgresDB(
 		cfg.Database.URL,
