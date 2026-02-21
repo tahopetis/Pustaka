@@ -72,6 +72,12 @@ func initializeAdminUser(pool *pgxpool.Pool, rbacService *auth.RBACService, pass
 			Str("email", adminConfig.Email).
 			Msg("Admin user created successfully")
 	} else {
+		// Check if the error is because the users table doesn't exist (fresh database)
+		if err.Error() == "ERROR: relation \"users\" does not exist (SQLSTATE 42P01)" ||
+		   err.Error() == "relation \"users\" does not exist" {
+			logger.Info().Msg("Users table doesn't exist yet, skipping admin user initialization")
+			return nil
+		}
 		return fmt.Errorf("failed to check admin user existence: %w", err)
 	}
 
@@ -134,21 +140,30 @@ func main() {
 	passwordService := auth.NewPasswordService()
 	rbacService := auth.NewRBACService(postgresDB.Pool)
 
-	// Initialize admin user before running migrations
-	// This is required because migration 009 references the admin user
-	logger.Info().Msg("Initializing admin user...")
+	// Try to initialize admin user before running migrations (for existing databases)
+	// This will skip if tables don't exist yet (fresh database)
+	logger.Info().Msg("Checking for existing admin user...")
 	if err := initializeAdminUser(postgresDB.Pool, rbacService, passwordService, cfg.Admin, logger); err != nil {
-		logger.Fatal().Err(err).Msg("Failed to initialize admin user")
+		logger.Warn().Err(err).Msg("Failed to check/admin user, will retry after migrations")
 	}
-	logger.Info().Msg("Admin user initialized successfully")
 
-	// Run database migrations (now that admin user exists)
+	// Run database migrations
+	// For fresh databases, this creates all tables including users
+	// For existing databases, this applies any pending migrations
 	logger.Info().Msg("Running database migrations...")
 	migrationsPath := "cmd/migrations"
 	if err := database.RunMigrations(cfg.Database.URL, migrationsPath, logger); err != nil {
 		logger.Fatal().Err(err).Msg("Failed to run database migrations")
 	}
 	logger.Info().Msg("Database migrations completed successfully")
+
+	// Initialize admin user after migrations (ensures admin user exists)
+	// This is required because migration 009 references the admin user
+	logger.Info().Msg("Initializing admin user...")
+	if err := initializeAdminUser(postgresDB.Pool, rbacService, passwordService, cfg.Admin, logger); err != nil {
+		logger.Fatal().Err(err).Msg("Failed to initialize admin user")
+	}
+	logger.Info().Msg("Admin user initialized successfully")
 
 	// Initialize remaining databases
 	neo4jDB, err := database.NewNeo4jDB(
