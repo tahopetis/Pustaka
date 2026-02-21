@@ -23,8 +23,8 @@ Requirements for initial EA module release. Each maps to roadmap phases.
 - [x] **ENT-04**: User can view EA entity details with all attributes and relationships
 - [x] **ENT-05**: User can search EA entities by domain, type, name, and attributes
 - [x] **ENT-06**: User can filter and paginate EA entity lists (handles 10K+ entities)
-- [ ] **ENT-07**: User can import EA entities in bulk from CSV files with validation
-- [ ] **ENT-08**: System validates EA entity data against type-specific rules before saving
+- [x] **ENT-07**: User can import EA entities in bulk from CSV files with validation
+- [x] **ENT-08**: System validates EA entity data against type-specific rules before saving
 - [ ] **ENT-09**: System tracks all EA entity changes in audit log (reuse existing audit_logs table)
 
 ### Relationship Management
@@ -126,8 +126,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENT-04 | Phase 2 | Complete |
 | ENT-05 | Phase 2 | Complete |
 | ENT-06 | Phase 2 | Complete |
-| ENT-07 | Phase 2 | Pending |
-| ENT-08 | Phase 2 | Pending |
+| ENT-07 | Phase 2 | Complete |
+| ENT-08 | Phase 2 | Complete |
 | ENT-09 | Phase 2 | Pending |
 | REL-01 | Phase 3 | Pending |
 | REL-02 | Phase 3 | Pending |
