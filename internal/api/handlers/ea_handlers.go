@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -165,14 +166,20 @@ func (h *EAHandlers) DeleteEAEntity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.eaService.DeleteEntity(r.Context(), id, userID); err != nil {
+	// Check for force flag (to bypass relationship check after confirmation)
+	forceDelete := r.URL.Query().Get("force") == "true"
+
+	if err := h.eaService.DeleteEntity(r.Context(), id, userID, forceDelete); err != nil {
 		if err.Error() == "EA entity not found" {
 			h.writeError(w, http.StatusNotFound, "EA entity not found")
 			return
 		}
-		// Check for relationship dependency error
-		if containsString(err.Error(), "cannot delete EA entity with existing relationships") {
-			h.writeError(w, http.StatusBadRequest, err.Error())
+		// Check for relationship dependency error - return count
+		if relErr, ok := err.(*ea.ErrRelationshipsExist); ok {
+			h.writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+				"error":            fmt.Sprintf("Cannot delete entity with %d relationships", relErr.Count),
+				"relationship_count": relErr.Count,
+			})
 			return
 		}
 		h.logger.ErrorService("ea", "delete_entity", err, map[string]interface{}{
