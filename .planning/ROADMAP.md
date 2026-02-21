@@ -48,13 +48,16 @@ Plans:
   5. System enforces EA-specific RBAC permissions (ea:read, ea:create, ea:update, ea:delete) and tracks all changes in audit log
   6. System provides data quality dashboard showing completeness, staleness, and validation errors
   7. EA entities maintain lifecycle status (proposed, active, deprecated, retired)
-**Plans**: 4 plans (Wave 1: 02-01 | Wave 2: 02-02 | Wave 3: 02-03, 02-04)
+**Plans**: 7 plans (Wave 1: 02-01, 02-02 | Wave 2: 02-03, 02-04 | Wave 3: 02-05, 02-06 | Wave 4: 02-07)
 
 Plans:
 - [x] 02-01-PLAN.md — Build EA entity CRUD HTTP handlers and endpoints with validation, RBAC, relationship checking, and audit logging ✅ COMPLETED 2026-02-20
 - [x] 02-02-PLAN.md — Create frontend entity management views with dynamic form builder, ag-grid integration, and per-domain navigation ✅ COMPLETED 2026-02-20
 - [x] 02-03-PLAN.md — Implement bulk CSV import workflow with template download, validation, dual error display, and progress tracking ✅ COMPLETED 2026-02-20
 - [x] 02-04-PLAN.md — Build data quality dashboard with stat cards, pie charts, drill-down navigation, and manual refresh ✅ COMPLETED 2026-02-20
+- [ ] 02-05-PLAN.md — Complete delete confirmation flow, audit logging integration, and lifecycle transition enforcement (gap closure: ENT-03, ENT-09, GOV-06)
+- [ ] 02-06-PLAN.md — Verify RBAC permission enforcement for all EA operations (gap closure: GOV-01, GOV-03, GOV-04, GOV-05)
+- [ ] 02-07-PLAN.md — Verify CSV import and warn-but-allow validation behavior (gap closure: ENT-07, ENT-08)
 
 ### Phase 3: Relationships & Impact
 **Goal**: Users can model cross-domain relationships and visualize 1-hop impact analysis
@@ -88,6 +91,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 4/4 | Complete | 2026-02-20 |
-| 2. Entity Management | 4/4 | Complete | 2026-02-20 |
+| 1. Foundation | 3/4 | In progress | 2026-02-20 |
+| 2. Entity Management | 4/7 | In progress | 2026-02-20 |
 | 3. Relationships & Impact | 0/7 | Not started | - |
