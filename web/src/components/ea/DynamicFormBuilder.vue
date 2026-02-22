@@ -40,6 +40,20 @@
               disabled
               class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
             />
+            <div v-else-if="isLoadingCITypes" class="relative">
+              <select
+                disabled
+                class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
+              >
+                <option>Loading CI Types...</option>
+              </select>
+              <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg class="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            </div>
             <select
               v-else
               v-model="formData.ci_type"
@@ -55,6 +69,9 @@
                 {{ type.name }}
               </option>
             </select>
+            <p v-if="!isLoadingCITypes && availableCITypes.length === 0" class="text-sm text-red-600 mt-1">
+              No CI types available. Please check your connection or contact support.
+            </p>
           </div>
 
           <!-- Lifecycle Status -->
@@ -82,7 +99,22 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">
               Owner Team <span class="text-red-500">*</span>
             </label>
+            <div v-if="isLoadingTeams" class="relative">
+              <select
+                disabled
+                class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
+              >
+                <option>Loading Teams...</option>
+              </select>
+              <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg class="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            </div>
             <select
+              v-else
               v-model="formData.owner"
               required
               class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -96,7 +128,10 @@
                 {{ team.name }}
               </option>
             </select>
-            <p class="text-xs text-gray-500 mt-1">EA team responsible for this entity</p>
+            <p v-if="!isLoadingTeams && eaTeams.length === 0" class="text-sm text-red-600 mt-1">
+              No teams available. Please check your connection or contact support.
+            </p>
+            <p v-else class="text-xs text-gray-500 mt-1">EA team responsible for this entity</p>
           </div>
 
           <!-- Tags -->
@@ -239,7 +274,11 @@ const availableCITypes = computed(() => {
   return eaTypesStore.ciTypes
 })
 
+const isLoadingCITypes = computed(() => eaTypesStore.loading && eaTypesStore.ciTypes.length === 0)
+
 const eaTeams = computed(() => eaTypesStore.teams || [])
+
+const isLoadingTeams = computed(() => eaTypesStore.loading && eaTypesStore.teams.length === 0)
 
 const ciTypeDefinition = computed(() => {
   if (!formData.value.ci_type) return null
