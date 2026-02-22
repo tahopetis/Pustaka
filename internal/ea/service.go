@@ -56,10 +56,11 @@ func (s *Service) CreateEACI(ctx context.Context, req *CreateEACIRequest, userID
 	}
 
 	// 2. Verify EA team exists
+	s.logger.Debug().Str("team_name", req.Owner).Msg("Looking up EA team")
 	team, err := s.repo.GetTeamByName(ctx, req.Owner)
 	if err != nil {
 		s.logger.Error().Err(err).Str("team_name", req.Owner).Msg("EA team not found")
-		return nil, fmt.Errorf("EA team not found: %w", err)
+		return nil, fmt.Errorf("EA team '%s' not found. Valid teams are: enterprise-architecture, business-architecture, application-architecture, data-architecture, technology-architecture, infrastructure-architecture, security-architecture, governance", req.Owner)
 	}
 
 	// 3. Get CI type definition for validation
@@ -421,10 +422,11 @@ func (s *Service) CreateEntity(ctx context.Context, req *CreateEACIRequest, user
 	}
 
 	// 2. Verify EA team exists
+	s.logger.Debug().Str("team_name", req.Owner).Msg("Looking up EA team")
 	team, err := s.repo.GetTeamByName(ctx, req.Owner)
 	if err != nil {
 		s.logger.Error().Err(err).Str("team_name", req.Owner).Msg("EA team not found")
-		return nil, fmt.Errorf("EA team not found: %w", err)
+		return nil, fmt.Errorf("EA team '%s' not found. Valid teams are: enterprise-architecture, business-architecture, application-architecture, data-architecture, technology-architecture, infrastructure-architecture, security-architecture, governance", req.Owner)
 	}
 
 	// 3. Get CI type definition for validation
@@ -591,9 +593,11 @@ func (s *Service) UpdateEntity(ctx context.Context, id string, req *UpdateEACIRe
 
 	if req.Owner != "" {
 		// Verify team exists
+		s.logger.Debug().Str("team_name", req.Owner).Msg("Looking up EA team for update")
 		team, err := s.repo.GetTeamByName(ctx, req.Owner)
 		if err != nil {
-			return nil, fmt.Errorf("EA team not found: %w", err)
+			s.logger.Error().Err(err).Str("team_name", req.Owner).Msg("EA team not found")
+			return nil, fmt.Errorf("EA team '%s' not found. Valid teams are: enterprise-architecture, business-architecture, application-architecture, data-architecture, technology-architecture, infrastructure-architecture, security-architecture, governance", req.Owner)
 		}
 		attributes["ea_owner"] = req.Owner
 		attributes["ea_team_id"] = team.ID.String()
