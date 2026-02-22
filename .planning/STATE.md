@@ -38,6 +38,7 @@ Progress: [███████████████████░] 86%
 
 *Updated after each plan completion*
 | Phase 02-entity-management P02-06 | 11 min | 5 tasks | 3 files |
+| Phase 02-entity-management P05 | 15m | 3 tasks | 1 files |
 
 ## Accumulated Context
 
