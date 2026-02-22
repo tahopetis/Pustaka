@@ -46,6 +46,7 @@ Progress: [████████████████░░] 90% (7/7 stan
 | Phase 02-entity-management P02-09 | TBD | 5 tasks (1 checkpoint) | 4 files |
 | Phase 02-entity-management P02-07 | 3 min | 2 tasks (1 blocked) | 0 files |
 | Phase 02-entity-management P02-06 | 11 min | 5 tasks | 3 files |
+| Phase 02-entity-management P02-08 | 1121 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,9 @@ Recent decisions affecting current work:
 - Plan 02-08: Migration 011 to add EA lifecycle statuses, improve team validation error messages
 - Plan 02-09: EA teams API endpoint, frontend store updates, form field additions
 - Wave Structure: 02-08 (wave 1, autonomous) → 02-09 (wave 2, has human checkpoint)
+- [Phase 02-entity-management]: EA lifecycle statuses added via migration 011 (5 statuses: proposed, active, deprecated, retired, archived)
+- [Phase 02-entity-management]: Team validation error messages now list all valid EA team names for better UX
+- [Phase 02-entity-management]: Kebab-case team names from migration 009 work correctly for validation
 
 ### Roadmap Evolution
 
