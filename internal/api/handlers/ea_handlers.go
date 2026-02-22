@@ -436,3 +436,28 @@ func (h *EAHandlers) ListEACITypes(w http.ResponseWriter, r *http.Request) {
 
 	h.writeJSON(w, http.StatusOK, ciTypes)
 }
+
+// ListEATeams handles GET /api/v1/ea/teams
+// @Summary List EA Teams
+// @Tags ea
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /ea/teams [get]
+func (h *EAHandlers) ListEATeams(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	teams, err := h.eaService.ListTeams(ctx)
+	if err != nil {
+		h.logger.ErrorService("ea", "list_ea_teams", err, nil)
+		h.writeError(w, http.StatusInternalServerError, "Failed to list EA teams")
+		return
+	}
+
+	response := map[string]interface{}{
+		"data":  teams,
+		"total": len(teams),
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}

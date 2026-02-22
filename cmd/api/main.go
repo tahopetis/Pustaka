@@ -661,6 +661,12 @@ func setupRouter(
 				r.Get("/", eaHandlers.ListEACITypes)
 			})
 
+			// EA Teams endpoints
+			r.Route("/ea/teams", func(r chi.Router) {
+				r.Use(middleware.RBAC("ea:read"))
+				r.Get("/", eaHandlers.ListEATeams)
+			})
+
 			// EA Import routes
 			r.Route("/ea/import", func(r chi.Router) {
 				r.Use(middleware.RBAC("ea:create"))
