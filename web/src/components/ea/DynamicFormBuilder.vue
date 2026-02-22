@@ -77,6 +77,28 @@
             </select>
           </div>
 
+          <!-- Owner/Team (EA-specific) -->
+          <div :data-field="'owner'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Owner Team <span class="text-red-500">*</span>
+            </label>
+            <select
+              v-model="formData.owner"
+              required
+              class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Select Team</option>
+              <option
+                v-for="team in eaTeams"
+                :key="team.id"
+                :value="team.name"
+              >
+                {{ team.name }}
+              </option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">EA team responsible for this entity</p>
+          </div>
+
           <!-- Tags -->
           <div class="col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -182,12 +204,14 @@ const formData = ref<{
   name: string
   ci_type: string
   lifecycle_status_id: string | null
+  owner: string
   attributes: Record<string, any>
   tags: string[]
 }>({
   name: '',
   ci_type: props.ciType || '',
   lifecycle_status_id: null,
+  owner: '',
   attributes: {},
   tags: []
 })
@@ -214,6 +238,8 @@ const availableCITypes = computed(() => {
   }
   return eaTypesStore.ciTypes
 })
+
+const eaTeams = computed(() => eaTypesStore.teams || [])
 
 const ciTypeDefinition = computed(() => {
   if (!formData.value.ci_type) return null
@@ -300,6 +326,7 @@ const handleSubmit = async () => {
     const data = {
       name: formData.value.name,
       ci_type: formData.value.ci_type,
+      owner: formData.value.owner,
       lifecycle_status_id: formData.value.lifecycle_status_id || undefined,
       attributes: formData.value.attributes,
       tags: formData.value.tags
@@ -384,6 +411,7 @@ const loadEntity = async () => {
           name: entity.name,
           ci_type: entity.ci_type,
           lifecycle_status_id: entity.lifecycle_status_id,
+          owner: entity.owner || '',
           attributes: { ...entity.attributes },
           tags: [...entity.tags]
         }
@@ -401,6 +429,11 @@ onMounted(async () => {
   // Load CI types if not already loaded
   if (eaTypesStore.ciTypes.length === 0) {
     await eaTypesStore.fetchCiTypes()
+  }
+
+  // Load EA teams if not already loaded
+  if (eaTypesStore.teams.length === 0) {
+    await eaTypesStore.fetchTeams()
   }
 
   // Load entity if editing

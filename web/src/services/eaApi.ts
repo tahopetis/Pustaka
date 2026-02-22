@@ -91,5 +91,12 @@ export const eaApi = {
     if (params?.page_size) queryParams.page_size = params.page_size
 
     return api.get<AuditLogsResponse>(`/ea/entities/${id}/audit`, { params: queryParams })
-  }
+  },
+
+  /**
+   * List EA teams
+   * GET /api/v1/ea/teams
+   */
+  listTeams: () =>
+    api.get('/ea/teams')
 }
