@@ -783,3 +783,8 @@ func (s *Service) GetEntityAuditLogs(ctx context.Context, entityID uuid.UUID, pa
 	return auditLogsWithUsers, response.Pagination.Total, nil
 }
 
+// ListEACITypes returns all EA-specific CI types from the database
+func (s *Service) ListEACITypes(ctx context.Context) ([]*CITypeDefinition, error) {
+	return s.repo.ListEACITypes(ctx)
+}
+
