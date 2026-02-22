@@ -416,3 +416,23 @@ func (h *EAHandlers) GetEAEntityAuditLogs(w http.ResponseWriter, r *http.Request
 
 	h.writeJSON(w, http.StatusOK, response)
 }
+
+// ListEACITypes handles GET /api/v1/ea/ci-types
+// @Summary List EA CI Types
+// @Tags ea
+// @Accept json
+// @Produce json
+// @Success 200 {array} ea.CITypeDefinition
+// @Router /ea/ci-types [get]
+func (h *EAHandlers) ListEACITypes(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ciTypes, err := h.eaService.ListEACITypes(ctx)
+	if err != nil {
+		h.logger.ErrorService("ea", "list_ea_ci_types", err, nil)
+		h.writeError(w, http.StatusInternalServerError, "Failed to list EA CI types")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, ciTypes)
+}
