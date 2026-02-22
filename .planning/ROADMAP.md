@@ -48,7 +48,7 @@ Plans:
   5. System enforces EA-specific RBAC permissions (ea:read, ea:create, ea:update, ea:delete) and tracks all changes in audit log
   6. System provides data quality dashboard showing completeness, staleness, and validation errors
   7. EA entities maintain lifecycle status (proposed, active, deprecated, retired)
-**Plans**: 7 plans (Wave 1: 02-01, 02-02 | Wave 2: 02-03, 02-04 | Gap Closure: 02-05, 02-06, 02-07)
+**Plans**: 10 plans (Wave 1: 02-01, 02-02 | Wave 2: 02-03, 02-04 | Gap Closure: 02-05, 02-06, 02-07, 02-08, 02-09, 02-10)
 
 Plans:
 - [x] 02-01-PLAN.md — Build EA entity CRUD HTTP handlers and endpoints with validation, RBAC, relationship checking, and audit logging ✅ COMPLETED 2026-02-20
@@ -58,6 +58,9 @@ Plans:
 - [x] 02-05-PLAN.md — Fix AG Grid module registration error in EntityListView (UAT gap closure: AG Grid error #272) ✅ COMPLETED 2026-02-22
 - [x] 02-06-PLAN.md — Create EA CI Types API endpoint to expose EA-specific CI types (UAT gap closure: missing /ea/ci-types endpoint) ✅ COMPLETED 2026-02-22
 - [x] 02-07-PLAN.md — Verify EA metamodel migration and end-to-end entity creation workflow (UAT gap closure: database verification) ✅ COMPLETED 2026-02-22
+- [x] 02-08-PLAN.md — Add EA lifecycle statuses and improve team validation (UAT gap closure: data validation fixes) ✅ COMPLETED 2026-02-22
+- [x] 02-09-PLAN.md — Add EA teams API endpoint and Owner field to entity form (UAT gap closure: form fixes) ✅ COMPLETED 2026-02-22
+- [ ] 02-10-PLAN.md — Fix EntityFormView store preload timing issue (UAT gap closure: CI Type dropdown loading)
 
 ### Phase 02.1: i think the implementation is not following the metamodel docs i provided in the docs folder (INSERTED)
 
