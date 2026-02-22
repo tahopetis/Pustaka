@@ -158,6 +158,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AgGridVue } from 'ag-grid-vue3'
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import { useAuthStore } from '@/stores/auth'
@@ -166,6 +167,9 @@ import { useEaTypesStore } from '@/stores/eaTypes'
 import { lifecycleStatusAPI } from '@/services/api'
 import type { EAEntity } from '@/types/ea'
 import type { GridApi, ColumnApi } from 'ag-grid-community'
+
+// Register AG Grid modules (required for v31+)
+ModuleRegistry.registerModules([AllCommunityModule])
 
 const route = useRoute()
 const router = useRouter()
