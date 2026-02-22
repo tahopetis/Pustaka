@@ -5,21 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Architects and stakeholders can trace relationships across domains to understand impact
-**Current focus:** Phase 2 - Entity Management
+**Current focus:** Phase 2 - Entity Management (Gap Closure)
 
 ## Current Position
 
 Phase: 02-entity-management
-Plan: 7 of 7
-Status: Complete
-Last activity: 2026-02-22 - Completed Plan 02-07: EA Metamodel Migration and End-to-End Entity Creation Verification
+Plan: 9 of 9 (2 gap closure plans)
+Status: Planning Gap Closure
+Last activity: 2026-02-22 - Created gap closure plans 02-08 and 02-09 for UAT issues
 
-Progress: [████████████████████] 100%
+Progress: [████████████████░░] 90% (7/7 standard plans complete, 2 gap closure plans ready)
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 13
+- Total plans created: 16 (13 completed + 2 gap closure + 1 verification)
 - Average duration: 14 min
 - Total execution time: 3 hours
 
@@ -28,18 +29,23 @@ Progress: [████████████████████] 100%
 | Phase | Plans | Complete | Avg/Plan |
 |-------|-------|----------|----------|
 | 1 (Foundation) | 4 | 4 | 11 min |
-| 2 (Entity Management) | 7 | 7 | 13 min |
+| 2 (Entity Management) | 9 | 7 | 13 min |
 | 2.1 (EA Metamodel Verification) | 1 | 1 | 37 min |
 | 3 (Relationships & Impact) | 0 | TBD | - |
+
+**Gap Closure Plans Created:**
+- 02-08: EA Entity CRUD Data Validation Fixes (lifecycle statuses, team names)
+- 02-09: EA Entity Create Form Fixes (CI Type dropdown, Owner field)
 
 **Recent Trend:**
 - Last 5 plans: 02-04 (22 min), 02-05 (33 min), 02-07 (6 min), 02.1-01 (37 min), 02-06 (11 min)
 - Trend: Stable velocity (~22 min/plan)
 
 *Updated after each plan completion*
+| Phase 02-entity-management P02-08 | TBD | 3 tasks | 3 files |
+| Phase 02-entity-management P02-09 | TBD | 5 tasks (1 checkpoint) | 4 files |
 | Phase 02-entity-management P02-07 | 3 min | 2 tasks (1 blocked) | 0 files |
 | Phase 02-entity-management P02-06 | 11 min | 5 tasks | 3 files |
-| Phase 02-entity-management P05 | 15m | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -87,15 +93,31 @@ Recent decisions affecting current work:
 - Infrastructure Preservation: ea_teams table, admin creation, RBAC sections preserved during migration rewrite
 - [Phase 02.1]: Metamodel docs are authoritative; migration 009 corrected to 32 CI types; specific directional relationships replace generic ArchiMate relationships
 
+**Gap Closure Planning (2026-02-22):**
+- Gap 1 (Data Validation): EA lifecycle statuses missing (need Proposed, Active, Deprecated, Retired, Archived)
+- Gap 2 (Frontend Form): CI Type dropdown not loading, Owner/Team field missing
+- Plan 02-08: Migration 011 to add EA lifecycle statuses, improve team validation error messages
+- Plan 02-09: EA teams API endpoint, frontend store updates, form field additions
+- Wave Structure: 02-08 (wave 1, autonomous) → 02-09 (wave 2, has human checkpoint)
+
 ### Roadmap Evolution
 
 - Phase 02.1 inserted after Phase 2: i think the implementation is not following the metamodel docs i provided in the docs folder (INSERTED)
+- Gap closure plans 02-08, 02-09 added: UAT revealed data validation and frontend form issues
 
 ### Pending Todos
 
+- **Execute Plan 02-08:** Add EA lifecycle statuses via migration 011, improve team validation
+- **Execute Plan 02-09:** Fix CI Type dropdown and add Owner field to entity form
 - Complete clean deployment and verification of corrected migration 009 (Docker rebuild required)
 
 ### Blockers/Concerns
+
+**UAT Test Failures (2026-02-22):**
+- UAT Test #1 (EA Entity CRUD): Major severity - EA lifecycle statuses missing, team validation issues
+- UAT Test #4 (EA Entity Create): Blocker severity - CI Type dropdown empty, Owner field missing
+- Root causes identified and gap closure plans created
+- Execution pending to resolve issues
 
 **Docker Image Caching Issue (2026-02-22):**
 - Docker build cache prevents corrected migration 009 from running on fresh deployment
@@ -110,6 +132,9 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-22 04:15
-Stopped at: Completed Plan 02-07 - EA Metamodel Migration and End-to-End Entity Creation Verification (2 tasks complete, 1 blocked by auth gate, verified migration 009 has 32 EA CI types, database seeded correctly, API endpoint exists)
-Resume file: .planning/phases/02-entity-management/02-07-SUMMARY.md
+Last session: 2026-02-22 13:50
+Gap closure planning activity: Created plans 02-08 and 02-09 to address UAT gaps in data validation and frontend form functionality
+Next step: Execute gap closure plans starting with 02-08 (EA lifecycle statuses migration)
+Resume files:
+- `.planning/phases/02-entity-management/02-08-PLAN.md`
+- `.planning/phases/02-entity-management/02-09-PLAN.md`
