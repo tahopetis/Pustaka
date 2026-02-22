@@ -55,9 +55,9 @@ Plans:
 - [x] 02-02-PLAN.md — Create frontend entity management views with dynamic form builder, ag-grid integration, and per-domain navigation ✅ COMPLETED 2026-02-20
 - [x] 02-03-PLAN.md — Implement bulk CSV import workflow with template download, validation, dual error display, and progress tracking ✅ COMPLETED 2026-02-20
 - [x] 02-04-PLAN.md — Build data quality dashboard with stat cards, pie charts, drill-down navigation, and manual refresh ✅ COMPLETED 2026-02-20
-- [ ] 02-05-PLAN.md — Fix AG Grid module registration error in EntityListView (UAT gap closure: AG Grid error #272)
-- [ ] 02-06-PLAN.md — Create EA CI Types API endpoint to expose EA-specific CI types (UAT gap closure: missing /ea/ci-types endpoint)
-- [ ] 02-07-PLAN.md — Verify EA metamodel migration and end-to-end entity creation workflow (UAT gap closure: database verification)
+- [x] 02-05-PLAN.md — Fix AG Grid module registration error in EntityListView (UAT gap closure: AG Grid error #272) ✅ COMPLETED 2026-02-22
+- [x] 02-06-PLAN.md — Create EA CI Types API endpoint to expose EA-specific CI types (UAT gap closure: missing /ea/ci-types endpoint) ✅ COMPLETED 2026-02-22
+- [x] 02-07-PLAN.md — Verify EA metamodel migration and end-to-end entity creation workflow (UAT gap closure: database verification) ✅ COMPLETED 2026-02-22
 
 ### Phase 02.1: i think the implementation is not following the metamodel docs i provided in the docs folder (INSERTED)
 
