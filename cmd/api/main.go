@@ -655,6 +655,12 @@ func setupRouter(
 				})
 			})
 
+			// EA CI Types endpoints
+			r.Route("/ea/ci-types", func(r chi.Router) {
+				r.Use(middleware.RBAC("ea:read"))
+				r.Get("/", eaHandlers.ListEACITypes)
+			})
+
 			// EA Import routes
 			r.Route("/ea/import", func(r chi.Router) {
 				r.Use(middleware.RBAC("ea:create"))
