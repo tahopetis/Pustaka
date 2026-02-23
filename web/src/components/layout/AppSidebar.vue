@@ -27,27 +27,131 @@
               Dashboard
             </router-link>
 
-            <!-- Configuration Items -->
-            <router-link
-              v-if="hasAnyPermission(['ci:read'])"
-              to="/ci"
-              class="group flex items-center px-2 py-2 text-sm font-medium rounded-md"
-              :class="isCurrentRoute('/ci')
-                ? 'bg-blue-100 text-blue-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
-            >
-              <svg
-                class="mr-3 h-5 w-5"
-                :class="isCurrentRoute('/ci') ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            <!-- Configuration Items (Collapsible) -->
+            <div v-if="hasAnyPermission(['ci:read'])">
+              <!-- Main CI Menu Toggle -->
+              <button
+                @click="ciMenuOpen = !ciMenuOpen"
+                class="group w-full flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md"
+                :class="hasCIRoute() && !isEAContext()
+                  ? 'bg-blue-100 text-blue-900'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              Configuration Items
-            </router-link>
+                <div class="flex items-center">
+                  <svg
+                    class="mr-3 h-5 w-5"
+                    :class="hasCIRoute() && !isEAContext() ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  Configuration Items
+                </div>
+                <svg
+                  class="h-5 w-5 transition-transform duration-200"
+                  :class="[
+                    ciMenuOpen ? 'transform rotate-90' : '',
+                    hasCIRoute() && !isEAContext() ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                  ]"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              <!-- CI Sub-menu -->
+              <div v-if="ciMenuOpen" class="space-y-1 mt-1">
+                <!-- Asset Management CI -->
+                <router-link
+                  :to="{ path: '/ci', query: { context: 'asset' } }"
+                  class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6"
+                  :class="isCIContext('asset')
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                >
+                  <svg
+                    class="mr-3 h-5 w-5"
+                    :class="isCIContext('asset') ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  Asset Management CI
+                </router-link>
+
+                <!-- Enterprise Architecture CI (Collapsible) -->
+                <div>
+                  <button
+                    @click="eaMenuOpen = !eaMenuOpen"
+                    class="group w-full flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md ml-6"
+                    :class="isEAContext()
+                      ? 'bg-blue-100 text-blue-900'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                  >
+                    <div class="flex items-center">
+                      <svg
+                        class="mr-3 h-5 w-5"
+                        :class="isEAContext() ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      Enterprise Architecture CI
+                    </div>
+                    <svg
+                      class="h-5 w-5 transition-transform duration-200"
+                      :class="[
+                        eaMenuOpen ? 'transform rotate-90' : '',
+                        isEAContext() ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                      ]"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+                  <!-- EA Domains Sub-menu -->
+                  <div v-if="eaMenuOpen" class="space-y-1 mt-1">
+                    <router-link
+                      v-for="domain in eaDomains"
+                      :key="domain.value"
+                      :to="{ path: '/ci', query: { context: 'ea', domain: domain.value } }"
+                      class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-12"
+                      :class="isEADomain(domain.value)
+                        ? 'bg-blue-100 text-blue-900'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                    >
+                      <svg
+                        class="mr-3 h-4 w-4"
+                        :class="isEADomain(domain.value) ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      {{ domain.label }}
+                    </router-link>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <!-- CI Types -->
             <router-link
@@ -232,12 +336,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const authStore = useAuthStore()
+
+const ciMenuOpen = ref(false)
+const eaMenuOpen = ref(false)
+
+const eaDomains = [
+  { value: 'strategy', label: 'Strategy' },
+  { value: 'business', label: 'Business' },
+  { value: 'application', label: 'Application' },
+  { value: 'data', label: 'Data' },
+  { value: 'infrastructure', label: 'Infrastructure' },
+  { value: 'security', label: 'Security' },
+  { value: 'technology', label: 'Technology' },
+  { value: 'governance', label: 'Governance' }
+]
 
 const isCurrentRoute = (path: string) => {
   return route.path === path || route.path.startsWith(path + '/')
@@ -245,5 +363,21 @@ const isCurrentRoute = (path: string) => {
 
 const hasAnyPermission = (permissions: string[]) => {
   return authStore.hasAnyPermission(permissions)
+}
+
+const isCIContext = (context: string) => {
+  return route.query.context === context
+}
+
+const isEAContext = () => {
+  return route.query.context === 'ea'
+}
+
+const isEADomain = (domain: string) => {
+  return route.query.context === 'ea' && route.query.domain === domain
+}
+
+const hasCIRoute = () => {
+  return route.path.startsWith('/ci') || route.path.startsWith('/entities')
 }
 </script>

@@ -3,7 +3,15 @@
     <!-- Page header -->
     <div class="page-header">
       <h1 class="page-title">
-        {{ isEdit ? 'Edit Configuration Item' : 'Create Configuration Item' }}
+        {{
+          isEdit
+            ? 'Edit Configuration Item'
+            : context === 'ea' && domain
+              ? `Create ${domain.charAt(0).toUpperCase() + domain.slice(1)} Entity`
+              : context === 'asset'
+                ? 'Create Asset Management CI'
+                : 'Create Configuration Item'
+        }}
       </h1>
       <p class="page-subtitle">
         {{ isEdit ? 'Update the configuration item details' : 'Add a new configuration item to your CMDB' }}
@@ -31,18 +39,14 @@
               </div>
               <div>
                 <label class="form-label">CI Type *</label>
-                <select
+                <CITypeAutocomplete
                   v-model="form.ci_type"
-                  required
-                  class="form-input"
+                  :domain="context === 'ea' ? 'ea' : context === 'asset' ? 'asset' : 'all'"
+                  :ea-domain="domain"
+                  placeholder="Search CI types..."
                   :disabled="loading || isEdit"
-                  @change="onCITypeChange"
-                >
-                  <option value="">Select CI Type</option>
-                  <option v-for="type in ciTypes" :key="type.id" :value="type.name">
-                    {{ type.name }} - {{ type.description }}
-                  </option>
-                </select>
+                  @update:model-value="onCITypeChange"
+                />
               </div>
               <div>
                 <label class="form-label">Lifecycle Status</label>
@@ -325,6 +329,7 @@ import { ciAPI, ciTypeAPI } from '@/services/api'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import DynamicAttributeField from '@/components/ci/DynamicAttributeField.vue'
 import Icon from '@/components/base/Icon.vue'
+import CITypeAutocomplete from '@/components/base/CITypeAutocomplete.vue'
 import type { CI, CIType, CreateCIData, UpdateCIData } from '@/types/ci'
 
 const route = useRoute()
@@ -332,6 +337,9 @@ const router = useRouter()
 const authStore = useAuthStore()
 const lifecycleStatusStore = useLifecycleStatusStore()
 const amortizationStore = useAmortizationStore()
+
+const context = computed(() => route.query.context as string | undefined)
+const domain = computed(() => route.query.domain as string | undefined)
 
 const loading = ref(false)
 const ciTypes = ref<CIType[]>([])
@@ -594,7 +602,19 @@ const calculateRemainingMonths = (): number => {
 const loadCITypes = async () => {
   try {
     const response = await ciTypeAPI.list()
-    ciTypes.value = response.data.ci_types || []
+    let allTypes = response.data.ci_types || []
+
+    // Filter based on context
+    if (context.value === 'asset') {
+      // Show only non-EA types
+      allTypes = allTypes.filter((type: CIType) => !type.name.startsWith('EA.'))
+    } else if (context.value === 'ea' && domain.value) {
+      // Show only EA types for specific domain
+      const domainPrefix = `EA.${domain.value.charAt(0).toUpperCase() + domain.value.slice(1)}`
+      allTypes = allTypes.filter((type: CIType) => type.name.startsWith(domainPrefix))
+    }
+
+    ciTypes.value = allTypes
   } catch (error) {
     console.error('Failed to load CI types:', error)
     showErrorToast('Failed to load CI types')

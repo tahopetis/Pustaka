@@ -3,12 +3,28 @@
     <!-- Page header -->
     <div class="page-header flex justify-between items-center">
       <div>
-        <h1 class="page-title">Configuration Items</h1>
-        <p class="page-subtitle">Manage your configuration items and their relationships</p>
+        <h1 class="page-title">
+          {{
+            context === 'ea' && domain
+              ? `${domain.charAt(0).toUpperCase() + domain.slice(1)} Configuration Items`
+              : context === 'asset'
+                ? 'Asset Management Configuration Items'
+                : 'Configuration Items'
+          }}
+        </h1>
+        <p class="page-subtitle">
+          {{
+            context === 'ea' && domain
+              ? `Manage ${domain.toLowerCase()} enterprise architecture entities`
+              : context === 'asset'
+                ? 'Manage asset management configuration items (non-EA)'
+                : 'Manage your configuration items and their relationships'
+          }}
+        </p>
       </div>
         <router-link
           v-if="hasPermission('ci:create')"
-          to="/ci/new"
+          :to="context || domain ? { path: '/ci/new', query: { ...context && { context }, ...domain && { domain } } } : '/ci/new'"
           class="btn btn-primary"
         >
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -22,7 +38,7 @@
       <AdvancedSearch
         :ci-types="ciTypes"
         :is-loading="loading"
-        :total-results="response?.total"
+        :total-results="filteredCIs.length"
         @search="onSearch"
         @clear="onClearSearch"
       />
@@ -31,7 +47,7 @@
       <div class="bg-white shadow rounded-lg">
         <div class="card-header">
           <h3 class="text-lg leading-6 font-medium text-gray-900">
-            Configuration Items ({{ response?.total || 0 }})
+            Configuration Items ({{ filteredCIs.length || 0 }})
           </h3>
         </div>
         <div class="card-body p-0">
@@ -42,16 +58,19 @@
           </div>
 
           <!-- Empty state -->
-          <div v-else-if="!loading && (!response?.cis || response.cis.length === 0)" class="text-center py-12">
+          <div v-else-if="!loading && filteredCIs.length === 0" class="text-center py-12">
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             <h3 class="mt-2 text-sm font-medium text-gray-900">No configuration items</h3>
             <p class="mt-1 text-sm text-gray-500">
-              Get started by creating your first configuration item.
+              {{ context === 'asset' ? 'No asset management configuration items found.' : context === 'ea' && domain ? `No ${domain} configuration items found.` : 'Get started by creating your first configuration item.' }}
             </p>
             <div class="mt-6" v-if="hasPermission('ci:create')">
-              <router-link to="/ci/new" class="btn btn-primary">
+              <router-link
+                :to="context || domain ? { path: '/ci/new', query: { ...context && { context }, ...domain && { domain } } } : '/ci/new'"
+                class="btn btn-primary"
+              >
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
@@ -76,7 +95,7 @@
                 </tr>
               </thead>
               <tbody class="table-body">
-                <tr v-for="ci in response?.cis" :key="ci.id">
+                <tr v-for="ci in filteredCIs" :key="ci.id">
                   <td class="table-cell">
                     <router-link :to="`/ci/${ci.id}`" class="text-blue-600 hover:text-blue-900 font-medium">
                       {{ ci.name }}
@@ -195,7 +214,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ciAPI, ciTypeAPI } from '@/services/api'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
@@ -203,7 +223,12 @@ import AdvancedSearch from '@/components/ci/AdvancedSearch.vue'
 import QRCodeButton from '@/components/qr/QRCodeButton.vue'
 import type { CI, CIType, CIListResponse } from '@/types/ci'
 
+const route = useRoute()
 const authStore = useAuthStore()
+
+// Query parameters for context-aware filtering
+const context = computed(() => route.query.context as string | undefined)
+const domain = computed(() => route.query.domain as string | undefined)
 
 const loading = ref(false)
 const response = ref<CIListResponse | null>(null)
@@ -221,6 +246,24 @@ const filters = reactive({
 const pagination = reactive({
   page: 1,
   limit: 20,
+})
+
+// Computed property to filter CIs based on context
+const filteredCIs = computed(() => {
+  if (!response.value?.cis) return []
+
+  let cis = response.value.cis
+
+  if (context.value === 'asset') {
+    // Show only non-EA types
+    cis = cis.filter(ci => !ci.ci_type.startsWith('EA.'))
+  } else if (context.value === 'ea' && domain.value) {
+    // Show only EA types for specific domain
+    const domainPrefix = `EA.${domain.value.charAt(0).toUpperCase() + domain.value.slice(1)}`
+    cis = cis.filter(ci => ci.ci_type.startsWith(domainPrefix))
+  }
+
+  return cis
 })
 
 const hasPermission = (permission: string) => {
