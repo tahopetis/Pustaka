@@ -240,14 +240,14 @@ const eaTypesStore = useEaTypesStore()
 const formData = ref<{
   name: string
   ci_type: string
-  lifecycle_status_id: string | null
+  lifecycle_status_id: string
   owner: string
   attributes: Record<string, any>
   tags: string[]
 }>({
   name: '',
   ci_type: props.ciType || '',
-  lifecycle_status_id: null,
+  lifecycle_status_id: '',
   owner: '',
   attributes: {},
   tags: []
