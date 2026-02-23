@@ -70,7 +70,8 @@
               </option>
             </select>
             <p v-if="!isLoadingCITypes && availableCITypes.length === 0" class="text-sm text-red-600 mt-1">
-              No CI types available. Please check your connection or contact support.
+              <span v-if="ciTypesError">{{ ciTypesError }}</span>
+              <span v-else>No CI types available. Please check your connection or contact support.</span>
             </p>
           </div>
 
@@ -129,7 +130,8 @@
               </option>
             </select>
             <p v-if="!isLoadingTeams && eaTeams.length === 0" class="text-sm text-red-600 mt-1">
-              No teams available. Please check your connection or contact support.
+              <span v-if="teamsError">{{ teamsError }}</span>
+              <span v-else>No teams available. Please check your connection or contact support.</span>
             </p>
             <p v-else class="text-xs text-gray-500 mt-1">EA team responsible for this entity</p>
           </div>
@@ -276,9 +278,13 @@ const availableCITypes = computed(() => {
 
 const isLoadingCITypes = computed(() => eaTypesStore.loading && eaTypesStore.ciTypes.length === 0)
 
+const ciTypesError = computed(() => eaTypesStore.error)
+
 const eaTeams = computed(() => eaTypesStore.teams || [])
 
 const isLoadingTeams = computed(() => eaTypesStore.loading && eaTypesStore.teams.length === 0)
+
+const teamsError = computed(() => eaTypesStore.error)
 
 const ciTypeDefinition = computed(() => {
   if (!formData.value.ci_type) return null
@@ -463,16 +469,30 @@ const loadEntity = async () => {
 
 // Lifecycle
 onMounted(async () => {
+  console.log('[DynamicFormBuilder] Component mounting, fetching data...')
+
   await loadLifecycleStatuses()
 
   // Load CI types if not already loaded
   if (eaTypesStore.ciTypes.length === 0) {
-    await eaTypesStore.fetchCiTypes()
+    console.log('[DynamicFormBuilder] Fetching CI types...')
+    try {
+      await eaTypesStore.fetchCiTypes()
+      console.log('[DynamicFormBuilder] CI types loaded:', eaTypesStore.ciTypes.length)
+    } catch (err) {
+      console.error('[DynamicFormBuilder] Failed to load CI types:', err)
+    }
   }
 
   // Load EA teams if not already loaded
   if (eaTypesStore.teams.length === 0) {
-    await eaTypesStore.fetchTeams()
+    console.log('[DynamicFormBuilder] Fetching EA teams...')
+    try {
+      await eaTypesStore.fetchTeams()
+      console.log('[DynamicFormBuilder] EA teams loaded:', eaTypesStore.teams.length)
+    } catch (err) {
+      console.error('[DynamicFormBuilder] Failed to load EA teams:', err)
+    }
   }
 
   // Load entity if editing

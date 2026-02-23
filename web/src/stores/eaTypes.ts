@@ -27,7 +27,9 @@ export const useEaTypesStore = defineStore('eaTypes', () => {
 
   const getCiTypesByDomain = computed(() => {
     return (domain: string) => {
-      const domainPrefix = `EA.${domain}`
+      // Capitalize first letter of domain to match EA.* naming convention
+      const capitalizedDomain = domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase()
+      const domainPrefix = `EA.${capitalizedDomain}`
       return ciTypes.value.filter(ct => ct.name.startsWith(domainPrefix))
     }
   })
