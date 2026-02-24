@@ -468,10 +468,27 @@ const hasPermission = (permission: string) => {
   return authStore.hasPermission(permission)
 }
 
-const onCITypeChange = () => {
+const onCITypeChange = async () => {
   // Reset attributes and validation when CI type changes
   form.attributes = {}
   attributeValidation.value = {}
+
+  // If selectedCIType is not in ciTypes, we need to fetch it
+  if (!selectedCIType.value && form.ci_type) {
+    try {
+      // Fetch the CI type details from API
+      const response = await ciTypeAPI.list({ search: form.ci_type, limit: 100 })
+      const matchedType = response.data.ci_types.find((t: CIType) => t.name === form.ci_type)
+      if (matchedType) {
+        // Add to ciTypes if not already present
+        if (!ciTypes.value.find(t => t.name === matchedType.name)) {
+          ciTypes.value.push(matchedType)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load CI type details:', error)
+    }
+  }
 
   // Set default values for required attributes if available
   if (selectedCIType.value) {

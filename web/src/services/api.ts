@@ -129,11 +129,13 @@ export const ciAPI = {
     ci_type: string
     attributes: Record<string, any>
     tags?: string[]
+    lifecycle_status_id?: string
   }) => api.post('/ci', data),
 
   update: (id: string, data: {
     attributes?: Record<string, any>
     tags?: string[]
+    lifecycle_status_id?: string
   }) => api.put(`/ci/${id}`, data),
 
   delete: (id: string) => api.delete(`/ci/${id}`),
