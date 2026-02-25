@@ -92,12 +92,12 @@
                 <div>
                   <button
                     @click="eaMenuOpen = !eaMenuOpen"
-                    class="group w-full flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md ml-6"
+                    class="group w-full flex items-center justify-start px-2 py-2 text-sm font-medium rounded-md ml-6"
                     :class="isEAContext()
                       ? 'bg-blue-100 text-blue-900'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
                   >
-                    <div class="flex items-center">
+                    <div class="flex items-center flex-1">
                       <svg
                         class="mr-3 h-5 w-5"
                         :class="isEAContext() ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'"
@@ -111,7 +111,7 @@
                       Enterprise Architecture CI
                     </div>
                     <svg
-                      class="h-5 w-5 transition-transform duration-200"
+                      class="h-5 w-5 transition-transform duration-200 ml-auto"
                       :class="[
                         eaMenuOpen ? 'transform rotate-90' : '',
                         isEAContext() ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
