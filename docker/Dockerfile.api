@@ -11,13 +11,23 @@ WORKDIR /app
 COPY go.mod go.sum ./
 
 # Download dependencies
-RUN go mod download
+# Cache mount keeps the module cache across rebuilds instead of baking it into a
+# layer that is discarded whenever go.mod, go.sum, or the source changes.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/api
+# - No `-a` / `-installsuffix cgo`: CGO is already disabled and nothing in this
+#   repo imports "C", so `-a` only forces a redundant full stdlib rebuild
+#   (~20 min on slow hosts) while ignoring the build cache.
+# - Cache mounts keep the compiler cache and module cache between builds, making
+#   source-only rebuilds take seconds instead of minutes.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -o main ./cmd/api
 
 # Final stage
 FROM alpine:latest

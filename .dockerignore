@@ -1,0 +1,35 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+.github
+
+# Build artifacts
+bin/
+**/dist/
+**/build/
+coverage/
+web/coverage/
+*.log
+*.out
+
+# Node dependencies (installed inside the image)
+**/node_modules/
+**/.npm/
+
+# Local secrets and environment files (compose injects env at runtime)
+.env
+.env.*
+!.env.example
+
+# Docs and editor cruft (not needed by either build stage)
+docs/
+.vscode/
+.idea/
+.DS_Store
+
+# Local test artifacts
+web/cypress/screenshots/
+web/cypress/videos/
+web/test-results/
+web/playwright-report/

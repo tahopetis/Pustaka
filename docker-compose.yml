@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:15
     container_name: pustaka-ci-fix-postgres
+    mem_limit: 256m
     environment:
       POSTGRES_DB: pustaka
       POSTGRES_USER: pustaka
@@ -23,12 +24,15 @@ services:
   neo4j:
     image: neo4j:5-community
     container_name: pustaka-ci-fix-neo4j
+    # Conservative memory limits: heap + pagecache + JVM native overhead must
+    # fit inside mem_limit. Raise these if the host has more RAM available.
+    mem_limit: 1g
     environment:
       NEO4J_AUTH: neo4j/password
       NEO4J_PLUGINS: '["apoc"]'
-      NEO4J_dbms_memory_heap_initial__size: 512m
-      NEO4J_dbms_memory_heap_max__size: 1g
-      NEO4J_dbms_memory_pagecache_size: 512m
+      NEO4J_dbms_memory_heap_initial__size: 256m
+      NEO4J_dbms_memory_heap_max__size: 512m
+      NEO4J_dbms_memory_pagecache_size: 256m
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
       NEO4J_dbms_security_procedures_allowlist: apoc.*
       NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
@@ -51,6 +55,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: pustaka-ci-fix-redis
+    mem_limit: 64m
     command: redis-server --appendonly yes --requirepass redispassword
     volumes:
       - redis_data:/data
@@ -69,6 +74,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.api
     container_name: pustaka-ci-fix-api
+    mem_limit: 256m
     environment:
       # Database Configuration
       PUSTAKA_DATABASE_URL: postgres://pustaka:password@postgres:5432/pustaka?sslmode=disable
@@ -138,6 +144,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.frontend
     container_name: pustaka-ci-fix-frontend
+    mem_limit: 128m
     environment:
       VITE_API_URL: /api/v1
       VITE_API_BASE_URL: /api/v1

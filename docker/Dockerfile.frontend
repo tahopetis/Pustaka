@@ -4,6 +4,13 @@ FROM node:18-alpine AS builder
 # Set working directory
 WORKDIR /app
 
+# Skip heavyweight dev-only browser binaries (Cypress, Playwright) and audit noise.
+# They are never used by `vite build` and cost ~250 MB + minutes on slow builders.
+ENV CYPRESS_INSTALL_BINARY=0 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    npm_config_audit=false \
+    npm_config_fund=false
+
 # Copy package files
 COPY web/package*.json ./
 

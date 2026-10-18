@@ -47,9 +47,11 @@ clean:
 	@echo "✅ Clean complete"
 
 # Build Docker images
+# Sequential on purpose: the Go and Vite build stages each peak around 1-1.5 GB
+# RAM, and running them in parallel OOMs on low-memory hosts.
 docker-build:
-	@echo "Building Docker images..."
-	docker-compose build --parallel
+	@echo "Building Docker images (sequential)..."
+	docker-compose build
 	@echo "✅ Docker build complete"
 
 # Start services with Docker Compose
@@ -57,11 +59,11 @@ docker-up:
 	@echo "Starting services with Docker Compose..."
 	docker-compose up -d
 	@echo "✅ Services started"
-	@echo "🌐 Frontend: http://localhost:3000"
-	@echo "🚀 API: http://localhost:8080"
-	@echo "🐘 PostgreSQL: localhost:5432"
-	@echo "🕸️  Neo4j: http://localhost:7474"
-	@echo "🔴 Redis: localhost:6379"
+	@echo "🌐 Frontend: http://localhost:3001"
+	@echo "🚀 API: http://localhost:8081"
+	@echo "🐘 PostgreSQL: localhost:5433"
+	@echo "🕸️  Neo4j: http://localhost:7475"
+	@echo "🔴 Redis: localhost:6380"
 
 # Stop services with Docker Compose
 docker-down:
