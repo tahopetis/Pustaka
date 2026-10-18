@@ -46,11 +46,14 @@ services:
     networks:
       - pustaka-network
     healthcheck:
-      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "password", "RETURN 1"]
+      # `cypher-shell` boots a JVM per probe (>150s on slow hosts) and cannot fit
+      # in any sane timeout. Probe the Bolt listener instead: bash /dev/tcp is
+      # instant, and Neo4j opens the connector only once the server is up.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/7687' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 12
+      start_period: 300s
 
   redis:
     image: redis:7-alpine
