@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:15
     container_name: pustaka-ci-fix-postgres
+    restart: unless-stopped
     mem_limit: 256m
     environment:
       POSTGRES_DB: pustaka
@@ -24,6 +25,7 @@ services:
   neo4j:
     image: neo4j:5-community
     container_name: pustaka-ci-fix-neo4j
+    restart: unless-stopped
     # Conservative memory limits: heap + pagecache + JVM native overhead must
     # fit inside mem_limit. Raise these if the host has more RAM available.
     mem_limit: 1g
@@ -58,6 +60,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: pustaka-ci-fix-redis
+    restart: unless-stopped
     mem_limit: 64m
     command: redis-server --appendonly yes --requirepass redispassword
     volumes:
