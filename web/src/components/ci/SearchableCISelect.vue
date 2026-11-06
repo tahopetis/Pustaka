@@ -77,7 +77,9 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | string[] | null]
-  'change': [value: string | string[] | null]
+  // Mirrors the repo's other selects (e.g. RelationshipTypeSelect): `v-model`
+  // carries the id(s), while `change` carries the selected CI object(s).
+  'change': [value: CIOption | CIOption[] | null]
 }>()
 
 // The API caps `limit` at 100 per request; walk pages until everything is loaded.
@@ -123,7 +125,14 @@ const groupedCIs = computed(() => {
 
 const handleChange = () => {
   emit('update:modelValue', internalValue.value)
-  emit('change', internalValue.value)
+
+  if (props.multiple) {
+    const ids = Array.isArray(internalValue.value) ? internalValue.value : []
+    emit('change', ciList.value.filter((ci) => ids.includes(ci.id)))
+  } else {
+    const id = typeof internalValue.value === 'string' ? internalValue.value : ''
+    emit('change', ciList.value.find((ci) => ci.id === id) || null)
+  }
 }
 
 const loadCIs = async () => {

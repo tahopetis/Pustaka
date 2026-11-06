@@ -593,6 +593,10 @@ const handleSubmit = async (andAddMore = false) => {
         notificationStore.showError('Please select at least one target CI')
         return
       }
+      if (form.value.source_ids.some(id => form.value.target_ids.includes(id))) {
+        notificationStore.showError('Source and target configuration items must be different')
+        return
+      }
     } else if (bulkMode.value === 'targets') {
       if (!form.value.source_id) {
         notificationStore.showError('Please select a source CI')
