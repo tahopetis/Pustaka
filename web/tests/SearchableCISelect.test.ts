@@ -93,6 +93,56 @@ describe('SearchableCISelect', () => {
     expect(allowed.attributes('disabled')).toBeUndefined()
   })
 
+  it('emits the selected CI object on change for single select', async () => {
+    listMock.mockResolvedValue(
+      makeResponse([
+        { id: 'ci-1', name: 'server01', ci_type: 'Server' },
+        { id: 'ci-2', name: 'db01', ci_type: 'Database' }
+      ])
+    )
+
+    const wrapper = mount(SearchableCISelect, { props: { modelValue: null } })
+    await flushPromises()
+
+    await wrapper.find('select').setValue('ci-2')
+
+    // v-model keeps the id, `change` carries the CI object (repo convention).
+    expect(wrapper.emitted('update:modelValue')?.[0]?.[0]).toBe('ci-2')
+    expect(wrapper.emitted('change')?.[0]?.[0]).toEqual({
+      id: 'ci-2',
+      name: 'db01',
+      ci_type: 'Database'
+    })
+
+    await wrapper.find('select').setValue('')
+    expect(wrapper.emitted('change')?.[1]?.[0]).toBeNull()
+  })
+
+  it('emits CI objects on change for multi select', async () => {
+    listMock.mockResolvedValue(
+      makeResponse([
+        { id: 'ci-1', name: 'server01', ci_type: 'Server' },
+        { id: 'ci-2', name: 'db01', ci_type: 'Database' }
+      ])
+    )
+
+    const wrapper = mount(SearchableCISelect, {
+      props: { modelValue: null, multiple: true }
+    })
+    await flushPromises()
+
+    await wrapper.find('select').setValue(['ci-1', 'ci-2'])
+
+    // DOM order follows the sorted optgroups, so compare as sets.
+    const emittedIds = wrapper.emitted('update:modelValue')?.[0]?.[0] as string[]
+    expect(emittedIds).toHaveLength(2)
+    expect(emittedIds).toEqual(expect.arrayContaining(['ci-1', 'ci-2']))
+
+    const emittedCIs = wrapper.emitted('change')?.[0]?.[0] as Array<{ id: string }>
+    expect(emittedCIs).toHaveLength(2)
+    expect(emittedCIs.map((ci) => ci.id)).toEqual(expect.arrayContaining(['ci-1', 'ci-2']))
+  })
+
   it('surfaces a load failure instead of silently rendering an empty list', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     listMock.mockRejectedValue(new Error('boom'))
