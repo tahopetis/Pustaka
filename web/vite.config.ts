@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
@@ -36,5 +36,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Playwright specs live under tests/ too; keep them out of Vitest discovery.
+    exclude: [...configDefaults.exclude, 'tests/e2e/**', 'tests/**/*.spec.ts'],
   },
 })

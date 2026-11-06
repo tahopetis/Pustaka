@@ -176,7 +176,10 @@ describe('DonutChart', () => {
 
       colorIndicators.forEach((indicator, index) => {
         const style = indicator.attributes('style')
-        expect(style).toContain(`background-color: ${mockData[index].color}`)
+        // jsdom serializes hex colors to rgb(); compare in the same form.
+        const probe = document.createElement('div')
+        probe.style.backgroundColor = mockData[index].color
+        expect(style).toContain(`background-color: ${probe.style.backgroundColor}`)
       })
     })
 
@@ -309,7 +312,8 @@ describe('DonutChart', () => {
         props: { data: mockData },
       })
 
-      const legendItems = wrapper.findAll('[role="button"]')
+      const legendItems = wrapper.findAll('[role="button"][aria-label*=" items,"]')
+      expect(legendItems).toHaveLength(mockData.length)
       legendItems.forEach((item) => {
         expect(item.attributes('tabindex')).toBe('0')
         expect(item.attributes('aria-label')).toBeTruthy()
@@ -321,7 +325,8 @@ describe('DonutChart', () => {
         props: { data: mockData },
       })
 
-      const legendItems = wrapper.findAll('[role="button"]')
+      const legendItems = wrapper.findAll('[role="button"][aria-label*=" items,"]')
+      expect(legendItems).toHaveLength(mockData.length)
       legendItems.forEach((item, index) => {
         const ariaLabel = item.attributes('aria-label')
         expect(ariaLabel).toContain(mockData[index].label)
@@ -469,7 +474,8 @@ describe('DonutChart', () => {
 
       const segments = wrapper.findAll('.segment')
       expect(segments).toHaveLength(1)
-      expect(wrapper.text()).toContain('100%')
+      // Legend percentages are rendered with one decimal (see "shows percentages in legend").
+      expect(wrapper.text()).toContain('100.0%')
     })
 
     it('handles many segments', () => {

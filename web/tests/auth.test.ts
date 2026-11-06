@@ -1,24 +1,33 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { useAuthStore } from '@/stores/auth'
-import axios from 'axios'
 
-// Mock axios
-vi.mock('axios')
+// The auth store talks to the shared axios instance from '@/services/api',
+// so mock that module rather than bare 'axios' (whose automock leaves
+// axios.create() returning undefined and breaks api.ts at import time).
+const { api } = vi.hoisted(() => ({
+  api: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    defaults: { headers: { common: {} as Record<string, string> } },
+  },
+}))
+
+vi.mock('@/services/api', () => ({ api }))
+
+import { useAuthStore } from '@/stores/auth'
 
 describe('Auth Store', () => {
   let authStore: any
 
   beforeEach(() => {
-    // Create a fresh pinia instance for each test
+    // Fresh pinia + storage; clear the shared Authorization header between tests.
     setActivePinia(createPinia())
-    authStore = useAuthStore()
-
-    // Clear localStorage
     localStorage.clear()
-
-    // Reset all mocks
+    api.defaults.headers.common = {}
     vi.clearAllMocks()
+    authStore = useAuthStore()
   })
 
   describe('Initial State', () => {
@@ -50,25 +59,29 @@ describe('Auth Store', () => {
         }
       }
 
-      vi.mocked(axios.post).mockResolvedValueOnce(mockResponse)
+      api.post.mockResolvedValueOnce(mockResponse)
 
       await authStore.login({
         username: 'testuser',
         password: 'password123'
       })
 
+      expect(api.post).toHaveBeenCalledWith('/auth/login', {
+        username: 'testuser',
+        password: 'password123'
+      })
       expect(authStore.user).toEqual(mockUser)
       expect(authStore.accessToken).toBe('mock-access-token')
       expect(authStore.isAuthenticated).toBe(true)
       expect(localStorage.getItem('access_token')).toBe('mock-access-token')
-      expect(axios.defaults.headers.common['Authorization']).toBe('Bearer mock-access-token')
+      expect(api.defaults.headers.common['Authorization']).toBe('Bearer mock-access-token')
     })
 
     it('should handle login failure', async () => {
       const mockError = new Error('Invalid credentials')
       mockError.response = { status: 401, data: { error: 'Invalid credentials' } }
 
-      vi.mocked(axios.post).mockRejectedValueOnce(mockError)
+      api.post.mockRejectedValueOnce(mockError)
 
       await expect(authStore.login({
         username: 'testuser',
@@ -96,6 +109,7 @@ describe('Auth Store', () => {
       authStore.refreshToken = 'mock-refresh-token'
       localStorage.setItem('access_token', 'mock-token')
       localStorage.setItem('refresh_token', 'mock-refresh-token')
+      api.defaults.headers.common['Authorization'] = 'Bearer mock-token'
 
       await authStore.logout()
 
@@ -105,7 +119,7 @@ describe('Auth Store', () => {
       expect(authStore.isAuthenticated).toBe(false)
       expect(localStorage.getItem('access_token')).toBeNull()
       expect(localStorage.getItem('refresh_token')).toBeNull()
-      expect(axios.defaults.headers.common['Authorization']).toBeUndefined()
+      expect(api.defaults.headers.common['Authorization']).toBeUndefined()
     })
   })
 
@@ -140,13 +154,13 @@ describe('Auth Store', () => {
     })
 
     it('should check any permission correctly', () => {
-      expect(authStore.hasAnyPermission('ci:read', 'ci:delete')).toBe(true)
-      expect(authStore.hasAnyPermission('ci:delete', 'user:delete')).toBe(false)
+      expect(authStore.hasAnyPermission(['ci:read', 'ci:delete'])).toBe(true)
+      expect(authStore.hasAnyPermission(['ci:delete', 'user:delete'])).toBe(false)
     })
 
     it('should check all permissions correctly', () => {
-      expect(authStore.hasAllPermissions('ci:read', 'ci:create')).toBe(true)
-      expect(authStore.hasAllPermissions('ci:read', 'ci:delete')).toBe(false)
+      expect(authStore.hasAllPermissions(['ci:read', 'ci:create'])).toBe(true)
+      expect(authStore.hasAllPermissions(['ci:read', 'ci:delete'])).toBe(false)
     })
   })
 
@@ -161,11 +175,14 @@ describe('Auth Store', () => {
         }
       }
 
-      vi.mocked(axios.post).mockResolvedValueOnce(mockResponse)
+      api.post.mockResolvedValueOnce(mockResponse)
 
       const result = await authStore.refreshAccessToken()
 
       expect(result).toBe(true)
+      expect(api.post).toHaveBeenCalledWith('/auth/refresh', {
+        refresh_token: 'mock-refresh-token'
+      })
       expect(authStore.accessToken).toBe('new-access-token')
       expect(authStore.refreshToken).toBe('new-refresh-token')
       expect(localStorage.getItem('access_token')).toBe('new-access-token')
@@ -178,7 +195,7 @@ describe('Auth Store', () => {
       const mockError = new Error('Token expired')
       mockError.response = { status: 401 }
 
-      vi.mocked(axios.post).mockRejectedValueOnce(mockError)
+      api.post.mockRejectedValueOnce(mockError)
 
       const result = await authStore.refreshAccessToken()
 
@@ -203,7 +220,7 @@ describe('Auth Store', () => {
         permissions: []
       }
 
-      vi.mocked(axios.get).mockResolvedValueOnce({ data: { user: mockUser } })
+      api.get.mockResolvedValueOnce({ data: { user: mockUser } })
 
       const result = await authStore.checkAuth()
 
@@ -226,10 +243,10 @@ describe('Auth Store', () => {
       }
 
       // First call fails (invalid token)
-      vi.mocked(axios.get).mockRejectedValueOnce(new Error('Invalid token'))
+      api.get.mockRejectedValueOnce(new Error('Invalid token'))
 
       // Refresh succeeds
-      vi.mocked(axios.post).mockResolvedValueOnce({
+      api.post.mockResolvedValueOnce({
         data: {
           access_token: 'new-token',
           refresh_token: 'new-refresh-token'
@@ -237,7 +254,7 @@ describe('Auth Store', () => {
       })
 
       // Get user with new token succeeds
-      vi.mocked(axios.get).mockResolvedValueOnce({ data: { user: mockUser } })
+      api.get.mockResolvedValueOnce({ data: { user: mockUser } })
 
       const result = await authStore.checkAuth()
 
