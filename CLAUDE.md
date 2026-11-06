@@ -274,3 +274,17 @@ go test -v -run TestSpecificFunction ./internal/ci/
 - Write-offs and adjustments logged to main audit_logs table
 
 **To start implementation:** Run `implement amortization module phase 1` or follow the implementation plan in docs/
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues in `tahopetis/Pustaka` (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` at the repo root and ADRs in `docs/adr/`. See `docs/agents/domain.md`.
