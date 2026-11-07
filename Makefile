@@ -14,7 +14,7 @@ help:
 	@echo "  pull           Pull published multi-arch images from GHCR"
 	@echo "  images-build   Build Docker images locally (slow; CI normally does this)"
 	@echo "  docker-build   Alias for images-build"
-	@echo "  docker-up      Start services with Docker Compose (pulls images)"
+	@echo "  docker-up      Start services with Docker Compose (pulls missing images)"
 	@echo "  docker-down    Stop services with Docker Compose"
 	@echo "  migrate        Run database migrations"
 	@echo "  fmt            Format Go code"
@@ -65,8 +65,9 @@ images-build:
 
 docker-build: images-build
 
-# Start services with Docker Compose
-docker-up: pull
+# Start services with Docker Compose. Compose only pulls images that are missing
+# locally, so a locally built image survives; run `make pull` to refresh on purpose.
+docker-up:
 	@echo "Starting services with Docker Compose..."
 	docker compose up -d
 	@echo "✅ Services started"
@@ -112,10 +113,10 @@ dev: docker-up migrate
 	@echo "🚀 Development environment ready!"
 	@echo ""
 	@echo "Services:"
-	@echo "  Frontend: http://localhost:3000"
-	@echo "  API: http://localhost:8080"
-	@echo "  API Health: http://localhost:8080/health"
-	@echo "  Neo4j Browser: http://localhost:7474"
+	@echo "  Frontend: http://localhost:3001"
+	@echo "  API: http://localhost:8081"
+	@echo "  API Health: http://localhost:8081/health"
+	@echo "  Neo4j Browser: http://localhost:7475"
 	@echo ""
 	@echo "Default credentials:"
 	@echo "  PostgreSQL: porta/password"

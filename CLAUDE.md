@@ -70,12 +70,12 @@ npm run format                # Format code with Prettier
 ```
 
 ### Docker Services
-- **Frontend**: http://localhost:3000
-- **API**: http://localhost:8080
-- **API Health**: http://localhost:8080/health
-- **Neo4j Browser**: http://localhost:7474
-- **PostgreSQL**: localhost:5432
-- **Redis**: localhost:6379
+- **Frontend**: http://localhost:3001
+- **API**: http://localhost:8081
+- **API Health**: http://localhost:8081/health
+- **Neo4j Browser**: http://localhost:7475
+- **PostgreSQL**: localhost:5433
+- **Redis**: localhost:6380
 
 Default credentials (from `.env.example`):
 - PostgreSQL: porta/password
@@ -218,14 +218,14 @@ web/src/
 ### Debug Commands
 ```bash
 # Check service status
-docker-compose ps
-docker-compose logs postgres
-docker-compose logs neo4j
-docker-compose logs api
-docker-compose logs frontend
+docker compose ps
+docker compose logs postgres
+docker compose logs neo4j
+docker compose logs api
+docker compose logs frontend
 
 # Test API health
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 
 # Verify database connections
 docker exec -it porta-postgres psql -U porta -d porta -c "SELECT 1;"

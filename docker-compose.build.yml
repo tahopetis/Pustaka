@@ -7,7 +7,8 @@
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml build
 #
 # Nothing here changes at runtime; the services keep their published image
-# names so `docker compose up` after a local build still uses the local image.
+# names, and `docker compose up` only pulls an image when it is missing locally,
+# so a locally built image is the one that runs.
 services:
   api:
     build:

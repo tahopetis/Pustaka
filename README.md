@@ -73,9 +73,9 @@ Images are built and published by GitHub Actions (multi-arch, GHCR), so the
 deployment host only pulls them. To rebuild locally instead — slow, and only
 needed when changing Dockerfiles or dependencies — run `make images-build`.
 
-* Frontend: [http://localhost:3000](http://localhost:3000)
-* API: [http://localhost:8080](http://localhost:8080)
-* Neo4j Browser: [http://localhost:7474](http://localhost:7474)
+* Frontend: [http://localhost:3001](http://localhost:3001)
+* API: [http://localhost:8081](http://localhost:8081)
+* Neo4j Browser: [http://localhost:7475](http://localhost:7475)
 
 Create an initial admin user:
 

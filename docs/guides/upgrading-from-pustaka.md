@@ -30,11 +30,12 @@ The same applies to every other key: `DATABASE_*`, `REDIS_*`, `JWT_*`, `SERVER_*
 Unprefixed names (`DATABASE_URL`, `JWT_SECRET`, …) are still accepted, and
 `.env.example` uses them.
 
-## 2. Database
+## 2. Database and volumes
 
-The default role and database are now `porta` (was `pustaka`).
+The default role and database are now `porta` (was `pustaka`), and because the compose
+project name is now explicit the old volumes are **not** reused.
 
-**Fresh development environment** — the volumes are recreated:
+**Fresh development environment** — recreate everything:
 
 ```sh
 docker compose down -v
@@ -42,29 +43,46 @@ docker compose pull
 docker compose up -d
 ```
 
-**Data you must keep** — either dump/restore, or rename in place:
+**Data you must keep** — do this while the *old* stack is still running, then copy the
+volumes across before starting the new stack:
 
 ```sh
-# PostgreSQL, inside the postgres container
-psql -U postgres -c 'ALTER DATABASE pustaka RENAME TO porta;'
-psql -U postgres -c 'ALTER ROLE pustaka RENAME TO porta;'
+# 1. Rename the database and role. The old stack's POSTGRES_USER is 'pustaka'
+#    (a superuser); there is no 'postgres' role, so connect as the app user.
+docker exec -it pustaka-ci-fix-postgres \
+  psql -U pustaka -d postgres -c 'ALTER DATABASE pustaka RENAME TO porta;'
+docker exec -it pustaka-ci-fix-postgres \
+  psql -U pustaka -d postgres -c 'ALTER ROLE pustaka RENAME TO porta;'
+
+# 2. Stop the old stack; its volumes (pustaka_*) survive.
+docker compose down
+
+# 3. Copy the data volumes to the new project prefix.
+for v in postgres_data neo4j_data neo4j_logs neo4j_import redis_data; do
+  docker volume create "porta_$v"
+  docker run --rm -v "pustaka_$v:/from:ro" -v "porta_$v:/to" \
+    alpine sh -c 'cp -a /from/. /to/'
+done
+
+# 4. Start the new stack.
+docker compose pull
+docker compose up -d
 ```
 
-The seeded administrator email also changed: `admin@pustaka.local` → `admin@porta.local`
-(fresh installs only; existing rows are untouched).
+The administrator email also moved. Migrations insert `admin@porta.local`, and on Docker
+installs `PORTA_ADMIN_EMAIL` (compose sets `admin@porta.dev`) is applied at startup and
+wins — so the effective address is `admin@porta.dev` unless you override it. Existing
+rows keep the address they already have.
 
 ## 3. Containers, network, volumes
 
 | Before | After |
 | --- | --- |
-| `pustaka-ci-fix-*` containers | `porta-*` (`porta-api`, `porta-postgres`, …) |
-| `pustaka-network` | `porta-network` |
+| containers `pustaka-ci-fix-*` | `porta-*` (`porta-api`, `porta-postgres`, `porta-neo4j`, `porta-redis`, `porta-frontend`) |
+| network `pustaka_pustaka-network` | `porta_porta-network` (project-prefixed; the network has no explicit `name:`) |
 | compose project derived from directory | explicit `name: porta` |
+| volumes `pustaka_*` | volumes `porta_*` (`porta_postgres_data`, `porta_neo4j_data`, …) |
 | images built on the host | `ghcr.io/tahopetis/porta-{api,frontend}` pulled from GHCR |
-
-Because the compose project name is now explicit, volumes are named
-`porta_postgres_data`, `porta_neo4j_data`, etc. Old `pustaka_*` volumes are **not**
-reused; export your data before switching if it matters.
 
 ## 4. Authentication
 
