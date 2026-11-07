@@ -38,7 +38,7 @@
   "devDependencies": {
     "@playwright/test": "^1.55.1",
     "@types/d3": "^7.4.3",
-    "@vitejs/plugin-vue": "^4.5.0",
+    "@vitejs/plugin-vue": "^6.0.10",
     "@vue/test-utils": "^2.4.2",
     "autoprefixer": "^10.4.16",
     "cypress": "^13.6.0",
@@ -47,8 +47,8 @@
     "postcss": "^8.4.32",
     "prettier": "^3.1.0",
     "typescript": "^5.2.2",
-    "vite": "^5.0.0",
-    "vitest": "^0.34.6"
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
   },
   "keywords": [
     "cmdb",
