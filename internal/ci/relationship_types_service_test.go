@@ -105,7 +105,7 @@ type RelationshipTypeServiceTestSuite struct {
 
 func (suite *RelationshipTypeServiceTestSuite) SetupTest() {
 	suite.repo = new(MockRelationshipTypeRepository)
-	suite.logger, _ = pustakaLogger.NewLogger("debug")
+	suite.logger = pustakaLogger.New(pustakaLogger.Config{Level: "debug"})
 	suite.service = NewRelationshipTypeService(suite.repo, suite.logger)
 	suite.ctx = context.Background()
 	suite.userID = uuid.New()

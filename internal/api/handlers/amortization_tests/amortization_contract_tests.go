@@ -33,7 +33,7 @@ type AmortizationContractTestSuite struct {
 }
 
 func (suite *AmortizationContractTestSuite) SetupSuite() {
-	suite.logger = pustakaLogger.NewLogger()
+	suite.logger = pustakaLogger.Default()
 	suite.mockService = NewMockAmortizationService()
 	suite.handler = NewAmortizationHandler(suite.mockService, suite.logger)
 

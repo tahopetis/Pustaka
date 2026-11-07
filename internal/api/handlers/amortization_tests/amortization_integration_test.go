@@ -35,7 +35,7 @@ type AmortizationIntegrationTestSuite struct {
 }
 
 func (suite *AmortizationIntegrationTestSuite) SetupSuite() {
-	suite.logger = pustakaLogger.NewLogger()
+	suite.logger = pustakaLogger.Default()
 	suite.mockService = NewMockAmortizationService()
 	suite.handler = NewAmortizationHandler(suite.mockService, suite.logger)
 

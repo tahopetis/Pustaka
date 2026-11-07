@@ -33,9 +33,7 @@ type RelationshipTypeIntegrationTestSuite struct {
 
 func (suite *RelationshipTypeIntegrationTestSuite) SetupSuite() {
 	// Initialize logger
-	logger, err := pustakaLogger.NewLogger("debug")
-	require.NoError(suite.T(), err)
-	suite.logger = logger
+	suite.logger = pustakaLogger.New(pustakaLogger.Config{Level: "debug"})
 
 	// This would normally use a real database setup
 	// For now, we'll create a simplified test setup
