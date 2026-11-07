@@ -1,5 +1,5 @@
 #!/usr/bin/zsh
-# Script to trigger manual amortization run for Pustaka CMDB
+# Script to trigger manual amortization run for Porta CMDB
 # Usage: ./run-amortization.sh [options]
 #
 # Options:
@@ -62,7 +62,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}Pustaka Amortization Manual Run${NC}"
+echo -e "${BLUE}Porta Amortization Manual Run${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 

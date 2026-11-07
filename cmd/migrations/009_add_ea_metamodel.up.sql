@@ -32,7 +32,7 @@ BEGIN
         VALUES (
             admin_user_id,
             'admin',
-            'admin@pustaka.local',
+            'admin@porta.local',
             '$argon2id$v=19$m=65536,t=3,p=4$change-this-password-in-production-salt$change-this-password-in-production-hash',
             true,
             NOW(),

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Pustaka CMDB - Phase 1 Setup Script
+# Porta CMDB - Phase 1 Setup Script
 # This script sets up the development environment for Phase 1
 
 set -e
 
-echo "🚀 Setting up Pustaka CMDB - Phase 1"
+echo "🚀 Setting up Porta CMDB - Phase 1"
 echo "=================================="
 
 # Colors for output
@@ -116,7 +116,7 @@ start_docker_services() {
     # Wait for PostgreSQL to be ready
     print_status "Waiting for PostgreSQL..."
     timeout=60
-    while ! docker-compose exec -T postgres pg_isready -U pustaka -d pustaka > /dev/null 2>&1; do
+    while ! docker-compose exec -T postgres pg_isready -U porta -d porta > /dev/null 2>&1; do
         if [ $timeout -le 0 ]; then
             print_error "PostgreSQL failed to start within timeout"
             exit 1
@@ -167,7 +167,7 @@ run_migrations() {
 
     # The migrations should already be applied automatically by PostgreSQL init
     # But we'll check if tables exist
-    TABLES=$(docker-compose exec -T postgres psql -U pustaka -d pustaka -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'")
+    TABLES=$(docker-compose exec -T postgres psql -U porta -d porta -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'")
 
     if [ "$TABLES" -gt 0 ]; then
         print_success "Database tables already exist"
@@ -182,15 +182,15 @@ create_admin_user() {
     print_status "Creating admin user..."
 
     # Check if admin user already exists
-    ADMIN_EXISTS=$(docker-compose exec -T postgres psql -U pustaka -d pustaka -tAc "SELECT COUNT(*) FROM users WHERE username = 'admin'")
+    ADMIN_EXISTS=$(docker-compose exec -T postgres psql -U porta -d porta -tAc "SELECT COUNT(*) FROM users WHERE username = 'admin'")
 
     if [ "$ADMIN_EXISTS" -gt 0 ]; then
         print_status "Admin user already exists"
     else
         # This would normally be done via the API, but for setup we'll insert directly
-        docker-compose exec -T postgres psql -U pustaka -d pustaka -c "
+        docker-compose exec -T postgres psql -U porta -d porta -c "
             INSERT INTO users (username, email, password_hash, is_active, created_at, updated_at)
-            VALUES ('admin', 'admin@pustaka.local', '\$argon2id\$v=19\$m=65536,t=4,p=4\$c29tZXNhbHQ\$RDEwMEEwQjAxRjlGQjQ0NjU2NzgwNjQ1Njg2NDU2NzgwNjQ1Njg2NDU2', true, NOW(), NOW());
+            VALUES ('admin', 'admin@porta.local', '\$argon2id\$v=19\$m=65536,t=4,p=4\$c29tZXNhbHQ\$RDEwMEEwQjAxRjlGQjQ0NjU2NzgwNjQ1Njg2NDU2NzgwNjQ1Njg2NDU2', true, NOW(), NOW());
 
             INSERT INTO user_roles (user_id, role_id, assigned_by, assigned_at)
             SELECT u.id, r.id, u.id, NOW()
@@ -251,7 +251,7 @@ build_and_start_application() {
 
 # Display success message
 display_success_message() {
-    print_success "🎉 Pustaka CMDB Phase 1 setup completed successfully!"
+    print_success "🎉 Porta CMDB Phase 1 setup completed successfully!"
     echo ""
     echo "📋 What's been set up:"
     echo "  ✅ PostgreSQL database with schema and default CI types"
