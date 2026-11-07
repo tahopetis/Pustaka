@@ -51,13 +51,11 @@ func (m *MockCIService) ListCIs(ctx context.Context, filters ci.ListCIFilters, p
 		cis = append(cis, ci)
 	}
 	return &ci.CIListResponse{
-		CIs: cis,
-		Pagination: ci.PaginationResponse{
-			Page:       page,
-			Limit:      limit,
-			Total:      int64(len(cis)),
-			TotalPages: 1,
-		},
+		CIs:        cis,
+		Page:       page,
+		Limit:      limit,
+		Total:      int64(len(cis)),
+		TotalPages: 1,
 	}, nil
 }
 
