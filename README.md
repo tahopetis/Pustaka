@@ -1,12 +1,14 @@
-# Pustaka CMDB
+# Porta
 
 > A modern, open-source **Configuration Management Database (CMDB)** designed for managing IT assets, their relationships, and governance in enterprise environments.
+
+Porta was previously named **Pustaka** — see the [upgrade guide](./docs/guides/upgrading-from-pustaka.md) if you are migrating an existing installation.
 
 ---
 
 ## 🚀 Overview
 
-**Pustaka** provides a structured and extensible way to store, manage, and visualize configuration items (CIs) across IT domains.  
+**Porta** provides a structured and extensible way to store, manage, and visualize configuration items (CIs) across IT domains.  
 It supports hierarchical taxonomies, relationship mapping, access control, and auditing — built to align with enterprise architecture and IT service management practices.
 
 **Phase 1 (✅ Complete):**
@@ -51,8 +53,8 @@ It supports hierarchical taxonomies, relationship mapping, access control, and a
 ## 🔧 Prerequisites
 
 - Docker & Docker Compose  
-- Go 1.22+ (if running locally)  
-- Node.js 18+ (frontend development)  
+- Go 1.24+ (if running locally)  
+- Node.js 24+ (frontend development)  
 
 ---
 
@@ -61,11 +63,15 @@ It supports hierarchical taxonomies, relationship mapping, access control, and a
 ### Quick Start (Docker Compose)
 
 ```sh
-git clone https://github.com/tahopetis/Pustaka.git
-cd Pustaka
+git clone https://github.com/tahopetis/porta.git
+cd porta
 cp .env.example .env   # configure DB, JWT secret, etc.
-make dev
-````
+make dev               # pulls the published images from GHCR, then migrates
+```
+
+Images are built and published by GitHub Actions (multi-arch, GHCR), so the
+deployment host only pulls them. To rebuild locally instead — slow, and only
+needed when changing Dockerfiles or dependencies — run `make images-build`.
 
 * Frontend: [http://localhost:3000](http://localhost:3000)
 * API: [http://localhost:8080](http://localhost:8080)
@@ -82,7 +88,7 @@ make create-admin
 ## 🛠 Project Structure
 
 ```
-pustaka/
+porta/
 ├── cmd/                 # Entrypoints (API, migrations, setup)
 ├── internal/            # Backend application logic
 │   ├── cmdb/            # CMDB models & services
@@ -137,6 +143,6 @@ Licensed under the **MIT License**. See [LICENSE](./LICENSE).
 
 ---
 
-Pustaka aims to provide enterprises with a robust and extensible **CMDB** foundation for IT governance, compliance, and architecture alignment.
+Porta aims to provide enterprises with a robust and extensible **CMDB** foundation for IT governance, compliance, and architecture alignment.
 
 

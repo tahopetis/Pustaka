@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues in `tahopetis/Pustaka`. Use the `gh` CLI for all operations.
+Issues and specs for this repo live as GitHub issues in `tahopetis/porta`. Use the `gh` CLI for all operations.
 
 ## Conventions
 

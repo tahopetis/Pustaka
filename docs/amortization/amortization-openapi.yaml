@@ -1,10 +1,10 @@
 openapi: 3.0.3
 info:
-  title: Pustaka CMDB - IT Asset Amortization API
+  title: Porta CMDB - IT Asset Amortization API
   description: RESTful API for managing IT asset amortization calculations and schedules
   version: 1.0.0
   contact:
-    name: Pustaka Development Team
+    name: Porta Development Team
   license:
     name: MIT
 

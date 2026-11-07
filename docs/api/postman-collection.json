@@ -1,10 +1,10 @@
 {
 	"info": {
-		"_postman_id": "pustaka-api-collection",
-		"name": "Pustaka CMDB API",
-		"description": "Complete API collection for Pustaka Configuration Management Database",
+		"_postman_id": "porta-api-collection",
+		"name": "Porta CMDB API",
+		"description": "Complete API collection for Porta Configuration Management Database",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "pustaka-team"
+		"_exporter_id": "porta-team"
 	},
 	"item": [
 		{
@@ -22,7 +22,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"admin@pustaka.dev\",\n  \"password\": \"your-password\"\n}"
+							"raw": "{\n  \"email\": \"admin@porta.dev\",\n  \"password\": \"your-password\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/auth/login",
@@ -44,7 +44,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"email\": \"admin@pustaka.dev\",\n  \"password\": \"your-password\"\n}"
+									"raw": "{\n  \"email\": \"admin@porta.dev\",\n  \"password\": \"your-password\"\n}"
 								},
 								"url": {
 									"raw": "{{baseUrl}}/auth/login",
@@ -62,7 +62,7 @@
 								}
 							],
 							"cookie": [],
-							"body": "{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"expires_in\": 900,\n  \"user\": {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"email\": \"admin@pustaka.dev\",\n    \"name\": \"John Doe\",\n    \"role\": \"admin\",\n    \"is_active\": true\n  }\n}"
+							"body": "{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"expires_in\": 900,\n  \"user\": {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"email\": \"admin@porta.dev\",\n    \"name\": \"John Doe\",\n    \"role\": \"admin\",\n    \"is_active\": true\n  }\n}"
 						}
 					]
 				},
@@ -156,7 +156,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"newuser@pustaka.dev\",\n  \"password\": \"securePassword123\",\n  \"name\": \"Jane Smith\",\n  \"role\": \"user\"\n}"
+							"raw": "{\n  \"email\": \"newuser@porta.dev\",\n  \"password\": \"securePassword123\",\n  \"name\": \"Jane Smith\",\n  \"role\": \"user\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/users",

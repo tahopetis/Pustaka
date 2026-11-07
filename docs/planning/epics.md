@@ -1,4 +1,4 @@
-# Pustaka CMDB - Epic Breakdown
+# Porta CMDB - Epic Breakdown
 
 **Author:** tahopetis
 **Date:** 2025-10-14
@@ -331,7 +331,7 @@
 
 #### Story 4.3: Enterprise SSO Integration
 **As an** IT Administrator
-**I want to** integrate Pustaka CMDB with our enterprise identity provider
+**I want to** integrate Porta CMDB with our enterprise identity provider
 **So that** users can use existing credentials and security policies
 
 **Acceptance Criteria:**
@@ -390,7 +390,7 @@
 #### Story 5.1: Complete REST API with Documentation
 **As a** Developer
 **I want to** access all CMDB functionality via REST API
-**So that** I can integrate Pustaka with external systems and workflows
+**So that** I can integrate Porta with external systems and workflows
 
 **Acceptance Criteria:**
 - API provides endpoints for all CRUD operations on CIs and relationships

@@ -1,8 +1,8 @@
-# Pustaka CMDB - Project Overview
+# Porta CMDB - Project Overview
 
 ## Executive Summary
 
-Pustaka is a modern, open-source Configuration Management Database (CMDB) built for enterprise IT asset management. It features a hierarchical taxonomy system, relationship mapping, role-based access control (RBAC), audit logging, and graph visualization capabilities. The system is designed as a brownfield project with comprehensive documentation and a flexible architecture supporting infinite-level taxonomies.
+Porta is a modern, open-source Configuration Management Database (CMDB) built for enterprise IT asset management. It features a hierarchical taxonomy system, relationship mapping, role-based access control (RBAC), audit logging, and graph visualization capabilities. The system is designed as a brownfield project with comprehensive documentation and a flexible architecture supporting infinite-level taxonomies.
 
 ## Quick Reference
 
@@ -114,7 +114,7 @@ Pustaka is a modern, open-source Configuration Management Database (CMDB) built 
 This is a **monorepo** with clear separation of concerns:
 
 ```
-pustaka/
+porta/
 ├── web/                    # Vue 3 Frontend SPA
 │   ├── src/
 │   │   ├── components/     # Reusable UI components

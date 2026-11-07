@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the implementation plan for the IT Asset Amortization & Lifecycle Financials feature in Pustaka CMDB.
+This document outlines the implementation plan for the IT Asset Amortization & Lifecycle Financials feature in Porta CMDB.
 
 ---
 

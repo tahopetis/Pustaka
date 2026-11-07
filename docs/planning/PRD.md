@@ -1,4 +1,4 @@
-# Pustaka CMDB Product Requirements Document (PRD)
+# Porta CMDB Product Requirements Document (PRD)
 
 **Author:** tahopetis
 **Date:** 2025-10-14
@@ -12,7 +12,7 @@
 
 ### Description
 
-Pustaka CMDB is a modern, open-source Configuration Management Database designed for enterprise IT asset management. It features a hierarchical taxonomy system with infinite nesting levels, comprehensive relationship mapping, role-based access control, audit logging, and interactive graph visualization capabilities. The system is built upon a sophisticated Vue 3 + Go API architecture with multi-database integration (PostgreSQL + Neo4j + Redis) and is designed to overcome limitations of traditional CMDB solutions.
+Porta CMDB is a modern, open-source Configuration Management Database designed for enterprise IT asset management. It features a hierarchical taxonomy system with infinite nesting levels, comprehensive relationship mapping, role-based access control, audit logging, and interactive graph visualization capabilities. The system is built upon a sophisticated Vue 3 + Go API architecture with multi-database integration (PostgreSQL + Neo4j + Redis) and is designed to overcome limitations of traditional CMDB solutions.
 
 ### Deployment Intent
 
@@ -26,7 +26,7 @@ Enterprise system deployment targeting organizations with complex IT environment
 
 The current IT landscape demands CMDB solutions that can adapt rapidly to changing infrastructure requirements, support DevOps practices, and provide real-time visibility into complex system dependencies. Traditional CMDB systems often fail to accommodate flexible taxonomy structures needed by modern enterprises, particularly in cloud-native environments and microservices architectures.
 
-Pustaka CMDB represents a significant advancement by addressing critical limitations through:
+Porta CMDB represents a significant advancement by addressing critical limitations through:
 - **Flexible Taxonomy System**: Dynamic schema evolution supporting unlimited hierarchical levels
 - **Advanced Graph Visualization**: Interactive network graphs with clustering capabilities for complex relationship navigation
 - **Multi-Database Architecture**: Optimized PostgreSQL + Neo4j + Redis integration for different data types
