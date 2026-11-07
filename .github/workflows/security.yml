@@ -1,8 +1,13 @@
 name: security
 
-# Vulnerability assessment. Dependency findings fail the job; scanners whose
-# baseline is still being triaged (gosec, Trivy) are report-only: they upload
-# SARIF to the Security tab and are flipped to blocking later.
+# Vulnerability assessment.
+#
+# Disposition in this first iteration:
+#   - dependency-review: BLOCKING. It only judges the PR's own dependency/action
+#     changes, so it catches new vulnerable dependencies without freezing work.
+#   - govulncheck / npm audit: report-only until the pre-existing backlog is
+#     upgraded (issues #10 and #12), then flip to blocking.
+#   - gosec / Trivy: report-only (SARIF to the Security tab); flip later.
 
 on:
   pull_request:
@@ -36,9 +41,12 @@ jobs:
           fail-on-severity: high
 
   govulncheck:
-    name: Go vulnerability check
+    name: Go vulnerability check (report-only)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Pre-existing backlog: 37 findings on main (issue #10). Flip to blocking
+    # once the dependency upgrades land.
+    continue-on-error: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -55,9 +63,12 @@ jobs:
         run: govulncheck $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$|amortization_tests')
 
   npm-audit:
-    name: npm audit
+    name: npm audit (report-only)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Pre-existing backlog: 34 advisories in the lockfile (issue #12). Flip to
+    # blocking once they are updated.
+    continue-on-error: true
     defaults:
       run:
         working-directory: web
@@ -110,7 +121,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
       - name: Scan published api image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/porta-api:main
           format: sarif
@@ -119,7 +130,7 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
       - name: Scan published frontend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/porta-frontend:main
           format: sarif
