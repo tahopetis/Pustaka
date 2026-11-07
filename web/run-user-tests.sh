@@ -27,7 +27,7 @@ if curl -s http://localhost:3000 > /dev/null 2>&1; then
     echo "✅ Application is running"
 else
     echo "❌ Application is not running. Please start the application first:"
-    echo "   cd /home/syam/dev/pustaka && make dev"
+    echo "   cd /home/syam/dev/porta && make dev"
     exit 1
 fi
 

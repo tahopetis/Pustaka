@@ -1,7 +1,7 @@
-# Pustaka Graph Page Test Execution Plan
+# Porta Graph Page Test Execution Plan
 
 ## Overview
-This document outlines the comprehensive Playwright test automation strategy for verifying the graph page functionality fixes in the Pustaka CMDB application.
+This document outlines the comprehensive Playwright test automation strategy for verifying the graph page functionality fixes in the Porta CMDB application.
 
 ## Test Automation Strategy
 
@@ -41,21 +41,21 @@ This document outlines the comprehensive Playwright test automation strategy for
 
 ## Test Files Created
 
-### 1. `/home/syam/dev/pustaka/web/tests/e2e/graph-authenticated.spec.ts`
+### 1. `/home/syam/dev/porta/web/tests/e2e/graph-authenticated.spec.ts`
 - **Purpose**: Comprehensive authenticated tests
 - **Features**: Full test coverage with login handling
 - **Test Cases**: 8 major test scenarios
 
-### 2. `/home/syam/dev/pustaka/web/tests/e2e/auth-helper.ts`
+### 2. `/home/syam/dev/porta/web/tests/e2e/auth-helper.ts`
 - **Purpose**: Authentication helper
 - **Features**: Automatic login before tests
 - **Credentials**: admin / Admin@123
 
-### 3. `/home/syam/dev/pustaka/web/playwright.config.ts`
+### 3. `/home/syam/dev/porta/web/playwright.config.ts`
 - **Purpose**: Playwright configuration
 - **Features**: Multi-browser, HTML reports, screenshots on failure
 
-### 4. `/home/syam/dev/pustaka/web/run-tests.sh`
+### 4. `/home/syam/dev/porta/web/run-tests.sh`
 - **Purpose**: Test execution script
 - **Features**: Docker service checking, dependency installation
 
@@ -63,14 +63,14 @@ This document outlines the comprehensive Playwright test automation strategy for
 
 ### 1. Application Setup
 ```bash
-cd /home/syam/dev/pustaka
+cd /home/syam/dev/porta
 docker compose up -d
 # Wait for services to be ready (30-60 seconds)
 ```
 
 ### 2. Test Environment Setup
 ```bash
-cd /home/syam/dev/pustaka/web
+cd /home/syam/dev/porta/web
 npm install
 npx playwright install
 ```
@@ -83,7 +83,7 @@ npx playwright install
 
 ### 1. Headless Mode (Recommended for CI/CD)
 ```bash
-cd /home/syam/dev/pustaka/web
+cd /home/syam/dev/porta/web
 npx playwright test
 ```
 
@@ -227,7 +227,7 @@ docker compose up -d
 ### 1. Execute Tests
 Run the automated tests to verify graph page functionality:
 ```bash
-cd /home/syam/dev/pustaka/web
+cd /home/syam/dev/porta/web
 npx playwright test --headed
 ```
 

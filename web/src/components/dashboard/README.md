@@ -1,6 +1,6 @@
 # Dashboard Components
 
-This directory contains reusable components for the Pustaka CMDB dashboard, part of the dashboard enhancement plan documented in `~/.claude/plans/cheeky-weaving-ocean.md`.
+This directory contains reusable components for the Porta CMDB dashboard, part of the dashboard enhancement plan documented in `~/.claude/plans/cheeky-weaving-ocean.md`.
 
 ## Components
 
@@ -170,7 +170,7 @@ dashboard/
 
 ## Design System
 
-All components follow the Pustaka design system:
+All components follow the Porta design system:
 - **Colors**: Tailwind CSS utility classes
 - **Spacing**: Consistent px-4 py-5 (mobile) and sm:px-6 (desktop)
 - **Shadows**: `shadow` class for cards
@@ -358,10 +358,10 @@ const relationshipData = relationshipTypeUsage.value.map(item => ({
 ## Related Documentation
 
 - **Dashboard Plan**: `~/.claude/plans/cheeky-weaving-ocean.md`
-- **Project Docs**: `/home/tahopetis/dev/pustaka/CLAUDE.md`
-- **Dashboard Types**: `/home/tahopetis/dev/pustaka/web/src/types/dashboard.ts`
-- **Dashboard Composable**: `/home/tahopetis/dev/pustaka/web/src/composables/useDashboardData.ts`
-- **Dashboard View**: `/home/tahopetis/dev/pustaka/web/src/views/DashboardView.vue`
+- **Project Docs**: `/home/tahopetis/dev/porta/CLAUDE.md`
+- **Dashboard Types**: `/home/tahopetis/dev/porta/web/src/types/dashboard.ts`
+- **Dashboard Composable**: `/home/tahopetis/dev/porta/web/src/composables/useDashboardData.ts`
+- **Dashboard View**: `/home/tahopetis/dev/porta/web/src/views/DashboardView.vue`
 
 ## Support
 

@@ -1,4 +1,4 @@
-// Lifecycle Status Types for Pustaka CMDB
+// Lifecycle Status Types for Porta CMDB
 
 export interface LifecycleStatus {
   id: string
