@@ -30,7 +30,7 @@ go test -cover ./internal/ci/ # Run tests with coverage report
 # Development
 make pull                     # Pull published multi-arch images from GHCR
 make dev                      # Start full dev environment (pulls images + migrations)
-make docker-up                # Start only Docker services (pulls images)
+make docker-up                # Start only Docker services (pulls missing images)
 make images-build             # Rebuild images locally (escape hatch; CI normally builds)
 make docker-down              # Stop Docker services
 
