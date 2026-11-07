@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
-	"github.com/pustaka/pustaka/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
+	"github.com/tahopetis/porta/internal/ci"
 )
 
 // Service is the base EA service that extends CI service
@@ -18,7 +18,7 @@ type Service struct {
 	neo4j        *ci.Neo4jService
 	redis        *redis.Client
 	auditService *ci.AuditService
-	logger       *pustakaLogger.Logger
+	logger       *portaLogger.Logger
 }
 
 // NewService creates a new EA service
@@ -29,7 +29,7 @@ func NewService(
 	neo4j *ci.Neo4jService,
 	redis *redis.Client,
 	auditService *ci.AuditService,
-	logger *pustakaLogger.Logger,
+	logger *portaLogger.Logger,
 ) *Service {
 	return &Service{
 		ciService:    ciService,

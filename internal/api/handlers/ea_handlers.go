@@ -8,19 +8,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/api/middleware"
-	"github.com/pustaka/pustaka/internal/ea"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/api/middleware"
+	"github.com/tahopetis/porta/internal/ea"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // EAHandlers handles EA entity HTTP requests
 type EAHandlers struct {
 	eaService *ea.Service
-	logger    *pustakaLogger.Logger
+	logger    *portaLogger.Logger
 }
 
 // NewEAHandlers creates a new EA handlers instance
-func NewEAHandlers(eaService *ea.Service, logger *pustakaLogger.Logger) *EAHandlers {
+func NewEAHandlers(eaService *ea.Service, logger *portaLogger.Logger) *EAHandlers {
 	return &EAHandlers{
 		eaService: eaService,
 		logger:    logger,

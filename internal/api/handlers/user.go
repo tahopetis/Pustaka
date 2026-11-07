@@ -8,17 +8,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/auth"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/auth"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 type UserHandler struct {
 	rbacService *auth.RBACService
 	passwordService *auth.PasswordService
-	logger     *pustakaLogger.Logger
+	logger     *portaLogger.Logger
 }
 
-func NewUserHandler(rbacService *auth.RBACService, passwordService *auth.PasswordService, logger *pustakaLogger.Logger) *UserHandler {
+func NewUserHandler(rbacService *auth.RBACService, passwordService *auth.PasswordService, logger *portaLogger.Logger) *UserHandler {
 	return &UserHandler{
 		rbacService: rbacService,
 		passwordService: passwordService,

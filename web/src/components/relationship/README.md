@@ -1,10 +1,10 @@
 # Relationship Type Management System
 
-This document describes the Vue.js frontend components for managing relationship types in the Pustaka CMDB.
+This document describes the Vue.js frontend components for managing relationship types in the Porta CMDB.
 
 ## Overview
 
-The relationship type management system provides comprehensive functionality for creating, viewing, editing, and managing relationship types between configuration items. This system integrates with the existing Pustaka architecture and follows established patterns.
+The relationship type management system provides comprehensive functionality for creating, viewing, editing, and managing relationship types between configuration items. This system integrates with the existing Porta architecture and follows established patterns.
 
 ## Components
 
@@ -84,7 +84,7 @@ The relationship type management system provides comprehensive functionality for
 
 ### 2. Permission-Based Access Control
 
-The system integrates with Pustaka's RBAC system:
+The system integrates with Porta's RBAC system:
 
 - `relationship-type:read`: View relationship types
 - `relationship-type:create`: Create new relationship types
@@ -159,7 +159,7 @@ import RelationshipTypeFormView from '@/views/relationship-types/RelationshipTyp
 
 ## Styling and Theming
 
-- Uses existing Pustaka CSS classes and design system
+- Uses existing Porta CSS classes and design system
 - Responsive design with mobile-first approach
 - Color customization per relationship type
 - Badge styling with proper contrast ratios

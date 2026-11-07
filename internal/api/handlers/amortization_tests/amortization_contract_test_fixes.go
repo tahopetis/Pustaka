@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/go-chi/chi/v5"
-	"github.com/pustaka/pustaka/internal/api/middleware"
+	"github.com/tahopetis/porta/internal/api/middleware"
 )
 
 // Fix for missing imports and function references in contract tests

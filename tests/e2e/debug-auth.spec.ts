@@ -120,7 +120,7 @@ test.describe('Debug Authentication & Permissions', () => {
           console.log('Has search input:', hasSearch);
 
           // Take screenshot for visual debugging
-          await page.screenshot({ path: '/home/syam/dev/Pustaka/relationship-types-page-debug.png' });
+          await page.screenshot({ path: '/home/syam/dev/Porta/relationship-types-page-debug.png' });
           console.log('✅ Screenshot saved');
 
         } else if (relationshipTypesUrl.includes('/dashboard')) {
@@ -152,7 +152,7 @@ test.describe('Debug Authentication & Permissions', () => {
         console.log('❌ Relationship Types link NOT found in sidebar');
 
         // Take screenshot to see what's actually in the sidebar
-        await page.screenshot({ path: '/home/syam/dev/Pustaka/sidebar-debug.png' });
+        await page.screenshot({ path: '/home/syam/dev/Porta/sidebar-debug.png' });
         console.log('✅ Sidebar screenshot saved');
 
         // List all visible links in sidebar
@@ -174,7 +174,7 @@ test.describe('Debug Authentication & Permissions', () => {
       }
 
       // Take screenshot to see login state
-      await page.screenshot({ path: '/home/syam/dev/Pustaka/login-debug.png' });
+      await page.screenshot({ path: '/home/syam/dev/Porta/login-debug.png' });
       console.log('✅ Login screenshot saved');
     }
 

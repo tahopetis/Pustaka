@@ -1,6 +1,6 @@
 # Advanced CI Search
 
-The Pustaka CMDB now includes powerful JSONB-aware search functionality that allows users to search within CI attributes, not just basic CI fields.
+The Porta CMDB now includes powerful JSONB-aware search functionality that allows users to search within CI attributes, not just basic CI fields.
 
 ## Features
 

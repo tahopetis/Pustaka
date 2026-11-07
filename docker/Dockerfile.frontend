@@ -1,5 +1,7 @@
 # Build stage
-FROM node:18-alpine AS builder
+# The Vite output is platform-independent, so build it natively on the builder
+# platform and only pull the target-arch nginx base for the final stage.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
 
 # Set working directory
 WORKDIR /app

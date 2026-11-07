@@ -1,4 +1,4 @@
--- Initial schema for Pustaka CMDB
+-- Initial schema for Porta CMDB
 -- Supports FSD-compliant flexible JSONB attributes
 
 -- Enable UUID extension

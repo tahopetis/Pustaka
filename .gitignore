@@ -5,7 +5,7 @@
 *.so
 *.dylib
 bin/
-api
+/api
 bdui-*
 
 # Test binary, built with `go test -c`

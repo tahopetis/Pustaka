@@ -1,4 +1,4 @@
-# Pustaka CMDB - UX/UI Specifications
+# Porta CMDB - UX/UI Specifications
 
 **Version**: 1.0
 **Date**: October 14, 2025
@@ -795,4 +795,4 @@ font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
 
 ---
 
-*This UX/UI specification document provides comprehensive guidance for implementing the Pustaka CMDB interface. It ensures consistency, accessibility, and usability across all user interactions while maintaining professional enterprise standards.*
+*This UX/UI specification document provides comprehensive guidance for implementing the Porta CMDB interface. It ensures consistency, accessibility, and usability across all user interactions while maintaining professional enterprise standards.*

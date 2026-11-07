@@ -38,11 +38,11 @@ function generateTestReport() {
   const report = `# User Management Functionality Test Report
 
 **Generated:** ${new Date().toISOString()}
-**Test Environment:** Pustaka CMDB Application
+**Test Environment:** Porta CMDB Application
 
 ## Executive Summary
 
-This report documents the comprehensive testing of the user management functionality in the Pustaka CMDB application. The tests were designed to verify that the previously reported issues have been resolved:
+This report documents the comprehensive testing of the user management functionality in the Porta CMDB application. The tests were designed to verify that the previously reported issues have been resolved:
 
 1. **Issue #1:** /users page showing "No users found" despite having an admin user
 2. **Issue #2:** Add user page returning 404 error

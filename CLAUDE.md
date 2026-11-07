@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Pustaka is a modern, open-source Configuration Management Database (CMDB) built for enterprise IT asset management. It features a hierarchical taxonomy system (Domains → Categories → Subcategories → Configuration Items), relationship mapping, RBAC, audit logging, and graph visualization.
+Porta is a modern, open-source Configuration Management Database (CMDB) built for enterprise IT asset management. It features a hierarchical taxonomy system (Domains → Categories → Subcategories → Configuration Items), relationship mapping, RBAC, audit logging, and graph visualization.
 
 **Architecture:**
 - **Backend**: Go with Chi v5 framework, PostgreSQL for structured data, Neo4j for relationships, Redis for caching
@@ -28,8 +28,10 @@ go test -v ./internal/ci/     # Run tests with verbose output
 go test -cover ./internal/ci/ # Run tests with coverage report
 
 # Development
-make dev                      # Start full dev environment (Docker + migrations)
-make docker-up                # Start only Docker services
+make pull                     # Pull published multi-arch images from GHCR
+make dev                      # Start full dev environment (pulls images + migrations)
+make docker-up                # Start only Docker services (pulls missing images)
+make images-build             # Rebuild images locally (escape hatch; CI normally builds)
 make docker-down              # Stop Docker services
 
 # Code quality
@@ -68,15 +70,15 @@ npm run format                # Format code with Prettier
 ```
 
 ### Docker Services
-- **Frontend**: http://localhost:3000
-- **API**: http://localhost:8080
-- **API Health**: http://localhost:8080/health
-- **Neo4j Browser**: http://localhost:7474
-- **PostgreSQL**: localhost:5432
-- **Redis**: localhost:6379
+- **Frontend**: http://localhost:3001
+- **API**: http://localhost:8081
+- **API Health**: http://localhost:8081/health
+- **Neo4j Browser**: http://localhost:7475
+- **PostgreSQL**: localhost:5433
+- **Redis**: localhost:6380
 
 Default credentials (from `.env.example`):
-- PostgreSQL: pustaka/password
+- PostgreSQL: porta/password
 - Neo4j: neo4j/password
 - Admin user: admin/Admin@123 (created automatically on startup)
 
@@ -216,27 +218,27 @@ web/src/
 ### Debug Commands
 ```bash
 # Check service status
-docker-compose ps
-docker-compose logs postgres
-docker-compose logs neo4j
-docker-compose logs api
-docker-compose logs frontend
+docker compose ps
+docker compose logs postgres
+docker compose logs neo4j
+docker compose logs api
+docker compose logs frontend
 
 # Test API health
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 
 # Verify database connections
-docker exec -it pustaka-postgres psql -U pustaka -d pustaka -c "SELECT 1;"
-docker exec -it pustaka-neo4j cypher-shell -u neo4j -p password "RETURN 1;"
+docker exec -it porta-postgres psql -U porta -d porta -c "SELECT 1;"
+docker exec -it porta-neo4j cypher-shell -u neo4j -p password "RETURN 1;"
 
 # Run specific tests with coverage
 go test -cover ./internal/ci/
 go test -v -run TestSpecificFunction ./internal/ci/
 ```
-- use docker compose down && docker compose up --build -d to rebuild the app after modifying the code
+- images are built and published by GitHub Actions (multi-arch, GHCR); the host only pulls: `docker compose pull && docker compose up -d`
+- use `make images-build` (`docker compose -f docker-compose.yml -f docker-compose.build.yml build`) only when you intentionally rebuild locally — it is slow on low-memory hosts
 - use agents if necessary
 - always assume app runs on docker, so if you want to know the state of the app use docker ps
-- to apply changes, use docker compose down && docker compose up --build -d
 - use agents to help your tasks if necessary
 
 ## Pending Feature: IT Asset Amortization Module
@@ -279,7 +281,7 @@ go test -v -run TestSpecificFunction ./internal/ci/
 
 ### Issue tracker
 
-GitHub Issues in `tahopetis/Pustaka` (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+GitHub Issues in `tahopetis/porta` (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

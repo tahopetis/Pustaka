@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // AuditLoggerInterface defines the audit logging interface
@@ -21,11 +21,11 @@ type AuditLoggerInterface interface {
 // auditLogger implements audit logging for amortization operations
 type auditLogger struct {
 	auditService interface{} // This would be the actual audit service
-	logger      *pustakaLogger.Logger
+	logger      *portaLogger.Logger
 }
 
 // NewAuditLogger creates a new audit logger
-func NewAuditLogger(auditService interface{}, logger *pustakaLogger.Logger) AuditLoggerInterface {
+func NewAuditLogger(auditService interface{}, logger *portaLogger.Logger) AuditLoggerInterface {
 	return &auditLogger{
 		auditService: auditService,
 		logger:      logger,

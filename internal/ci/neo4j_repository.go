@@ -8,15 +8,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 type Neo4jRepository struct {
 	driver neo4j.DriverWithContext
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
-func NewNeo4jRepository(driver neo4j.DriverWithContext, logger *pustakaLogger.Logger) *Neo4jRepository {
+func NewNeo4jRepository(driver neo4j.DriverWithContext, logger *portaLogger.Logger) *Neo4jRepository {
 	return &Neo4jRepository{
 		driver: driver,
 		logger: logger,

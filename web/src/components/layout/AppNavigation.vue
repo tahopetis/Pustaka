@@ -14,7 +14,7 @@
                 </div>
               </div>
               <div class="ml-3">
-                <h1 class="text-xl font-bold text-gray-900">Pustaka</h1>
+                <h1 class="text-xl font-bold text-gray-900">Porta</h1>
                 <p class="text-xs text-gray-500">Configuration Management</p>
               </div>
             </div>

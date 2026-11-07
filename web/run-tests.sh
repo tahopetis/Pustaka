@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# Playwright test runner script for Pustaka graph functionality
+# Playwright test runner script for Porta graph functionality
 # This script sets up the environment and runs the tests
 
 set -e
 
-echo "🎭 Pustaka Graph Functionality Tests"
+echo "🎭 Porta Graph Functionality Tests"
 echo "=================================="
 
 # Check if docker services are running
 echo "📋 Checking if Docker services are running..."
-if ! docker ps | grep -q "pustaka"; then
+if ! docker ps | grep -q "porta"; then
     echo "⚠️  Docker services not running. Starting services..."
-    cd /home/syam/dev/pustaka
+    cd /home/syam/dev/porta
     docker compose up -d
     echo "⏳ Waiting for services to be ready..."
     sleep 30
@@ -39,7 +39,7 @@ else
 fi
 
 # Navigate to web directory
-cd /home/syam/dev/pustaka/web
+cd /home/syam/dev/porta/web
 
 # Install dependencies if needed
 if [ ! -d "node_modules" ]; then

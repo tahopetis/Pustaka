@@ -45,7 +45,7 @@ The amortization test suite consists of several key components:
 ### Prerequisites
 
 - Go 1.19 or higher
-- Access to the Pustaka codebase
+- Access to the Porta codebase
 - Required Go modules:
   ```bash
   go mod tidy
@@ -445,7 +445,7 @@ For integration tests with real database:
 
 ```go
 func setupTestDB() *sql.DB {
-    db, err := sql.Open("postgres", "postgres://test:test@localhost/pustaka_test?sslmode=disable")
+    db, err := sql.Open("postgres", "postgres://test:test@localhost/porta_test?sslmode=disable")
     if err != nil {
         log.Fatal(err)
     }

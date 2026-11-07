@@ -12,7 +12,7 @@ test.describe('Graph Page Functionality (Authenticated)', () => {
 
   test('should display graph page with correct title and elements', async ({ page }) => {
     // Check page title
-    await expect(page).toHaveTitle(/Pustaka/);
+    await expect(page).toHaveTitle(/Porta/);
 
     // Check main heading
     await expect(page.locator('h1.page-title')).toContainText('Graph Visualization');

@@ -1,10 +1,10 @@
 openapi: 3.0.3
 info:
-  title: Pustaka CMDB API
+  title: Porta CMDB API
   description: |
     Configuration Management Database (CMDB) API for managing IT infrastructure components.
 
-    Pustaka provides flexible schema definition for configuration items, comprehensive relationship
+    Porta provides flexible schema definition for configuration items, comprehensive relationship
     management, and advanced search capabilities with JSONB attribute support.
 
     ## Key Features
@@ -42,16 +42,16 @@ info:
     ```
   version: 1.0.0
   contact:
-    name: Pustaka Team
-    email: support@pustaka.dev
-    url: https://pustaka.dev
+    name: Porta Team
+    email: support@porta.dev
+    url: https://porta.dev
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
 servers:
-  - url: https://api.pustaka.dev/v1
+  - url: https://api.porta.dev/v1
     description: Production server
-  - url: https://staging-api.pustaka.dev/v1
+  - url: https://staging-api.porta.dev/v1
     description: Staging server
   - url: http://localhost:8080/api/v1
     description: Development server
@@ -101,7 +101,7 @@ paths:
                   format: password
                   description: User password
               example:
-                email: admin@pustaka.dev
+                email: admin@porta.dev
                 password: securePassword123
       responses:
         '200':
@@ -1245,7 +1245,7 @@ components:
           nullable: true
       example:
         id: "550e8400-e29b-41d4-a716-446655440000"
-        email: "admin@pustaka.dev"
+        email: "admin@porta.dev"
         name: "John Doe"
         role: "admin"
         is_active: true
@@ -1274,7 +1274,7 @@ components:
           type: string
           enum: [admin, user, viewer]
       example:
-        email: "newuser@pustaka.dev"
+        email: "newuser@porta.dev"
         password: "securePassword123"
         name: "Jane Smith"
         role: "user"

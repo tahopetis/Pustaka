@@ -8,18 +8,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/skip2/go-qrcode"
-	"github.com/pustaka/pustaka/internal/ci"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 type QRHandlers struct {
 	*Handler
 	ciService *ci.Service
-	logger    *pustakaLogger.Logger
+	logger    *portaLogger.Logger
 	baseURL   string
 }
 
-func NewQRHandlers(handler *Handler, ciService *ci.Service, logger *pustakaLogger.Logger, baseURL string) *QRHandlers {
+func NewQRHandlers(handler *Handler, ciService *ci.Service, logger *portaLogger.Logger, baseURL string) *QRHandlers {
 	return &QRHandlers{
 		Handler:   handler,
 		ciService: ciService,

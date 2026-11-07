@@ -1,11 +1,11 @@
-# Pustaka CMDB - Documentation Index
+# Porta CMDB - Documentation Index
 
 ## Project Overview
 
 **Type:** Monorepo with 2 parts
 **Primary Language:** TypeScript (Frontend), Go (Backend)
 **Architecture:** SPA with REST API + Multi-database
-**Repository Root:** /home/syam/dev/pustaka
+**Repository Root:** /home/syam/dev/porta
 
 ## Quick Reference
 
@@ -71,7 +71,7 @@
 ### Frontend Part (web/)
 **Type:** Web Application (Vue 3 SPA)
 **Tech Stack:** Vue 3 + TypeScript + Vite + Pinia + Tailwind CSS
-**Root:** /home/syam/dev/pustaka/web/
+**Root:** /home/syam/dev/porta/web/
 
 **Key Components:**
 - State management with Pinia stores
@@ -83,7 +83,7 @@
 ### Backend Part (internal/)
 **Type:** Backend/API Service (Go REST API)
 **Tech Stack:** Go 1.22 + Chi v5 + PostgreSQL + Neo4j + Redis
-**Root:** /home/syam/dev/pustaka/internal/
+**Root:** /home/syam/dev/porta/internal/
 
 **Key Components:**
 - REST API handlers with Chi routing
@@ -143,7 +143,7 @@ go run cmd/api/main.go                  # Start backend API server
 
 ### Default Credentials
 - **Admin User:** admin / Admin@123
-- **PostgreSQL:** pustaka / password
+- **PostgreSQL:** porta / password
 - **Neo4j:** neo4j / password
 
 ## Development Commands

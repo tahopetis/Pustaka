@@ -1,4 +1,4 @@
-# Pustaka CMDB - Epics and User Stories
+# Porta CMDB - Epics and User Stories
 
 **Version**: 1.0
 **Date**: October 14, 2025
@@ -711,4 +711,4 @@ Ensure system performance meets enterprise requirements through optimization and
 
 ---
 
-*These epics and user stories provide a comprehensive roadmap for enhancing the Pustaka CMDB. Each story builds upon the existing solid foundation while addressing enterprise-scale needs.*
+*These epics and user stories provide a comprehensive roadmap for enhancing the Porta CMDB. Each story builds upon the existing solid foundation while addressing enterprise-scale needs.*

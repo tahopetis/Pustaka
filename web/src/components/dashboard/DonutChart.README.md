@@ -1,6 +1,6 @@
 # DonutChart Component
 
-A fully-featured D3.js donut chart component for the Pustaka CMDB dashboard, designed for displaying distribution data with interactive features and accessible design.
+A fully-featured D3.js donut chart component for the Porta CMDB dashboard, designed for displaying distribution data with interactive features and accessible design.
 
 ## Overview
 
@@ -33,7 +33,7 @@ The DonutChart component is part of Phase 2 of the Dashboard Enhancement Plan an
 
 The component is located at:
 ```
-/home/tahopetis/dev/pustaka/web/src/components/dashboard/DonutChart.vue
+/home/tahopetis/dev/porta/web/src/components/dashboard/DonutChart.vue
 ```
 
 ## Usage
@@ -254,7 +254,7 @@ Segment: "Servers: 45 (45%)"
 
 ### Unit Tests
 
-Location: `/home/tahopetis/dev/pustaka/web/src/components/dashboard/DonutChart.test.ts`
+Location: `/home/tahopetis/dev/porta/web/src/components/dashboard/DonutChart.test.ts`
 
 Test coverage includes:
 - Basic rendering
@@ -407,10 +407,10 @@ Potential improvements for future versions:
 
 ## Files
 
-- **Component**: `/home/tahopetis/dev/pustaka/web/src/components/dashboard/DonutChart.vue`
-- **Tests**: `/home/tahopetis/dev/pustaka/web/src/components/dashboard/DonutChart.test.ts`
-- **Examples**: `/home/tahopetis/dev/pustaka/web/src/components/dashboard/DonutChart.example.md`
-- **Types**: `/home/tahopetis/dev/pustaka/web/src/types/dashboard.ts`
+- **Component**: `/home/tahopetis/dev/porta/web/src/components/dashboard/DonutChart.vue`
+- **Tests**: `/home/tahopetis/dev/porta/web/src/components/dashboard/DonutChart.test.ts`
+- **Examples**: `/home/tahopetis/dev/porta/web/src/components/dashboard/DonutChart.example.md`
+- **Types**: `/home/tahopetis/dev/porta/web/src/types/dashboard.ts`
 
 ## Support
 

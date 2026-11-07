@@ -7,24 +7,24 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/api/middleware"
-	"github.com/pustaka/pustaka/internal/auth"
-	"github.com/pustaka/pustaka/internal/ci"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/api/middleware"
+	"github.com/tahopetis/porta/internal/auth"
+	"github.com/tahopetis/porta/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // LifecycleStatusHandler handles HTTP requests for lifecycle statuses
 type LifecycleStatusHandler struct {
 	lifecycleStatusService *ci.LifecycleStatusService
 	rbacService           *auth.RBACService
-	logger                *pustakaLogger.Logger
+	logger                *portaLogger.Logger
 }
 
 // NewLifecycleStatusHandler creates a new lifecycle status handler
 func NewLifecycleStatusHandler(
 	lifecycleStatusService *ci.LifecycleStatusService,
 	rbacService *auth.RBACService,
-	logger *pustakaLogger.Logger,
+	logger *portaLogger.Logger,
 ) *LifecycleStatusHandler {
 	return &LifecycleStatusHandler{
 		lifecycleStatusService: lifecycleStatusService,

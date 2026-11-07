@@ -1,6 +1,6 @@
 # User Management E2E Test Suite
 
-This directory contains comprehensive end-to-end tests for the Pustaka CMDB user management functionality, specifically designed to verify that previously reported issues have been resolved.
+This directory contains comprehensive end-to-end tests for the Porta CMDB user management functionality, specifically designed to verify that previously reported issues have been resolved.
 
 ## Test Coverage
 
@@ -21,9 +21,9 @@ This directory contains comprehensive end-to-end tests for the Pustaka CMDB user
 
 ## Prerequisites
 
-1. **Application Running:** Ensure the Pustaka CMDB application is running on `http://localhost:3000`
+1. **Application Running:** Ensure the Porta CMDB application is running on `http://localhost:3000`
    ```bash
-   cd /home/syam/dev/pustaka
+   cd /home/syam/dev/porta
    make dev
    ```
 

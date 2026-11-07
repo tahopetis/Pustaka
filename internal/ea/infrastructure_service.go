@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/ci"
+	"github.com/tahopetis/porta/internal/ci"
 )
 
 // InfrastructureService handles Infrastructure domain EA operations

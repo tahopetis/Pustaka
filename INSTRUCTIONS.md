@@ -4,12 +4,12 @@
 
 The worktree has already been created at:
 ```bash
-/home/tahopetis/dev/pustaka-ci-sidebar-refactor
+/home/tahopetis/dev/porta
 ```
 
 ### Navigate to Worktree
 ```bash
-cd /home/tahopetis/dev/pustaka-ci-sidebar-refactor
+cd /home/tahopetis/dev/porta
 ```
 
 ### Verify Current Branch
@@ -73,7 +73,7 @@ nano web/src/router/index.ts
 
 ```bash
 # From worktree directory
-cd /home/tahopetis/dev/pustaka-ci-sidebar-refactor
+cd /home/tahopetis/dev/porta
 
 # Stop existing containers
 docker compose down
@@ -82,8 +82,8 @@ docker compose down
 docker compose up --build -d
 
 # Check logs
-docker logs -f pustaka-sidebar-refactor-frontend
-docker logs -f pustaka-sidebar-refactor-api
+docker logs -f porta-frontend
+docker logs -f porta-api
 
 # Access app
 # Frontend: http://localhost:3001
@@ -94,11 +94,11 @@ docker logs -f pustaka-sidebar-refactor-api
 
 ```bash
 # Terminal 1 - Backend
-cd /home/tahopetis/dev/pustaka-ci-sidebar-refactor
+cd /home/tahopetis/dev/porta
 go run cmd/api/main.go
 
 # Terminal 2 - Frontend
-cd /home/tahopetis/dev/pustaka-ci-sidebar-refactor/web
+cd /home/tahopetis/dev/porta/web
 npm run dev
 ```
 
@@ -205,4 +205,4 @@ git checkout main
 
 - `PLAN.md` - Detailed implementation plan with code
 - `INSTRUCTIONS.md` - This file
-- Current worktree: `/home/tahopetis/dev/pustaka-ci-sidebar-refactor`
+- Current worktree: `/home/tahopetis/dev/porta`

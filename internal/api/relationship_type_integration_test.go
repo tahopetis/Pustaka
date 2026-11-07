@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/pustaka/pustaka/internal/api/handlers"
-	"github.com/pustaka/pustaka/internal/auth"
-	"github.com/pustaka/pustaka/internal/ci"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/api/handlers"
+	"github.com/tahopetis/porta/internal/auth"
+	"github.com/tahopetis/porta/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // RelationshipTypeIntegrationTestSuite tests the relationship type API endpoints
@@ -28,14 +28,12 @@ type RelationshipTypeIntegrationTestSuite struct {
 	adminToken      string
 	userToken       string
 	testUserID      uuid.UUID
-	logger          *pustakaLogger.Logger
+	logger          *portaLogger.Logger
 }
 
 func (suite *RelationshipTypeIntegrationTestSuite) SetupSuite() {
 	// Initialize logger
-	logger, err := pustakaLogger.NewLogger("debug")
-	require.NoError(suite.T(), err)
-	suite.logger = logger
+	suite.logger = portaLogger.New(portaLogger.Config{Level: "debug"})
 
 	// This would normally use a real database setup
 	// For now, we'll create a simplified test setup

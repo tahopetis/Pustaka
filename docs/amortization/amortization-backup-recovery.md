@@ -79,7 +79,7 @@ postgres:
 #### Continuous WAL Archiving
 ```bash
 # WAL-G Configuration for Continuous Backup
-export WALG_S3_PREFIX="s3://pustaka-backups/amortization/wal"
+export WALG_S3_PREFIX="s3://porta-backups/amortization/wal"
 export WALG_S3_STORAGE_CLASS="STANDARD_IA"
 export WALG_DELTA_MAX_STEPS="8"
 export WALG_COMPRESSION_METHOD="lz4"
@@ -99,7 +99,7 @@ BACKUP_DIR="/backups/amortization/daily/${BACKUP_DATE}"
 mkdir -p "${BACKUP_DIR}"
 
 # Export amortization tables
-pg_dump -h localhost -U pustaka -d pustaka \
+pg_dump -h localhost -U porta -d porta \
   --schema=public \
   --table=amortization_ledger \
   --table=configuration_items \
@@ -118,7 +118,7 @@ pg_restore --list "${BACKUP_DIR}/amortization_${BACKUP_DATE}.dump" > "${BACKUP_D
 sha256sum "${BACKUP_DIR}/amortization_${BACKUP_DATE}.dump" > "${BACKUP_DIR}/amortization_${BACKUP_DATE}.sha256"
 
 # Upload to cloud storage
-aws s3 cp "${BACKUP_DIR}/" s3://pustaka-backups/amortization/daily/${BACKUP_DATE}/ --recursive
+aws s3 cp "${BACKUP_DIR}/" s3://porta-backups/amortization/daily/${BACKUP_DATE}/ --recursive
 ```
 
 ### 2. Point-in-Time Recovery (PITR) Configuration
@@ -150,7 +150,7 @@ create_recovery_point() {
     local point_name=$1
     local description=$2
 
-    psql -h localhost -U pustaka -d pustaka << EOF
+    psql -h localhost -U porta -d porta << EOF
 INSERT INTO recovery_points (point_name, recovery_timestamp, description)
 VALUES ('${point_name}', NOW(), '${description}')
 RETURNING id, recovery_timestamp;
@@ -187,7 +187,7 @@ rm -rf /var/lib/postgresql/data/*
 
 # Step 3: Restore base backup
 echo "Restoring base backup..."
-pg_restore -h localhost -U pustaka -d pustaka \
+pg_restore -h localhost -U porta -d porta \
   --clean --if-exists --verbose \
   "/backups/amortization/daily/${BACKUP_DATE}/amortization_${BACKUP_DATE}.dump"
 
@@ -207,14 +207,14 @@ EOF
 docker-compose up -d postgres
 
 # Step 7: Monitor recovery progress
-while ! pg_isready -h localhost -p 5432 -U pustaka; do
+while ! pg_isready -h localhost -p 5432 -U porta; do
     echo "Waiting for database to become ready..."
     sleep 10
 done
 
 # Step 8: Verify data integrity
 echo "Verifying data integrity..."
-psql -h localhost -U pustaka -d pustaka << EOF
+psql -h localhost -U porta -d porta << EOF
 -- Verify ledger integrity
 SELECT COUNT(*) as total_ledger_entries FROM amortization_ledger;
 SELECT COUNT(*) as total_cis_with_financials
@@ -247,13 +247,13 @@ CORRUPTION_DATE=$2
 echo "Recovering ledger entries for CI: ${CI_ID} from ${CORRUPTION_DATE}"
 
 # Step 1: Create backup of current state
-pg_dump -h localhost -U pustaka -d pustaka \
+pg_dump -h localhost -U porta -d porta \
   --data-only --table=amortization_ledger \
   --where="ci_id = '${CI_ID}'" \
   > "/tmp/ci_${CI_ID}_backup_$(date +%Y%m%d_%H%M%S).sql"
 
 # Step 2: Remove corrupted entries
-psql -h localhost -U pustaka -d pustaka << EOF
+psql -h localhost -U porta -d porta << EOF
 DELETE FROM amortization_ledger
 WHERE ci_id = '${CI_ID}'
 AND entry_date >= '${CORRUPTION_DATE}';
@@ -265,7 +265,7 @@ AND reporting_date >= '${CORRUPTION_DATE}';
 EOF
 
 # Step 3: Recalculate current book value
-psql -h localhost -U pustaka -d pustaka << EOF
+psql -h localhost -U porta -d porta << EOF
 -- Update CI current book value from last valid ledger entry
 UPDATE configuration_items
 SET current_book_value = (
@@ -443,12 +443,12 @@ INTEGRITY_LOG="/var/log/amortization/integrity_check_$(date +%Y%m%d).log"
 echo "Starting daily amortization integrity check at $(date)" >> ${INTEGRITY_LOG}
 
 # Run integrity checks
-psql -h localhost -U pustuka -d pustaka -c "
+psql -h localhost -U pustuka -d porta -c "
 SELECT * FROM verify_amortization_integrity();
 " >> ${INTEGRITY_LOG} 2>&1
 
 # Check for failures
-FAILED_CHECKS=$(psql -h localhost -U pustaka -d pustaka -t -c "
+FAILED_CHECKS=$(psql -h localhost -U porta -d porta -t -c "
 SELECT COUNT(*) FROM verify_amortization_integrity() WHERE status = 'FAIL';
 ")
 
@@ -560,7 +560,7 @@ ARCHIVAL_CUTOFF_YEAR=$((${ARCHIVAL_YEAR} - 7))
 echo "Starting archival process for data older than ${ARCHIVAL_CUTOFF_YEAR}"
 
 # Step 1: Create archival backup
-pg_dump -h localhost -U pustaka -d pustaka \
+pg_dump -h localhost -U porta -d porta \
   --table=amortization_ledger \
   --where="entry_date < '${ARCHIVAL_CUTOFF_YEAR}-01-01'" \
   --format=custom \
@@ -569,11 +569,11 @@ pg_dump -h localhost -U pustaka -d pustaka \
 
 # Step 2: Export to cold storage
 aws s3 cp "/backups/amortization/archival/ledger_before_${ARCHIVAL_CUTOFF_YEAR}.dump" \
-  "s3://pustaka-archives/amortization/ledger_before_${ARCHIVAL_CUTOFF_YEAR}.dump" \
+  "s3://porta-archives/amortization/ledger_before_${ARCHIVAL_CUTOFF_YEAR}.dump" \
   --storage-class GLACIER
 
 # Step 3: Create summary of archived data
-psql -h localhost -U pustaka -d pustaka << EOF
+psql -h localhost -U porta -d porta << EOF
 CREATE TABLE amortization_ledger_archived_${ARCHIVAL_CUTOFF_YEAR} AS
 SELECT
     ci_id,
@@ -594,7 +594,7 @@ read -p "Continue with deletion? (y/N): " -n 1 -r
 echo
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    psql -h localhost -U pustaka -d pustaka << EOF
+    psql -h localhost -U porta -d porta << EOF
 DELETE FROM amortization_ledger
 WHERE entry_date < '${ARCHIVAL_CUTOFF_YEAR}-01-01';
 
@@ -649,7 +649,7 @@ BACKUP_SUCCESS_LOG="/var/log/amortization/backup_status.log"
 ALERT_THRESHOLD_HOURS=24
 
 # Check last successful backup
-LAST_BACKUP=$(aws s3 ls s3://pustaka-backups/amortization/daily/ --recursive | sort | tail -n 1)
+LAST_BACKUP=$(aws s3 ls s3://porta-backups/amortization/daily/ --recursive | sort | tail -n 1)
 BACKUP_TIMESTAMP=$(echo ${LAST_BACKUP} | awk '{print $1, $2}')
 
 # Convert to epoch time for comparison
@@ -674,15 +674,15 @@ fi
 #!/bin/bash
 # Monthly disaster recovery test
 TEST_DATE=$(date +%Y%m%d)
-TEST_DB="pustaka_amortization_test_${TEST_DATE}"
-TEST_CONTAINER="pustaka-test-${TEST_DATE}"
+TEST_DB="porta_amortization_test_${TEST_DATE}"
+TEST_CONTAINER="porta-test-${TEST_DATE}"
 
 echo "Starting monthly recovery test at $(date)"
 
 # Step 1: Create test database
 docker run -d --name ${TEST_CONTAINER} \
   -e POSTGRES_DB=${TEST_DB} \
-  -e POSTGRES_USER=pustaka \
+  -e POSTGRES_USER=porta \
   -e POSTGRES_PASSWORD=password \
   postgres:15
 
@@ -690,18 +690,18 @@ docker run -d --name ${TEST_CONTAINER} \
 sleep 30
 
 # Step 2: Test restoration from latest backup
-docker exec ${TEST_CONTAINER} createdb -U pustaka ${TEST_DB}
+docker exec ${TEST_CONTAINER} createdb -U porta ${TEST_DB}
 
-LATEST_BACKUP=$(aws s3 ls s3://pustaka-backups/amortization/daily/ --recursive | grep "dump" | sort | tail -n 1 | awk '{print $4}')
-aws s3 cp "s3://pustaka-backups/amortization/daily/${LATEST_BACKUP}" /tmp/test_restore.dump
+LATEST_BACKUP=$(aws s3 ls s3://porta-backups/amortization/daily/ --recursive | grep "dump" | sort | tail -n 1 | awk '{print $4}')
+aws s3 cp "s3://porta-backups/amortization/daily/${LATEST_BACKUP}" /tmp/test_restore.dump
 
 docker cp /tmp/test_restore.dump ${TEST_CONTAINER}:/tmp/test_restore.dump
 
 # Step 3: Restore and verify
-docker exec ${TEST_CONTAINER} pg_restore -U pustaka -d ${TEST_DB} /tmp/test_restore.dump
+docker exec ${TEST_CONTAINER} pg_restore -U porta -d ${TEST_DB} /tmp/test_restore.dump
 
 # Step 4: Verify data integrity
-RESTORE_RESULT=$(docker exec ${TEST_CONTAINER} psql -U pustaka -d ${TEST_DB} -t -c "
+RESTORE_RESULT=$(docker exec ${TEST_CONTAINER} psql -U porta -d ${TEST_DB} -t -c "
 SELECT COUNT(*) FROM amortization_ledger;
 SELECT COUNT(*) FROM configuration_items WHERE purchase_cost IS NOT NULL;
 ")

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Pustaka CMDB - Comprehensive E2E Tests', () => {
+test.describe('Porta CMDB - Comprehensive E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
     // Set up console logging to capture any errors
     page.on('console', (message) => {

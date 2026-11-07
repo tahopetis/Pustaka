@@ -321,7 +321,7 @@ Complete all items to verify CSV import functionality:
 - **Check:** API is accessible (curl http://localhost:8080/health)
 
 ### Issue: Validation passes but import fails
-- **Check:** Database connection (docker logs pustaka-api)
+- **Check:** Database connection (docker logs porta-api)
 - **Check:** Required foreign keys exist (lifecycle_statuses, ea_teams)
 - **Check:** API logs for specific error messages
 
@@ -332,8 +332,8 @@ Complete all items to verify CSV import functionality:
 
 ### Issue: Import is slow
 - **Check:** CSV row count (should be < 1000 rows for manual testing)
-- **Check:** Database performance (docker logs pustaka-postgres)
-- **Check:** API container resources (docker stats pustaka-api)
+- **Check:** Database performance (docker logs porta-postgres)
+- **Check:** API container resources (docker stats porta-api)
 
 ---
 

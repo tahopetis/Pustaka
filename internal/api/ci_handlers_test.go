@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/pustaka/pustaka/internal/ci"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // MockCIService from testify/mock for more granular testing
@@ -80,12 +80,12 @@ func (m *MockCIServiceWithMock) GetGraphData(ctx context.Context, filters ci.Gra
 type CIHandlerSuite struct {
 	suite.Suite
 	mockCI *MockCIServiceWithMock
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
 func (suite *CIHandlerSuite) SetupTest() {
 	suite.mockCI = new(MockCIServiceWithMock)
-	suite.logger = pustakaLogger.New(pustakaLogger.Config{Level: "info"})
+	suite.logger = portaLogger.New(portaLogger.Config{Level: "info"})
 }
 
 func (suite *CIHandlerSuite) TestCreateCI() {

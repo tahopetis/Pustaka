@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/pustaka/pustaka/internal/ci"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // MockCITypeService is a mock implementation of the CI type service interface
@@ -64,12 +64,12 @@ func (m *MockCITypeService) DeleteCIType(ctx context.Context, ciTypeID uuid.UUID
 type CITypeHandlerSuite struct {
 	suite.Suite
 	mockCIType *MockCITypeService
-	logger     *pustakaLogger.Logger
+	logger     *portaLogger.Logger
 }
 
 func (suite *CITypeHandlerSuite) SetupTest() {
 	suite.mockCIType = new(MockCITypeService)
-	suite.logger = pustakaLogger.New(pustakaLogger.Config{Level: "info"})
+	suite.logger = portaLogger.New(portaLogger.Config{Level: "info"})
 }
 
 func (suite *CITypeHandlerSuite) TestCreateCIType() {

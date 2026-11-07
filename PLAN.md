@@ -22,7 +22,7 @@ Configuration Items (collapsible)
 ## Worktree Location
 
 ```bash
-/home/tahopetis/dev/pustaka-ci-sidebar-refactor
+/home/tahopetis/dev/porta
 ```
 
 ## Current State Analysis
@@ -389,7 +389,7 @@ After implementation, verify:
 If issues occur:
 ```bash
 # Switch back to main branch
-cd /home/tahopetis/dev/pustaka-ci-sidebar-refactor
+cd /home/tahopetis/dev/porta
 git checkout main
 
 # Or view changes

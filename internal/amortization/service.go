@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // service implements the Service interface
@@ -19,7 +19,7 @@ type service struct {
 	auditLogger      AuditLoggerInterface
 	ciService        CIServiceInterface
 	lifecycleService LifecycleServiceInterface
-	logger           *pustakaLogger.Logger
+	logger           *portaLogger.Logger
 }
 
 // NewAmortizationService creates a new amortization service
@@ -32,7 +32,7 @@ func NewAmortizationService(
 	auditLogger AuditLoggerInterface,
 	ciService CIServiceInterface,
 	lifecycleService LifecycleServiceInterface,
-	logger *pustakaLogger.Logger,
+	logger *portaLogger.Logger,
 ) Service {
 	return &service{
 		repo:             repo,

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // EventPublisherInterface defines the event publishing interface
@@ -21,11 +21,11 @@ type EventPublisherInterface interface {
 
 // eventPublisher implements event publishing for amortization operations
 type eventPublisher struct {
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
 // NewEventPublisher creates a new event publisher
-func NewEventPublisher(logger *pustakaLogger.Logger) EventPublisherInterface {
+func NewEventPublisher(logger *portaLogger.Logger) EventPublisherInterface {
 	return &eventPublisher{
 		logger: logger,
 	}

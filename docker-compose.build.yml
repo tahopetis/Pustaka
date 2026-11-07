@@ -1,0 +1,20 @@
+# Local build override for the published Porta images.
+#
+# Normal operation pulls pre-built multi-arch images from GHCR (see
+# docker-compose.yml). GitHub Actions is the source of truth for those images;
+# this override exists only for offline/local rebuilds:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml build
+#
+# Nothing here changes at runtime; the services keep their published image
+# names, and `docker compose up` only pulls an image when it is missing locally,
+# so a locally built image is the one that runs.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend

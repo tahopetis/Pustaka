@@ -1,6 +1,6 @@
-# Pustaka Graph Functionality Tests
+# Porta Graph Functionality Tests
 
-This directory contains Playwright end-to-end tests for the Pustaka graph page functionality.
+This directory contains Playwright end-to-end tests for the Porta graph page functionality.
 
 ## Test Coverage
 
@@ -40,7 +40,7 @@ The tests verify the following functionality:
 
 1. Docker services must be running:
    ```bash
-   cd /home/syam/dev/pustaka
+   cd /home/syam/dev/porta
    docker compose up -d
    ```
 
@@ -50,7 +50,7 @@ The tests verify the following functionality:
 ### Install Dependencies
 
 ```bash
-cd /home/syam/dev/pustaka/web
+cd /home/syam/dev/porta/web
 npm install
 npx playwright install
 ```
@@ -114,7 +114,7 @@ The `auth-helper.ts` file handles automatic login before running tests.
 ### Issues with Docker Services
 If tests fail due to services not being available:
 ```bash
-cd /home/syam/dev/pustaka
+cd /home/syam/dev/porta
 docker compose down
 docker compose up -d
 # Wait for services to be ready (30-60 seconds)

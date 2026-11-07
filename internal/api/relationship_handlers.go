@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/api/middleware"
-	"github.com/pustaka/pustaka/internal/ci"
+	"github.com/tahopetis/porta/internal/api/middleware"
+	"github.com/tahopetis/porta/internal/ci"
 )
 
 type RelationshipHandlers struct {

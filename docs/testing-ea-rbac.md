@@ -20,7 +20,7 @@ The EA module implements RBAC using four permissions:
 
 ## Prerequisites
 
-1. Running Pustaka API server (http://localhost:8080)
+1. Running Porta API server (http://localhost:8080)
 2. PostgreSQL database with EA permissions seeded (migration 010_ea_permissions.sql)
 3. Test users with different roles:
    - Admin user (has all EA permissions)
@@ -438,7 +438,7 @@ ORDER BY r.name, p.name;
 **Cause:** EA permissions not seeded in database
 
 **Solution:**
-- Run migration: `docker compose exec -T postgres psql -U pustaka -d pustaka < cmd/migrations/010_ea_permissions.sql`
+- Run migration: `docker compose exec -T postgres psql -U porta -d porta < cmd/migrations/010_ea_permissions.sql`
 - Verify permissions exist: `SELECT * FROM permissions WHERE name LIKE 'ea:%';`
 
 ## Summary

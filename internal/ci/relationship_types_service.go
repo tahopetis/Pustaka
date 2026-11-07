@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // RelationshipTypeService handles business logic for relationship types
@@ -20,7 +20,7 @@ type RelationshipTypeService struct {
 	neo4jService *Neo4jService
 	redis        *redis.Client
 	auditService *AuditService
-	logger       *pustakaLogger.Logger
+	logger       *portaLogger.Logger
 	db           *pgxpool.Pool
 }
 
@@ -30,7 +30,7 @@ func NewRelationshipTypeService(
 	neo4jService *Neo4jService,
 	redis *redis.Client,
 	auditService *AuditService,
-	logger *pustakaLogger.Logger,
+	logger *portaLogger.Logger,
 	db *pgxpool.Pool,
 ) *RelationshipTypeService {
 	return &RelationshipTypeService{

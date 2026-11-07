@@ -1,6 +1,6 @@
-# Pustaka API Examples
+# Porta API Examples
 
-This document provides practical examples for using the Pustaka CMDB API, including curl commands, JavaScript SDK usage, and common integration patterns.
+This document provides practical examples for using the Porta CMDB API, including curl commands, JavaScript SDK usage, and common integration patterns.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ This document provides practical examples for using the Pustaka CMDB API, includ
 response=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@pustaka.dev",
+    "email": "admin@porta.dev",
     "password": "securePassword123"
   }')
 
@@ -51,17 +51,17 @@ echo "New Access Token: $new_access_token"
 ### JavaScript SDK Authentication
 
 ```javascript
-import { PustakaAPI } from '@pustaka/api-client';
+import { PortaAPI } from '@porta/api-client';
 
 // Initialize the API client
-const api = new PustakaAPI({
+const api = new PortaAPI({
   baseURL: 'http://localhost:8080/api/v1',
   apiKey: 'your-access-token'
 });
 
 // Or authenticate with credentials
 const user = await api.auth.login({
-  email: 'admin@pustaka.dev',
+  email: 'admin@porta.dev',
   password: 'securePassword123'
 });
 
@@ -79,7 +79,7 @@ curl -X POST http://localhost:8080/api/v1/users \
   -H "Authorization: Bearer $access_token" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "newuser@pustaka.dev",
+    "email": "newuser@porta.dev",
     "password": "securePassword123",
     "name": "Jane Smith",
     "role": "user"
@@ -443,9 +443,9 @@ curl -X GET "http://localhost:8080/api/v1/audit/export?start_date=2023-01-01T00:
 ### JavaScript SDK Basic Usage
 
 ```javascript
-import { PustakaAPI } from '@pustaka/api-client';
+import { PortaAPI } from '@porta/api-client';
 
-const api = new PustakaAPI({
+const api = new PortaAPI({
   baseURL: 'http://localhost:8080/api/v1',
   apiKey: 'your-access-token'
 });
@@ -487,11 +487,11 @@ console.log(`Found ${graph.nodes.length} nodes and ${graph.edges.length} edges`)
 ### Python SDK Integration
 
 ```python
-import pustaka_sdk
+import porta_sdk
 import json
 
 # Initialize client
-client = pustaka_sdk.Client(
+client = porta_sdk.Client(
     base_url='http://localhost:8080/api/v1',
     api_key='your-access-token'
 )
@@ -549,13 +549,13 @@ import (
     "fmt"
     "log"
 
-    "github.com/pustaka/pustaka-go"
-    "github.com/pustaka/pustaka-go/models"
+    "github.com/tahopetis/porta-go"
+    "github.com/tahopetis/porta-go/models"
 )
 
 func main() {
     // Initialize client
-    client := pustaka.NewClient(&pustaka.ClientConfig{
+    client := porta.NewClient(&porta.ClientConfig{
         BaseURL: "http://localhost:8080/api/v1",
         APIKey:  "your-access-token",
     })
@@ -755,7 +755,7 @@ echo "$stats" | jq -r '.actions_by_type | to_entries[] | "  \(.key): \(.value)"'
 echo "Compliance report saved to compliance-report-$date.txt"
 ```
 
-These examples provide a comprehensive foundation for integrating with the Pustaka CMDB API. Remember to:
+These examples provide a comprehensive foundation for integrating with the Porta CMDB API. Remember to:
 
 1. Always handle authentication securely
 2. Implement proper error handling

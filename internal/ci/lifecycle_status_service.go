@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // LifecycleStatusService handles business logic for lifecycle statuses
@@ -17,7 +17,7 @@ type LifecycleStatusService struct {
 	ciRepo       *Repository
 	redis        *redis.Client
 	auditService *AuditService
-	logger       *pustakaLogger.Logger
+	logger       *portaLogger.Logger
 }
 
 func NewLifecycleStatusService(
@@ -25,7 +25,7 @@ func NewLifecycleStatusService(
 	ciRepo *Repository,
 	redis *redis.Client,
 	auditService *AuditService,
-	logger *pustakaLogger.Logger,
+	logger *portaLogger.Logger,
 ) *LifecycleStatusService {
 	return &LifecycleStatusService{
 		repo:         repo,

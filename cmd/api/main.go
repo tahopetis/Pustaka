@@ -15,20 +15,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/pustaka/pustaka/internal/amortization"
-	"github.com/pustaka/pustaka/internal/api"
-	"github.com/pustaka/pustaka/internal/api/handlers"
-	"github.com/pustaka/pustaka/internal/api/middleware"
-	"github.com/pustaka/pustaka/internal/auth"
-	"github.com/pustaka/pustaka/internal/ci"
-	"github.com/pustaka/pustaka/internal/config"
-	"github.com/pustaka/pustaka/internal/database"
-	"github.com/pustaka/pustaka/internal/ea"
-	"github.com/pustaka/pustaka/internal/repository"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/amortization"
+	"github.com/tahopetis/porta/internal/api"
+	"github.com/tahopetis/porta/internal/api/handlers"
+	"github.com/tahopetis/porta/internal/api/middleware"
+	"github.com/tahopetis/porta/internal/auth"
+	"github.com/tahopetis/porta/internal/ci"
+	"github.com/tahopetis/porta/internal/config"
+	"github.com/tahopetis/porta/internal/database"
+	"github.com/tahopetis/porta/internal/ea"
+	"github.com/tahopetis/porta/internal/repository"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
-func initializeAdminUser(pool *pgxpool.Pool, rbacService *auth.RBACService, passwordService *auth.PasswordService, adminConfig config.AdminConfig, logger *pustakaLogger.Logger) error {
+func initializeAdminUser(pool *pgxpool.Pool, rbacService *auth.RBACService, passwordService *auth.PasswordService, adminConfig config.AdminConfig, logger *portaLogger.Logger) error {
 	ctx := context.Background()
 
 	// Hash the admin password
@@ -114,7 +114,7 @@ func main() {
 	}
 
 	// Initialize logger
-	logger := pustakaLogger.New(pustakaLogger.Config{
+	logger := portaLogger.New(portaLogger.Config{
 		Level:  cfg.Logging.Level,
 		Format: cfg.Logging.Format,
 	})
@@ -122,7 +122,7 @@ func main() {
 	logger.Info().
 		Str("version", "1.0.0").
 		Str("environment", cfg.Env).
-		Msg("Starting Pustaka API Server")
+		Msg("Starting Porta API Server")
 
 	// Initialize databases first (needed for admin user creation)
 	postgresDB, err := database.NewPostgresDB(
@@ -198,7 +198,7 @@ func main() {
 		cfg.JWT.Secret,
 		cfg.JWT.AccessTokenTTL,
 		cfg.JWT.RefreshTokenTTL,
-		"pustaka",
+		"porta",
 	)
 
 	// Create CI services
@@ -339,7 +339,7 @@ func main() {
 
 func setupRouter(
 	cfg *config.Config,
-	logger *pustakaLogger.Logger,
+	logger *portaLogger.Logger,
 	authHandler *handlers.AuthHandler,
 	userHandler *handlers.UserHandler,
 	ciHandlers *api.CIHandlers,

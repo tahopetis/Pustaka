@@ -623,7 +623,6 @@ func (m *MockAmortizationService) matchesLedgerFilters(entry *AmortizationEntry,
 	}
 
 	if len(filters.EntryTypes) > 0 {
-	if len(filters.EntryTypes) > 0 {
 		found := false
 		for _, entryType := range filters.EntryTypes {
 			if entry.EntryType == entryType {

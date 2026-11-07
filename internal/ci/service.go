@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 type Service struct {
@@ -17,10 +17,10 @@ type Service struct {
 	neo4j        *Neo4jService
 	redis        *redis.Client
 	auditService *AuditService
-	logger       *pustakaLogger.Logger
+	logger       *portaLogger.Logger
 }
 
-func NewService(db *Repository, neo4j *Neo4jService, redis *redis.Client, auditService *AuditService, logger *pustakaLogger.Logger) *Service {
+func NewService(db *Repository, neo4j *Neo4jService, redis *redis.Client, auditService *AuditService, logger *portaLogger.Logger) *Service {
 	return &Service{
 		repo:         db,
 		neo4j:        neo4j,

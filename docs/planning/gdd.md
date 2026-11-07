@@ -1,4 +1,4 @@
-# Pustaka CMDB - Game Design Document (Technical Architecture)
+# Porta CMDB - Game Design Document (Technical Architecture)
 
 **Version**: 1.0
 **Date**: October 14, 2025
@@ -8,7 +8,7 @@
 ## Technical Architecture Overview
 
 ### System Philosophy
-Pustaka CMDB follows a "Data-First, Relationship-Centric" architecture where:
+Porta CMDB follows a "Data-First, Relationship-Centric" architecture where:
 - Data integrity is paramount (PostgreSQL as source of truth)
 - Relationships are first-class citizens (Neo4j for graph operations)
 - Performance is achieved through intelligent caching (Redis)
@@ -77,7 +77,7 @@ func NewPostgresDBWithHealthCheck(config DatabaseConfig) (*pgxpool.Pool, error) 
 // Enhanced Neo4j service with connection pooling
 type Neo4jService struct {
     driver      neo4j.DriverWithContext
-    logger      *pustakaLogger.Logger
+    logger      *portaLogger.Logger
     queryCache  *sync.Map // Query result caching
     metrics     *Neo4jMetrics
 }
@@ -288,7 +288,7 @@ func (s *JWTService) GenerateTokenPair(userID uuid.UUID, roles []string) (*Token
 type EnhancedRBACService struct {
     db          *pgxpool.Pool
     cache       *RedisCache
-    logger      *pustakaLogger.Logger
+    logger      *portaLogger.Logger
     policies    *PolicyEngine
 }
 
@@ -864,8 +864,8 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_DB: pustaka
-      POSTGRES_USER: pustaka
+      POSTGRES_DB: porta
+      POSTGRES_USER: porta
       POSTGRES_PASSWORD: password
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -873,7 +873,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pustaka"]
+      test: ["CMD-SHELL", "pg_isready -U porta"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -911,7 +911,7 @@ services:
   api:
     build: .
     environment:
-      DATABASE_URL: postgres://pustaka:password@postgres:5432/pustaka
+      DATABASE_URL: postgres://porta:password@postgres:5432/porta
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USERNAME: neo4j
       NEO4J_PASSWORD: password
@@ -1035,7 +1035,7 @@ jobs:
       run: npm run build
 
     - name: Build Go binary
-      run: go build -o pustaka cmd/api/main.go
+      run: go build -o porta cmd/api/main.go
 
     - name: Run integration tests
       run: go test -v ./tests/integration/...
@@ -1055,8 +1055,8 @@ jobs:
     - name: Build Docker image
       if: github.ref == 'refs/heads/main'
       run: |
-        docker build -t pustaka:${{ github.sha }} .
-        docker tag pustaka:${{ github.sha }} pustaka:latest
+        docker build -t porta:${{ github.sha }} .
+        docker tag porta:${{ github.sha }} porta:latest
 ```
 
 ## Implementation Phases

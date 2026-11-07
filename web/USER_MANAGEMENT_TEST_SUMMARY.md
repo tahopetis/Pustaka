@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document summarizes the comprehensive Playwright E2E test suite created to verify that the user management functionality issues in the Pustaka CMDB application have been successfully resolved.
+This document summarizes the comprehensive Playwright E2E test suite created to verify that the user management functionality issues in the Porta CMDB application have been successfully resolved.
 
 ## Original Issues
 

@@ -9,14 +9,14 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // RunMigrations executes all pending database migrations
 // databaseURL: PostgreSQL connection string
 // migrationsPath: Path to migrations directory (can be relative or absolute)
 // logger: Logger instance for logging migration progress
-func RunMigrations(databaseURL string, migrationsPath string, logger *pustakaLogger.Logger) error {
+func RunMigrations(databaseURL string, migrationsPath string, logger *portaLogger.Logger) error {
 	// Convert to absolute path if relative
 	if !filepath.IsAbs(migrationsPath) {
 		abs, err := filepath.Abs(migrationsPath)

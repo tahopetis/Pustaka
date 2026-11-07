@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the comprehensive database schema and design decisions for the IT Asset Amortization Module integrated with the Pustaka CMDB system. The module provides automated depreciation tracking, financial audit trails, and status-aware amortization calculations.
+This document describes the comprehensive database schema and design decisions for the IT Asset Amortization Module integrated with the Porta CMDB system. The module provides automated depreciation tracking, financial audit trails, and status-aware amortization calculations.
 
 ## Architecture Summary
 
@@ -594,7 +594,7 @@ FROM (
 
 ## Conclusion
 
-The IT Asset Amortization Module provides a robust, scalable, and auditable solution for tracking IT asset depreciation within the Pustaka CMDB system. The design emphasizes data integrity, performance optimization, and financial compliance while maintaining seamless integration with existing CMDB functionality.
+The IT Asset Amortization Module provides a robust, scalable, and auditable solution for tracking IT asset depreciation within the Porta CMDB system. The design emphasizes data integrity, performance optimization, and financial compliance while maintaining seamless integration with existing CMDB functionality.
 
 Key strengths of the design:
 - **Financial Integrity**: Immutable ledger with complete audit trail

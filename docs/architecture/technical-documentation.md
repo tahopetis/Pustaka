@@ -1,4 +1,4 @@
-# Pustaka CMDB - Comprehensive Technical Documentation
+# Porta CMDB - Comprehensive Technical Documentation
 
 ## Table of Contents
 1. [Executive Summary](#executive-summary)
@@ -17,7 +17,7 @@
 
 ## Executive Summary
 
-Pustaka is a modern Configuration Management Database (CMDB) built with a microservices-oriented architecture. It features a hierarchical taxonomy system for IT assets, comprehensive relationship mapping, role-based access control, audit logging, and graph visualization capabilities. The system supports flexible schema definitions (FSD-compliant) and provides both REST APIs and a web interface for managing configuration items and their relationships.
+Porta is a modern Configuration Management Database (CMDB) built with a microservices-oriented architecture. It features a hierarchical taxonomy system for IT assets, comprehensive relationship mapping, role-based access control, audit logging, and graph visualization capabilities. The system supports flexible schema definitions (FSD-compliant) and provides both REST APIs and a web interface for managing configuration items and their relationships.
 
 ### Key Characteristics
 - **Multi-database Architecture**: PostgreSQL for structured data, Neo4j for relationships, Redis for caching
@@ -678,7 +678,7 @@ type CIRepository interface {
 
 type postgresCIRepository struct {
     db     *pgxpool.Pool
-    logger *pustakaLogger.Logger
+    logger *portaLogger.Logger
 }
 ```
 
@@ -689,7 +689,7 @@ type CIService struct {
     neo4jService  *Neo4jService
     redisClient   *redis.Client
     auditService  *AuditService
-    logger        *pustakaLogger.Logger
+    logger        *portaLogger.Logger
 }
 
 func (s *CIService) CreateCI(ctx context.Context, req *CreateCIRequest, userID uuid.UUID) (*ConfigurationItem, error) {
@@ -1122,4 +1122,4 @@ func (h *HealthHandler) Check(w http.ResponseWriter, r *http.Request) {
 - **System Metrics**: Infrastructure monitoring
 - **Application Metrics**: Performance indicators
 
-This comprehensive technical documentation provides a thorough understanding of the Pustaka CMDB architecture, patterns, and implementation details. It serves as a reference for developers, architects, and operations teams working with the system.
+This comprehensive technical documentation provides a thorough understanding of the Porta CMDB architecture, patterns, and implementation details. It serves as a reference for developers, architects, and operations teams working with the system.

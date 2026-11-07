@@ -1,6 +1,6 @@
-# Pustaka API Guide
+# Porta API Guide
 
-This guide provides comprehensive documentation for using the Pustaka CMDB API, including authentication, usage examples, and best practices.
+This guide provides comprehensive documentation for using the Porta CMDB API, including authentication, usage examples, and best practices.
 
 ## Table of Contents
 
@@ -22,8 +22,8 @@ This guide provides comprehensive documentation for using the Pustaka CMDB API, 
 
 ### Base URL
 ```
-Production: https://api.pustaka.dev/v1
-Staging: https://staging-api.pustaka.dev/v1
+Production: https://api.porta.dev/v1
+Staging: https://staging-api.porta.dev/v1
 Development: http://localhost:8080/api/v1
 ```
 
@@ -31,24 +31,24 @@ Development: http://localhost:8080/api/v1
 
 ```bash
 # 1. Authenticate
-curl -X POST https://api.pustaka.dev/v1/auth/login \
+curl -X POST https://api.porta.dev/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@pustaka.dev",
+    "email": "admin@porta.dev",
     "password": "your-password"
   }'
 
 # Response contains access_token and refresh_token
 
 # 2. Use the access token to make authenticated requests
-curl -X GET https://api.pustaka.dev/v1/ci \
+curl -X GET https://api.porta.dev/v1/ci \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -H "Content-Type: application/json"
 ```
 
 ## Authentication
 
-Pustaka uses JWT (JSON Web Token) authentication. You'll receive two tokens when logging in:
+Porta uses JWT (JSON Web Token) authentication. You'll receive two tokens when logging in:
 
 - **Access Token**: Short-lived (15 minutes by default) token for API requests
 - **Refresh Token**: Long-lived (7 days by default) token for obtaining new access tokens
@@ -466,9 +466,9 @@ Authorization: Bearer YOUR_TOKEN
 
 ### Official SDKs
 
-- **JavaScript/TypeScript**: `npm install @pustaka/api-client`
-- **Python**: `pip install pustaka-sdk`
-- **Go**: `go get github.com/pustaka/pustaka-go`
+- **JavaScript/TypeScript**: `npm install @porta/api-client`
+- **Python**: `pip install porta-sdk`
+- **Go**: `go get github.com/tahopetis/porta-go`
 
 ### Third-Party Tools
 
@@ -479,10 +479,10 @@ Authorization: Bearer YOUR_TOKEN
 ### Example: JavaScript SDK
 
 ```javascript
-import { PustakaAPI } from '@pustaka/api-client';
+import { PortaAPI } from '@porta/api-client';
 
-const client = new PustakaAPI({
-  baseURL: 'https://api.pustaka.dev/v1',
+const client = new PortaAPI({
+  baseURL: 'https://api.porta.dev/v1',
   apiKey: 'your-access-token'
 });
 
@@ -569,10 +569,10 @@ const newCI = await client.ci.create({
 
 ## Support and Resources
 
-- **Documentation**: https://docs.pustaka.dev
-- **API Reference**: https://api.pustaka.dev/docs
-- **Community**: https://community.pustaka.dev
-- **Support**: support@pustaka.dev
-- **Status Page**: https://status.pustaka.dev
+- **Documentation**: https://docs.porta.dev
+- **API Reference**: https://api.porta.dev/docs
+- **Community**: https://community.porta.dev
+- **Support**: support@porta.dev
+- **Status Page**: https://status.porta.dev
 
 For additional help, check the [OpenAPI specification](./openapi.yaml) for detailed endpoint documentation.

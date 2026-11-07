@@ -1,7 +1,7 @@
 {
-  "name": "pustaka-frontend",
+  "name": "porta-frontend",
   "version": "1.0.0",
-  "description": "Pustaka CMDB Frontend",
+  "description": "Porta CMDB Frontend",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -56,6 +56,6 @@
     "typescript",
     "vite"
   ],
-  "author": "Pustaka Team",
+  "author": "Porta Team",
   "license": "MIT"
 }

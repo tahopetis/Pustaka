@@ -323,7 +323,7 @@ Verify data_quality_score persisted correctly.
 ### Database Query
 
 ```bash
-docker exec -it pustaka-postgres psql -U pustaka -d pustaka -c "
+docker exec -it porta-postgres psql -U porta -d porta -c "
   SELECT
     id,
     name,

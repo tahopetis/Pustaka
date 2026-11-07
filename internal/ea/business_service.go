@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/ci"
+	"github.com/tahopetis/porta/internal/ci"
 )
 
 // BusinessService handles Business domain EA operations

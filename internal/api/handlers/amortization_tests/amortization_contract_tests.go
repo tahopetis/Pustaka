@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/pustaka/pustaka/internal/api/middleware"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/api/middleware"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // AmortizationContractTestSuite provides comprehensive contract testing
@@ -26,14 +26,14 @@ type AmortizationContractTestSuite struct {
 	handler        *AmortizationHandler
 	mockService    *MockAmortizationService
 	router         *httptest.Server
-	logger         *pustakaLogger.Logger
+	logger         *portaLogger.Logger
 	adminUserID    uuid.UUID
 	userUserID     uuid.UUID
 	validAuthToken string
 }
 
 func (suite *AmortizationContractTestSuite) SetupSuite() {
-	suite.logger = pustakaLogger.NewLogger()
+	suite.logger = portaLogger.Default()
 	suite.mockService = NewMockAmortizationService()
 	suite.handler = NewAmortizationHandler(suite.mockService, suite.logger)
 

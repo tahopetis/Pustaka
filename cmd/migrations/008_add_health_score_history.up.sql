@@ -59,7 +59,7 @@ COMMENT ON COLUMN health_score_history.compliant_cis IS 'Number of CIs following
 INSERT INTO users (username, email, password_hash, is_active, created_at, updated_at)
 VALUES (
     'admin',
-    'admin@pustaka.local',
+    'admin@porta.local',
     '$argon2id$v=19$m=65536,t=3,p=4$y5XhcR4fSJK6YqL8cJZx6g$W9wKjXKmYLqKo4XhNXpGvQXLvLHqRqJqLZhBKDqYQYE',
     true,
     NOW(),
