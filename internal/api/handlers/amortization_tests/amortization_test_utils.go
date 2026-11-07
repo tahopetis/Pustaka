@@ -26,15 +26,15 @@ func (f *TestDataFactory) CreateTestCI() *AmortizableCI {
 	return &AmortizableCI{
 		ID:                     uuid.New(),
 		Name:                   fmt.Sprintf("Test-Server-%04d", f.rand.Intn(10000)),
-		CIType:                 f.randomChoice([]string{"Server", "Database", "Laptop", "Network", "Storage"}),
+		CIType:                 randomChoice(f, []string{"Server", "Database", "Laptop", "Network", "Storage"}),
 		CITypeID:               uuid.New(),
 		PurchaseCost:           f.randomFloat(1000.0, 50000.0),
 		SalvageValue:           f.randomFloat(50.0, 2500.0),
 		UsefulLifeMonths:       f.randomInt(12, 120),
 		CurrentBookValue:       0.0, // Will be calculated
 		AccumulatedDepreciation: 0.0, // Will be calculated
-		DepreciationMethod:     f.randomChoice([]string{"straight_line", "declining_balance"}),
-		AmortizationBehavior:   f.randomChoice([]string{"pending", "active", "terminal"}),
+		DepreciationMethod:     randomChoice(f, []string{"straight_line", "declining_balance"}),
+		AmortizationBehavior:   randomChoice(f, []string{"pending", "active", "terminal"}),
 		IsAmortizable:          f.rand.Intn(10) > 1, // 90% chance of being amortizable
 		CreatedAt:              time.Now().AddDate(0, -f.rand.Intn(24), -f.rand.Intn(30)),
 		CreatedBy:              uuid.New(),
@@ -42,8 +42,8 @@ func (f *TestDataFactory) CreateTestCI() *AmortizableCI {
 			"hostname":    fmt.Sprintf("host-%04d", f.rand.Intn(10000)),
 			"ip_address":  fmt.Sprintf("10.0.%d.%d", f.rand.Intn(255), f.rand.Intn(255)),
 			"cpu_cores":   f.randomInt(2, 32),
-			"memory_gb":   f.randomChoice([]int{8, 16, 32, 64, 128}),
-			"environment": f.randomChoice([]string{"production", "staging", "development"}),
+			"memory_gb":   randomChoice(f, []int{8, 16, 32, 64, 128}),
+			"environment": randomChoice(f, []string{"production", "staging", "development"}),
 		},
 		Tags: f.randomTags(),
 	}
@@ -68,7 +68,7 @@ func (f *TestDataFactory) CreateTestLedgerEntry(ciID uuid.UUID) *AmortizationEnt
 
 	description := ""
 	if entryType != "monthly_depreciation" {
-		description = f.randomChoice([]string{
+		description = randomChoice(f, []string{
 			"Correction for calculation error",
 			"Asset revaluation",
 			"Disposal write-off",
@@ -172,7 +172,7 @@ func (f *TestDataFactory) CreateTestAmortizationRun() *AmortizationRun {
 	}
 
 	if status == "failed" {
-		errorMsg := f.randomChoice([]string{
+		errorMsg := randomChoice(f, []string{
 			"Database connection timeout",
 			"Insufficient permissions",
 			"Calculation overflow",
@@ -227,7 +227,7 @@ func (f *TestDataFactory) CreateTestAmortizationSummary(groupBy string) *Amortiz
 
 // Helper methods
 
-func (f *TestDataFactory) randomChoice[T any](slice []T) T {
+func randomChoice[T any](f *TestDataFactory, slice []T) T {
 	return slice[f.rand.Intn(len(slice))]
 }
 
