@@ -11,17 +11,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // repository implements the Repository interface
 type repository struct {
 	db     *pgxpool.Pool
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
 // NewRepository creates a new amortization repository
-func NewRepository(db *pgxpool.Pool, logger *pustakaLogger.Logger) Repository {
+func NewRepository(db *pgxpool.Pool, logger *portaLogger.Logger) Repository {
 	return &repository{
 		db:     db,
 		logger: logger,

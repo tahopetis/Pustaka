@@ -5,18 +5,18 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pustaka/pustaka/internal/repository"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/repository"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // DataQualityHandlers handles data quality HTTP requests
 type DataQualityHandlers struct {
 	qualityRepo *repository.EADataQualityRepository
-	logger      *pustakaLogger.Logger
+	logger      *portaLogger.Logger
 }
 
 // NewDataQualityHandlers creates a new data quality handlers instance
-func NewDataQualityHandlers(qualityRepo *repository.EADataQualityRepository, logger *pustakaLogger.Logger) *DataQualityHandlers {
+func NewDataQualityHandlers(qualityRepo *repository.EADataQualityRepository, logger *portaLogger.Logger) *DataQualityHandlers {
 	return &DataQualityHandlers{
 		qualityRepo: qualityRepo,
 		logger:      logger,

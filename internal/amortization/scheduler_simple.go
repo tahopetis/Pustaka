@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // Helper function to create string pointer
@@ -18,11 +18,11 @@ func stringPtr(s string) *string {
 type schedulerSimple struct {
 	repo      Repository
 	calculator CalculatorInterface
-	logger     *pustakaLogger.Logger
+	logger     *portaLogger.Logger
 }
 
 // NewScheduler creates a new amortization scheduler
-func NewScheduler(repo Repository, cache CacheRepositoryInterface, logger *pustakaLogger.Logger) SchedulerInterface {
+func NewScheduler(repo Repository, cache CacheRepositoryInterface, logger *portaLogger.Logger) SchedulerInterface {
 	calculator := NewCalculator(logger)
 	return &schedulerSimple{
 		repo:      repo,

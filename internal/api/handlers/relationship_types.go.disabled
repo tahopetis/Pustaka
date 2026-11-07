@@ -10,18 +10,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/ci"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // RelationshipTypeHandler handles relationship type operations
 type RelationshipTypeHandler struct {
 	service *ci.RelationshipTypeService
-	logger  *pustakaLogger.Logger
+	logger  *portaLogger.Logger
 }
 
 // NewRelationshipTypeHandler creates a new relationship type handler
-func NewRelationshipTypeHandler(service *ci.RelationshipTypeService, logger *pustakaLogger.Logger) *RelationshipTypeHandler {
+func NewRelationshipTypeHandler(service *ci.RelationshipTypeService, logger *portaLogger.Logger) *RelationshipTypeHandler {
 	return &RelationshipTypeHandler{
 		service: service,
 		logger:  logger,

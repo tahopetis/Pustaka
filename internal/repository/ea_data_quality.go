@@ -6,17 +6,17 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // EADataQualityRepository handles data quality queries for EA entities
 type EADataQualityRepository struct {
 	db     *pgxpool.Pool
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
 // NewEADataQualityRepository creates a new EA data quality repository
-func NewEADataQualityRepository(db *pgxpool.Pool, logger *pustakaLogger.Logger) *EADataQualityRepository {
+func NewEADataQualityRepository(db *pgxpool.Pool, logger *portaLogger.Logger) *EADataQualityRepository {
 	return &EADataQualityRepository{
 		db:     db,
 		logger: logger,

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/pustaka/pustaka/internal/testutils"
+	"github.com/tahopetis/porta/internal/testutils"
 )
 
 type CIServiceSuite struct {

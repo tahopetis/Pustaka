@@ -11,19 +11,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/amortization"
-	"github.com/pustaka/pustaka/internal/api/middleware"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/amortization"
+	"github.com/tahopetis/porta/internal/api/middleware"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // AmortizationHandler handles amortization HTTP requests
 type AmortizationHandler struct {
 	service amortization.Service
-	logger  *pustakaLogger.Logger
+	logger  *portaLogger.Logger
 }
 
 // NewAmortizationHandler creates a new amortization handler
-func NewAmortizationHandler(service amortization.Service, logger *pustakaLogger.Logger) *AmortizationHandler {
+func NewAmortizationHandler(service amortization.Service, logger *portaLogger.Logger) *AmortizationHandler {
 	return &AmortizationHandler{
 		service: service,
 		logger:  logger,

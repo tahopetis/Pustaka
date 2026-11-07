@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pustaka/pustaka/internal/auth"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/auth"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 type contextKey string
@@ -97,7 +97,7 @@ func OptionalAuth(jwtService *auth.JWTService) func(http.Handler) http.Handler {
 }
 
 // AuditLogging creates an audit logging middleware
-func AuditLogging(rbacService *auth.RBACService, logger *pustakaLogger.Logger) func(http.Handler) http.Handler {
+func AuditLogging(rbacService *auth.RBACService, logger *portaLogger.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip audit logging for GET requests and health checks
@@ -144,7 +144,7 @@ func hasPermission(user *auth.JWTClaims, permission string) bool {
 	return false
 }
 
-func logAuditEvent(r *http.Request, user *auth.JWTClaims, statusCode int, logger *pustakaLogger.Logger) {
+func logAuditEvent(r *http.Request, user *auth.JWTClaims, statusCode int, logger *portaLogger.Logger) {
 	// Only log successful operations (2xx status codes)
 	if statusCode < 200 || statusCode >= 300 {
 		return

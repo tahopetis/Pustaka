@@ -12,18 +12,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
-	"github.com/pustaka/pustaka/internal/ea"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
+	"github.com/tahopetis/porta/internal/ea"
 )
 
 // ImportHandlers handles EA entity import operations
 type ImportHandlers struct {
 	importService *ea.ImportService
-	logger        *pustakaLogger.Logger
+	logger        *portaLogger.Logger
 }
 
 // NewImportHandlers creates a new import handlers instance
-func NewImportHandlers(importService *ea.ImportService, logger *pustakaLogger.Logger) *ImportHandlers {
+func NewImportHandlers(importService *ea.ImportService, logger *portaLogger.Logger) *ImportHandlers {
 	return &ImportHandlers{
 		importService: importService,
 		logger:        logger,

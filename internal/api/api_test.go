@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/ci"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // Mock CI Service for testing
@@ -122,7 +122,7 @@ func (m *MockCIService) GetMostConnectedCIs(ctx context.Context, limit int) ([]c
 
 func TestHealthCheck(t *testing.T) {
 	// Setup
-	logger := pustakaLogger.Default()
+	logger := portaLogger.Default()
 	mockService := NewMockCIService()
 	router := NewRouter(mockService, logger)
 
@@ -153,7 +153,7 @@ func TestHealthCheck(t *testing.T) {
 
 func TestCreateCI(t *testing.T) {
 	// Setup
-	logger := pustakaLogger.Default()
+	logger := portaLogger.Default()
 	mockService := NewMockCIService()
 	router := NewRouter(mockService, logger)
 
@@ -200,7 +200,7 @@ func TestCreateCI(t *testing.T) {
 
 func TestListCIs(t *testing.T) {
 	// Setup
-	logger := pustakaLogger.Default()
+	logger := portaLogger.Default()
 	mockService := NewMockCIService()
 	router := NewRouter(mockService, logger)
 

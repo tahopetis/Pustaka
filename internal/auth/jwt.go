@@ -47,7 +47,7 @@ func (j *JWTService) GenerateAccessToken(userID uuid.UUID, username, email strin
 			ID:        uuid.New().String(),
 			Issuer:    j.issuer,
 			Subject:   userID.String(),
-			Audience:  []string{"pustaka"},
+			Audience:  []string{"porta"},
 			ExpiresAt: jwt.NewNumericDate(now.Add(j.accessTokenTTL)),
 			NotBefore: jwt.NewNumericDate(now),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -65,7 +65,7 @@ func (j *JWTService) GenerateRefreshToken(userID uuid.UUID) (string, error) {
 		ID:        uuid.New().String(),
 		Issuer:    j.issuer,
 		Subject:   userID.String(),
-		Audience:  []string{"pustaka-refresh"},
+		Audience:  []string{"porta-refresh"},
 		ExpiresAt: jwt.NewNumericDate(now.Add(j.refreshTokenTTL)),
 		NotBefore: jwt.NewNumericDate(now),
 		IssuedAt:  jwt.NewNumericDate(now),
@@ -107,7 +107,7 @@ func (j *JWTService) ValidateToken(tokenString string) (*JWTClaims, error) {
 	}
 
 	// Validate audience
-	if !verifyAudience(claims.Audience, "pustaka") {
+	if !verifyAudience(claims.Audience, "porta") {
 		return nil, errors.New("invalid token audience")
 	}
 
@@ -145,7 +145,7 @@ func (j *JWTService) ValidateRefreshToken(tokenString string) (uuid.UUID, error)
 	}
 
 	// Validate audience
-	if !verifyAudience(claims.Audience, "pustaka-refresh") {
+	if !verifyAudience(claims.Audience, "porta-refresh") {
 		return uuid.Nil, errors.New("invalid token audience")
 	}
 

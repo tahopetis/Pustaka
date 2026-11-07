@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/pustaka/pustaka/internal/api/middleware"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/api/middleware"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // AmortizationIntegrationTestSuite provides end-to-end testing of the amortization API
@@ -26,7 +26,7 @@ type AmortizationIntegrationTestSuite struct {
 	handler        *AmortizationHandler
 	mockService    *MockAmortizationService
 	router         chi.Router
-	logger         *pustakaLogger.Logger
+	logger         *portaLogger.Logger
 	adminUserID    uuid.UUID
 	userUserID     uuid.UUID
 	testCIs        map[uuid.UUID]*AmortizableCI
@@ -35,7 +35,7 @@ type AmortizationIntegrationTestSuite struct {
 }
 
 func (suite *AmortizationIntegrationTestSuite) SetupSuite() {
-	suite.logger = pustakaLogger.Default()
+	suite.logger = portaLogger.Default()
 	suite.mockService = NewMockAmortizationService()
 	suite.handler = NewAmortizationHandler(suite.mockService, suite.logger)
 

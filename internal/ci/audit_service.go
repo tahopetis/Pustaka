@@ -5,16 +5,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 type AuditService struct {
 	repo   AuditLogRepository
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
 // NewAuditService creates a new audit service
-func NewAuditService(repo AuditLogRepository, logger *pustakaLogger.Logger) *AuditService {
+func NewAuditService(repo AuditLogRepository, logger *portaLogger.Logger) *AuditService {
 	return &AuditService{
 		repo:   repo,
 		logger: logger,

@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // calculatorSimple implements the CalculatorInterface
 type calculatorSimple struct {
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
 // NewCalculator creates a new depreciation calculator
-func NewCalculator(logger *pustakaLogger.Logger) CalculatorInterface {
+func NewCalculator(logger *portaLogger.Logger) CalculatorInterface {
 	return &calculatorSimple{
 		logger: logger,
 	}

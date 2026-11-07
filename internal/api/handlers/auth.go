@@ -4,19 +4,19 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/pustaka/pustaka/internal/auth"
-	"github.com/pustaka/pustaka/internal/api/middleware"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	"github.com/tahopetis/porta/internal/auth"
+	"github.com/tahopetis/porta/internal/api/middleware"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 type AuthHandler struct {
 	jwtService     *auth.JWTService
 	passwordService *auth.PasswordService
 	rbacService    *auth.RBACService
-	logger         *pustakaLogger.Logger
+	logger         *portaLogger.Logger
 }
 
-func NewAuthHandler(jwtService *auth.JWTService, passwordService *auth.PasswordService, rbacService *auth.RBACService, logger *pustakaLogger.Logger) *AuthHandler {
+func NewAuthHandler(jwtService *auth.JWTService, passwordService *auth.PasswordService, rbacService *auth.RBACService, logger *portaLogger.Logger) *AuthHandler {
 	return &AuthHandler{
 		jwtService:     jwtService,
 		passwordService: passwordService,

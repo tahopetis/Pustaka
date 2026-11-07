@@ -8,18 +8,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // CacheRepository implements caching operations for amortization using Redis
 type CacheRepository struct {
 	client    *redis.Client
-	logger    *pustakaLogger.Logger
+	logger    *portaLogger.Logger
 	keyPrefix string
 }
 
 // NewCacheRepository creates a new cache repository
-func NewCacheRepository(client *redis.Client, logger *pustakaLogger.Logger) *CacheRepository {
+func NewCacheRepository(client *redis.Client, logger *portaLogger.Logger) *CacheRepository {
 	return &CacheRepository{
 		client:    client,
 		logger:    logger,

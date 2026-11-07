@@ -10,16 +10,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 type auditLogRepository struct {
 	pool   *pgxpool.Pool
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
 // NewAuditLogRepository creates a new audit log repository
-func NewAuditLogRepository(pool *pgxpool.Pool, logger *pustakaLogger.Logger) AuditLogRepository {
+func NewAuditLogRepository(pool *pgxpool.Pool, logger *portaLogger.Logger) AuditLogRepository {
 	return &auditLogRepository{
 		pool:   pool,
 		logger: logger,

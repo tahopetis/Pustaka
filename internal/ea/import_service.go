@@ -11,8 +11,8 @@ import (
 
 	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
-	"github.com/pustaka/pustaka/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
+	"github.com/tahopetis/porta/internal/ci"
 )
 
 // ImportService handles CSV import operations for EA entities
@@ -20,11 +20,11 @@ type ImportService struct {
 	repo                 *Repository
 	ciRepo               *ci.Repository
 	lifecycleStatusRepo  *ci.LifecycleStatusRepository
-	logger               *pustakaLogger.Logger
+	logger               *portaLogger.Logger
 }
 
 // NewImportService creates a new import service
-func NewImportService(repo *Repository, ciRepo *ci.Repository, lifecycleStatusRepo *ci.LifecycleStatusRepository, logger *pustakaLogger.Logger) *ImportService {
+func NewImportService(repo *Repository, ciRepo *ci.Repository, lifecycleStatusRepo *ci.LifecycleStatusRepository, logger *portaLogger.Logger) *ImportService {
 	return &ImportService{
 		repo:                repo,
 		ciRepo:              ciRepo,

@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // Logger is a middleware that logs HTTP requests
@@ -23,7 +23,7 @@ func Logger(next http.Handler) http.Handler {
 
 		// Log request
 		duration := time.Since(start)
-		pustakaLogger.Default().Info().
+		portaLogger.Default().Info().
 			Str("method", r.Method).
 			Str("path", r.URL.Path).
 			Str("remote_addr", r.RemoteAddr).
@@ -34,7 +34,7 @@ func Logger(next http.Handler) http.Handler {
 }
 
 type requestLogger struct {
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
 func (l *requestLogger) Print(v interface{}) {
@@ -62,7 +62,7 @@ func (l *requestLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 
 type logEntry struct {
 	request *http.Request
-	logger  *pustakaLogger.Logger
+	logger  *portaLogger.Logger
 }
 
 func (e *logEntry) Write(status, bytes int, header http.Header, elapsed time.Duration, extra interface{}) {

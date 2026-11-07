@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 // MockRelationshipTypeRepository is a mock for the RelationshipTypeRepository interface
@@ -98,14 +98,14 @@ type RelationshipTypeServiceTestSuite struct {
 	suite.Suite
 	service  *RelationshipTypeService
 	repo     *MockRelationshipTypeRepository
-	logger   *pustakaLogger.Logger
+	logger   *portaLogger.Logger
 	ctx      context.Context
 	userID   uuid.UUID
 }
 
 func (suite *RelationshipTypeServiceTestSuite) SetupTest() {
 	suite.repo = new(MockRelationshipTypeRepository)
-	suite.logger = pustakaLogger.New(pustakaLogger.Config{Level: "debug"})
+	suite.logger = portaLogger.New(portaLogger.Config{Level: "debug"})
 	suite.service = NewRelationshipTypeService(suite.repo, suite.logger)
 	suite.ctx = context.Background()
 	suite.userID = uuid.New()

@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
-	"github.com/pustaka/pustaka/internal/ci"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
+	"github.com/tahopetis/porta/internal/ci"
 )
 
 type Router struct {
@@ -18,7 +18,7 @@ type Router struct {
 
 func NewRouter(
 	ciService *ci.Service,
-	logger *pustakaLogger.Logger,
+	logger *portaLogger.Logger,
 ) *Router {
 	router := mux.NewRouter()
 
@@ -105,7 +105,7 @@ func (r *Router) setupRoutes() {
 func (r *Router) healthCheck(w http.ResponseWriter, req *http.Request) {
 	r.ciHandlers.writeJSON(w, http.StatusOK, map[string]string{
 		"status": "healthy",
-		"service": "pustaka-cmdb-api",
+		"service": "porta-cmdb-api",
 		"version": "1.0.0",
 	})
 }

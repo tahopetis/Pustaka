@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/pustaka/pustaka/internal/ci"
+	"github.com/tahopetis/porta/internal/ci"
 )
 
 // DataService handles Data domain EA operations

@@ -8,14 +8,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	pustakaLogger "github.com/pustaka/pustaka/pkg/logger"
+	portaLogger "github.com/tahopetis/porta/pkg/logger"
 )
 
 type Handler struct {
-	logger *pustakaLogger.Logger
+	logger *portaLogger.Logger
 }
 
-func NewHandler(logger *pustakaLogger.Logger) *Handler {
+func NewHandler(logger *portaLogger.Logger) *Handler {
 	return &Handler{
 		logger: logger,
 	}

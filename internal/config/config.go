@@ -110,43 +110,43 @@ func Load() (*Config, error) {
 	viper.AutomaticEnv()
 
 	// Bind environment variables to config keys
-	viper.BindEnv("database.url", "DATABASE_URL", "PUSTAKA_DATABASE_URL")
-	viper.BindEnv("database.max_open_conns", "DATABASE_MAX_OPEN_CONNS", "PUSTAKA_DATABASE_MAX_OPEN_CONNS")
-	viper.BindEnv("database.max_idle_conns", "DATABASE_MAX_IDLE_CONNS", "PUSTAKA_DATABASE_MAX_IDLE_CONNS")
-	viper.BindEnv("database.conn_max_lifetime", "DATABASE_CONN_MAX_LIFETIME", "PUSTAKA_DATABASE_CONN_MAX_LIFETIME")
+	viper.BindEnv("database.url", "DATABASE_URL", "PORTA_DATABASE_URL")
+	viper.BindEnv("database.max_open_conns", "DATABASE_MAX_OPEN_CONNS", "PORTA_DATABASE_MAX_OPEN_CONNS")
+	viper.BindEnv("database.max_idle_conns", "DATABASE_MAX_IDLE_CONNS", "PORTA_DATABASE_MAX_IDLE_CONNS")
+	viper.BindEnv("database.conn_max_lifetime", "DATABASE_CONN_MAX_LIFETIME", "PORTA_DATABASE_CONN_MAX_LIFETIME")
 
-	viper.BindEnv("neo4j.uri", "NEO4J_URL", "PUSTAKA_NEO4J_URI")
-	viper.BindEnv("neo4j.username", "NEO4J_USERNAME", "PUSTAKA_NEO4J_USERNAME")
-	viper.BindEnv("neo4j.password", "NEO4J_PASSWORD", "PUSTAKA_NEO4J_PASSWORD")
-	viper.BindEnv("neo4j.database", "NEO4J_DATABASE", "PUSTAKA_NEO4J_DATABASE")
-	viper.BindEnv("neo4j.max_pool", "NEO4J_MAX_POOL", "PUSTAKA_NEO4J_MAX_POOL")
+	viper.BindEnv("neo4j.uri", "NEO4J_URL", "PORTA_NEO4J_URI")
+	viper.BindEnv("neo4j.username", "NEO4J_USERNAME", "PORTA_NEO4J_USERNAME")
+	viper.BindEnv("neo4j.password", "NEO4J_PASSWORD", "PORTA_NEO4J_PASSWORD")
+	viper.BindEnv("neo4j.database", "NEO4J_DATABASE", "PORTA_NEO4J_DATABASE")
+	viper.BindEnv("neo4j.max_pool", "NEO4J_MAX_POOL", "PORTA_NEO4J_MAX_POOL")
 
-	viper.BindEnv("redis.url", "REDIS_URL", "PUSTAKA_REDIS_URL")
-	viper.BindEnv("redis.password", "REDIS_PASSWORD", "PUSTAKA_REDIS_PASSWORD")
-	viper.BindEnv("redis.pool_size", "REDIS_POOL_SIZE", "PUSTAKA_REDIS_POOL_SIZE")
+	viper.BindEnv("redis.url", "REDIS_URL", "PORTA_REDIS_URL")
+	viper.BindEnv("redis.password", "REDIS_PASSWORD", "PORTA_REDIS_PASSWORD")
+	viper.BindEnv("redis.pool_size", "REDIS_POOL_SIZE", "PORTA_REDIS_POOL_SIZE")
 
-	viper.BindEnv("jwt.secret", "JWT_SECRET", "PUSTAKA_JWT_SECRET")
-	viper.BindEnv("jwt.access_token_ttl", "JWT_ACCESS_TOKEN_TTL", "PUSTAKA_JWT_ACCESS_TOKEN_TTL")
-	viper.BindEnv("jwt.refresh_token_ttl", "JWT_REFRESH_TOKEN_TTL", "PUSTAKA_JWT_REFRESH_TOKEN_TTL")
+	viper.BindEnv("jwt.secret", "JWT_SECRET", "PORTA_JWT_SECRET")
+	viper.BindEnv("jwt.access_token_ttl", "JWT_ACCESS_TOKEN_TTL", "PORTA_JWT_ACCESS_TOKEN_TTL")
+	viper.BindEnv("jwt.refresh_token_ttl", "JWT_REFRESH_TOKEN_TTL", "PORTA_JWT_REFRESH_TOKEN_TTL")
 
-	viper.BindEnv("server.host", "SERVER_HOST", "PUSTAKA_SERVER_HOST")
-	viper.BindEnv("server.port", "SERVER_PORT", "PUSTAKA_SERVER_PORT")
-	viper.BindEnv("server.read_timeout", "SERVER_READ_TIMEOUT", "PUSTAKA_SERVER_READ_TIMEOUT")
-	viper.BindEnv("server.write_timeout", "SERVER_WRITE_TIMEOUT", "PUSTAKA_SERVER_WRITE_TIMEOUT")
-	viper.BindEnv("server.idle_timeout", "SERVER_IDLE_TIMEOUT", "PUSTAKA_SERVER_IDLE_TIMEOUT")
+	viper.BindEnv("server.host", "SERVER_HOST", "PORTA_SERVER_HOST")
+	viper.BindEnv("server.port", "SERVER_PORT", "PORTA_SERVER_PORT")
+	viper.BindEnv("server.read_timeout", "SERVER_READ_TIMEOUT", "PORTA_SERVER_READ_TIMEOUT")
+	viper.BindEnv("server.write_timeout", "SERVER_WRITE_TIMEOUT", "PORTA_SERVER_WRITE_TIMEOUT")
+	viper.BindEnv("server.idle_timeout", "SERVER_IDLE_TIMEOUT", "PORTA_SERVER_IDLE_TIMEOUT")
 
-	viper.BindEnv("cors.allowed_origins", "CORS_ALLOWED_ORIGINS", "PUSTAKA_CORS_ALLOWED_ORIGINS")
-	viper.BindEnv("cors.allowed_methods", "CORS_ALLOWED_METHODS", "PUSTAKA_CORS_ALLOWED_METHODS")
-	viper.BindEnv("cors.allowed_headers", "CORS_ALLOWED_HEADERS", "PUSTAKA_CORS_ALLOWED_HEADERS")
+	viper.BindEnv("cors.allowed_origins", "CORS_ALLOWED_ORIGINS", "PORTA_CORS_ALLOWED_ORIGINS")
+	viper.BindEnv("cors.allowed_methods", "CORS_ALLOWED_METHODS", "PORTA_CORS_ALLOWED_METHODS")
+	viper.BindEnv("cors.allowed_headers", "CORS_ALLOWED_HEADERS", "PORTA_CORS_ALLOWED_HEADERS")
 
-	viper.BindEnv("logging.level", "LOG_LEVEL", "PUSTAKA_LOGGING_LEVEL")
-	viper.BindEnv("logging.format", "LOG_FORMAT", "PUSTAKA_LOGGING_FORMAT")
+	viper.BindEnv("logging.level", "LOG_LEVEL", "PORTA_LOGGING_LEVEL")
+	viper.BindEnv("logging.format", "LOG_FORMAT", "PORTA_LOGGING_FORMAT")
 
-	viper.BindEnv("admin.username", "ADMIN_USERNAME", "PUSTAKA_ADMIN_USERNAME")
-	viper.BindEnv("admin.email", "ADMIN_EMAIL", "PUSTAKA_ADMIN_EMAIL")
-	viper.BindEnv("admin.password", "ADMIN_PASSWORD", "PUSTAKA_ADMIN_PASSWORD")
+	viper.BindEnv("admin.username", "ADMIN_USERNAME", "PORTA_ADMIN_USERNAME")
+	viper.BindEnv("admin.email", "ADMIN_EMAIL", "PORTA_ADMIN_EMAIL")
+	viper.BindEnv("admin.password", "ADMIN_PASSWORD", "PORTA_ADMIN_PASSWORD")
 
-	viper.BindEnv("environment", "ENVIRONMENT", "PUSTAKA_ENVIRONMENT")
+	viper.BindEnv("environment", "ENVIRONMENT", "PORTA_ENVIRONMENT")
 
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
@@ -163,7 +163,7 @@ func Load() (*Config, error) {
 
 func setDefaults() {
 	// Database defaults
-	viper.SetDefault("database.url", "postgres://pustaka:password@localhost:5432/pustaka?sslmode=disable")
+	viper.SetDefault("database.url", "postgres://porta:password@localhost:5432/porta?sslmode=disable")
 	viper.SetDefault("database.max_open_conns", 25)
 	viper.SetDefault("database.max_idle_conns", 25)
 	viper.SetDefault("database.conn_max_lifetime", "5m")
@@ -216,7 +216,7 @@ func setDefaults() {
 
 	// Admin defaults
 	viper.SetDefault("admin.username", "admin")
-	viper.SetDefault("admin.email", "admin@pustaka.dev")
+	viper.SetDefault("admin.email", "admin@porta.dev")
 	viper.SetDefault("admin.password", "Admin@123")
 
 	// Environment defaults
