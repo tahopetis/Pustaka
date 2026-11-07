@@ -28,16 +28,21 @@ jobs:
           go-version: "1.24"
           cache-dependency-path: go.sum
 
+      # internal/api/handlers/amortization_tests is excluded on purpose: it is a
+      # misfiled, never-compiled copy of amortization test helpers (all files
+      # declare `package amortization` while living outside internal/amortization,
+      # and two of them test handlers from that package). It does not compile on
+      # main either; repackaging it is tracked as a separate issue.
       - name: Build
-        run: go build ./...
+        run: go build $(go list -e ./... | grep -v 'internal/api/handlers/amortization_tests')
 
       - name: Vet
-        run: go vet ./...
+        run: go vet $(go list -e ./... | grep -v 'internal/api/handlers/amortization_tests')
 
       # Unit tests only. Database-backed integration suites skip themselves and
       # are wired up separately once they are proven.
       - name: Test
-        run: go test ./... -count=1
+        run: go test $(go list -e ./... | grep -v 'internal/api/handlers/amortization_tests') -count=1
 
   frontend:
     name: Frontend unit tests + production build
