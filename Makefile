@@ -47,7 +47,9 @@ test-integration:
 		echo "Set TEST_DATABASE_URL to a *_test database, e.g. postgres://porta:password@localhost:5433/porta_test?sslmode=disable"; \
 		exit 1; \
 	fi
-	go test ./internal/auth/ ./internal/ci/ -count=1
+	# -p 1: both suites share this database and CleanupDB deletes rows, so the
+	# packages must not run in parallel.
+	go test -p 1 ./internal/auth/ ./internal/ci/ -count=1
 
 test:
 	@echo "Running tests..."
