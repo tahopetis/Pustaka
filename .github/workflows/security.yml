@@ -66,7 +66,7 @@ jobs:
       # path to docker/docker, so the previous 2 symbol-level findings are gone;
       # module-level advisories in uncalled modules are printed but do not fail.
       - name: Run govulncheck
-        run: govulncheck $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$|amortization_tests')
+        run: govulncheck $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$')
 
   npm-audit:
     name: npm audit
