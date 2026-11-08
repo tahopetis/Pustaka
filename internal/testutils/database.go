@@ -2,12 +2,20 @@ package testutils
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -50,13 +58,14 @@ func testDatabaseConfig(raw string, allowUnsafe bool) (cfg *pgxpool.Config, skip
 }
 
 // SetupTestDB connects to the PostgreSQL instance configured by
-// TEST_DATABASE_URL and applies the minimal test schema. It skips the test when
-// the variable is unset, so the default suite needs no Docker daemon.
+// TEST_DATABASE_URL and applies the real schema migrations. It skips the test
+// when the variable is unset, so the default suite needs no Docker daemon.
 func SetupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 	t.Helper()
 
+	dsn := strings.TrimSpace(os.Getenv(testDatabaseURLEnv))
 	cfg, skip, err := testDatabaseConfig(
-		os.Getenv(testDatabaseURLEnv),
+		dsn,
 		os.Getenv(allowUnsafeTestDatabaseEnv) != "",
 	)
 	if err != nil {
@@ -80,7 +89,7 @@ func SetupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 		t.Fatalf("could not connect to test database: %v", err)
 	}
 
-	if err := runMigrations(pool); err != nil {
+	if err := runMigrations(dsn); err != nil {
 		cleanup()
 		t.Fatalf("could not apply test schema: %v", err)
 	}
@@ -105,30 +114,45 @@ func waitForDatabase(ctx context.Context, pool *pgxpool.Pool) error {
 	return lastErr
 }
 
-// CleanupDB cleans up all data from test database
+// CleanupDB truncates every public table (except golang-migrate's
+// schema_migrations) between tests. Discovered dynamically so the helper keeps
+// working as migrations add tables.
 func CleanupDB(t *testing.T, db *pgxpool.Pool) {
 	t.Helper()
 
 	ctx := context.Background()
 
-	// Delete all data in correct order respecting foreign keys
-	tables := []string{
-		"audit_logs",
-		"relationships",
-		"configuration_items",
-		"user_roles",
-		"role_permissions",
-		"users",
-		"roles",
-		"permissions",
-		"ci_type_definitions",
+	rows, err := db.Query(ctx, `
+		SELECT tablename
+		FROM pg_tables
+		WHERE schemaname = 'public' AND tablename <> 'schema_migrations'
+		ORDER BY tablename
+	`)
+	if err != nil {
+		t.Fatalf("could not list test tables: %v", err)
 	}
 
-	for _, table := range tables {
-		_, err := db.Exec(ctx, fmt.Sprintf("DELETE FROM %s", table))
-		if err != nil {
-			t.Logf("Warning: Could not clean table %s: %v", table, err)
+	var tables []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			t.Fatalf("could not scan table name: %v", err)
 		}
+		tables = append(tables, name)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		t.Fatalf("could not read test tables: %v", err)
+	}
+
+	if len(tables) == 0 {
+		return
+	}
+
+	statement := "TRUNCATE TABLE " + strings.Join(tables, ", ") + " RESTART IDENTITY CASCADE"
+	if _, err := db.Exec(ctx, statement); err != nil {
+		t.Fatalf("could not clean test database: %v", err)
 	}
 }
 
@@ -200,123 +224,37 @@ func InsertTestData(t *testing.T, db *pgxpool.Pool) {
 	}
 }
 
-// runMigrations runs the database schema migrations
-func runMigrations(db *pgxpool.Pool) error {
-	ctx := context.Background()
-
-	// Enable UUID extension
-	_, err := db.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
+// runMigrations applies the real schema migrations from cmd/migrations, so the
+// test database matches production instead of a hand-maintained copy.
+func runMigrations(dsn string) error {
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		return fmt.Errorf("failed to enable UUID extension: %w", err)
+		return fmt.Errorf("open migration connection: %w", err)
+	}
+	defer db.Close()
+
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return fmt.Errorf("create migration driver: %w", err)
 	}
 
-	// Create tables (simplified version of the migration)
-	_, err = db.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS users (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			username VARCHAR(100) UNIQUE NOT NULL,
-			email VARCHAR(255) UNIQUE NOT NULL,
-			password_hash VARCHAR(255) NOT NULL,
-			is_active BOOLEAN DEFAULT true,
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		);
-
-		CREATE TABLE IF NOT EXISTS roles (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			name VARCHAR(50) UNIQUE NOT NULL,
-			description TEXT,
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		);
-
-		CREATE TABLE IF NOT EXISTS permissions (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			name VARCHAR(100) UNIQUE NOT NULL,
-			description TEXT,
-			resource_type VARCHAR(50),
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		);
-
-		CREATE TABLE IF NOT EXISTS role_permissions (
-			role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
-			permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
-			PRIMARY KEY (role_id, permission_id)
-		);
-
-		CREATE TABLE IF NOT EXISTS user_roles (
-			user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-			role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
-			assigned_by UUID REFERENCES users(id),
-			assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			PRIMARY KEY (user_id, role_id)
-		);
-
-		CREATE TABLE IF NOT EXISTS ci_type_definitions (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			name VARCHAR(100) UNIQUE NOT NULL,
-			description TEXT,
-			required_attributes JSONB NOT NULL DEFAULT '[]',
-			optional_attributes JSONB NOT NULL DEFAULT '[]',
-			created_by UUID REFERENCES users(id),
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		);
-
-		CREATE TABLE IF NOT EXISTS configuration_items (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			name VARCHAR(255) NOT NULL,
-			ci_type VARCHAR(100) NOT NULL REFERENCES ci_type_definitions(name),
-			attributes JSONB NOT NULL DEFAULT '{}',
-			tags TEXT[] DEFAULT '{}',
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			created_by UUID REFERENCES users(id),
-			updated_by UUID REFERENCES users(id),
-			CONSTRAINT unique_name_per_type UNIQUE (name, ci_type)
-		);
-
-		CREATE TABLE IF NOT EXISTS relationships (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			source_id UUID NOT NULL REFERENCES configuration_items(id) ON DELETE CASCADE,
-			target_id UUID NOT NULL REFERENCES configuration_items(id) ON DELETE CASCADE,
-			relationship_type VARCHAR(50) NOT NULL,
-			attributes JSONB DEFAULT '{}',
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			created_by UUID REFERENCES users(id),
-			CONSTRAINT no_self_relationship CHECK (source_id != target_id),
-			CONSTRAINT unique_relationship UNIQUE (source_id, target_id, relationship_type)
-		);
-
-		CREATE TABLE IF NOT EXISTS audit_logs (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			entity_type VARCHAR(50) NOT NULL,
-			entity_id UUID,
-			action VARCHAR(50) NOT NULL,
-			performed_by UUID REFERENCES users(id),
-			timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			details JSONB NOT NULL DEFAULT '{}',
-			ip_address INET,
-			user_agent TEXT
-		);
-	`)
-
+	m, err := migrate.NewWithDatabaseInstance("file://"+migrationsDir(), "pgx", driver)
 	if err != nil {
-		return fmt.Errorf("failed to create tables: %w", err)
+		return fmt.Errorf("create migrator: %w", err)
 	}
 
-	// Create indexes
-	_, err = db.Exec(ctx, `
-		CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-		CREATE INDEX IF NOT EXISTS idx_cis_type ON configuration_items(ci_type);
-		CREATE INDEX IF NOT EXISTS idx_cis_name ON configuration_items(name);
-		CREATE INDEX IF NOT EXISTS idx_relationships_source ON relationships(source_id);
-		CREATE INDEX IF NOT EXISTS idx_relationships_target ON relationships(target_id);
-	`)
-
-	if err != nil {
-		return fmt.Errorf("failed to create indexes: %w", err)
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return fmt.Errorf("apply migrations: %w", err)
 	}
-
 	return nil
+}
+
+// migrationsDir resolves cmd/migrations relative to this source file so the
+// helper works regardless of the test working directory.
+func migrationsDir() string {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return filepath.Join("cmd", "migrations")
+	}
+	return filepath.Join(filepath.Dir(file), "..", "..", "cmd", "migrations")
 }
