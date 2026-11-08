@@ -5,36 +5,85 @@ import (
 	"testing"
 )
 
-func TestDatabaseURLFromEnv(t *testing.T) {
-	t.Run("unset returns empty", func(t *testing.T) {
-		got := databaseURLFromEnv(func(string) string { return "" })
-		if got != "" {
-			t.Fatalf("expected empty URL, got %q", got)
-		}
-	})
+func TestTestDatabaseConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		raw         string
+		allowUnsafe bool
+		wantSkip    bool
+		wantDB      string
+		wantErr     string
+	}{
+		{
+			name:     "unset skips",
+			raw:      "",
+			wantSkip: true,
+		},
+		{
+			name:     "whitespace only skips",
+			raw:      "   \n",
+			wantSkip: true,
+		},
+		{
+			name:     "test database is accepted",
+			raw:      "postgres://user:pass@localhost:5433/porta_test?sslmode=disable",
+			wantDB:   "porta_test",
+			wantSkip: false,
+		},
+		{
+			name:     "test substring anywhere in the name is accepted",
+			raw:      "postgres://user:pass@localhost:5433/my_testdb",
+			wantDB:   "my_testdb",
+			wantSkip: false,
+		},
+		{
+			name:    "non-test database is rejected",
+			raw:     "postgres://user:pass@localhost:5433/porta",
+			wantErr: "must contain \"test\"",
+		},
+		{
+			name:        "non-test database allowed with override",
+			raw:         "postgres://user:pass@localhost:5433/porta",
+			allowUnsafe: true,
+			wantDB:      "porta",
+		},
+		{
+			name:    "invalid DSN is rejected",
+			raw:     "not-a-dsn",
+			wantErr: "invalid TEST_DATABASE_URL",
+		},
+	}
 
-	t.Run("returns the configured DSN", func(t *testing.T) {
-		const dsn = "postgres://testuser:postgres@localhost:5432/testdb?sslmode=disable"
-		got := databaseURLFromEnv(func(key string) string {
-			if key != testDatabaseURLEnv {
-				t.Fatalf("unexpected env key %q", key)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, skip, err := testDatabaseConfig(tc.raw, tc.allowUnsafe)
+
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected an error containing %q, got nil", tc.wantErr)
+				}
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("expected error containing %q, got %q", tc.wantErr, err.Error())
+				}
+				return
 			}
-			return dsn
-		})
-		if got != dsn {
-			t.Fatalf("expected %q, got %q", dsn, got)
-		}
-	})
 
-	t.Run("trims surrounding whitespace", func(t *testing.T) {
-		got := databaseURLFromEnv(func(string) string {
-			return "  postgres://user@host:5432/db  \n"
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if skip != tc.wantSkip {
+				t.Fatalf("skip = %v, want %v", skip, tc.wantSkip)
+			}
+			if tc.wantDB != "" {
+				if cfg == nil {
+					t.Fatal("expected a pool config, got nil")
+				}
+				if got := cfg.ConnConfig.Database; got != tc.wantDB {
+					t.Fatalf("connected database = %q, want %q", got, tc.wantDB)
+				}
+			}
 		})
-		want := "postgres://user@host:5432/db"
-		if got != want {
-			t.Fatalf("expected %q, got %q", want, got)
-		}
-	})
+	}
 }
 
 // TestSetupTestDBSkipsWithoutURL pins the contract that switched this helper
@@ -50,12 +99,5 @@ func TestSetupTestDBSkipsWithoutURL(t *testing.T) {
 
 	if !skipped {
 		t.Fatal("expected SetupTestDB to skip the test when TEST_DATABASE_URL is unset")
-	}
-}
-
-func TestSkipMessageMentionsEnvVar(t *testing.T) {
-	msg := skipMessage()
-	if !strings.Contains(msg, testDatabaseURLEnv) {
-		t.Fatalf("skip message should name %s, got %q", testDatabaseURLEnv, msg)
 	}
 }

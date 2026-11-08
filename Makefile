@@ -1,6 +1,6 @@
 # Porta — Configuration Management Database Makefile
 
-.PHONY: help build run test clean pull images-build docker-build docker-up docker-down migrate fmt lint dev prod deps security create-admin
+.PHONY: help build run test test-integration clean pull images-build docker-build docker-up docker-down migrate fmt lint dev prod deps security create-admin
 
 # Default target
 help:
@@ -37,6 +37,18 @@ run:
 	go run cmd/api/main.go
 
 # Run all tests
+# Database-backed integration tests. They skip unless the DSN points at a
+# database whose name contains "test" (the helper creates tables and deletes
+# rows). Create one with:
+#   docker exec porta-postgres psql -U porta -d postgres -c 'CREATE DATABASE porta_test'
+# Tracked drift in these suites: see issue #5.
+test-integration:
+	@if [ -z "$TEST_DATABASE_URL" ]; then \
+		echo "Set TEST_DATABASE_URL to a *_test database, e.g. postgres://porta:password@localhost:5433/porta_test?sslmode=disable"; \
+		exit 1; \
+	fi
+	go test ./internal/auth/ ./internal/ci/ -count=1
+
 test:
 	@echo "Running tests..."
 	go test -v ./...

@@ -8,8 +8,10 @@ name: security
 #   - npm audit: BLOCKING (high/critical). 4 moderate advisories remain, all
 #     dev-only via @vue/test-utils -> js-beautify -> editorconfig/glob -> minimatch;
 #     they clear when @vue/test-utils updates js-beautify, so they are accepted.
-#   - govulncheck: BLOCKING. The last two findings (retired docker/docker
-#     module via dockertest) were cleared by #55; no vulnerabilities remain.
+#   - govulncheck: BLOCKING. #55 removed the last import path to the retired
+#     docker/docker module, so the code no longer calls any known vulnerability.
+#     (go.sum still lists those sums via golang-migrate's module graph;
+#     govulncheck does not report unimported modules.)
 #   - gosec / Trivy: report-only (SARIF to the Security tab); flip later.
 
 on:
@@ -58,7 +60,7 @@ jobs:
           go-version: "1.26"
           cache-dependency-path: go.sum
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
       # Blocks on any finding the code actually calls. dockertest/docker tree
       # removed in #55, so the previous 2 findings are gone.
       - name: Run govulncheck

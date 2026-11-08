@@ -65,7 +65,7 @@ Porta is a modern, open-source Configuration Management Database (CMDB) built fo
 - **Frontend Testing**: Vitest + Vue Test Utils
 - **E2E Testing**: Playwright + Cypress
 - **Backend Testing**: Go testing + testify
-- **Database Testing**: dockertest for integration tests
+- **Database Testing**: PostgreSQL via `TEST_DATABASE_URL` (tests skip when unset)
 - **Code Quality**: ESLint + Prettier (frontend), gofmt (backend)
 
 ## Architecture Overview

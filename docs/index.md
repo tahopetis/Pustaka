@@ -227,7 +227,7 @@ CMDB Services (internal/ci/)
 ### Backend Testing
 - **Unit Tests**: Go testing + testify for business logic
 - **Integration Tests**: API endpoint testing with test database
-- **Database Testing**: dockertest for database interaction testing
+- **Database Testing**: PostgreSQL via `TEST_DATABASE_URL` (tests skip when unset)
 
 ---
 

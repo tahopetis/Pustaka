@@ -17,14 +17,36 @@ import (
 // pulled the retired github.com/docker/docker module into the module graph.
 const testDatabaseURLEnv = "TEST_DATABASE_URL"
 
-// databaseURLFromEnv resolves the test DSN, trimming accidental whitespace.
-func databaseURLFromEnv(getenv func(string) string) string {
-	return strings.TrimSpace(getenv(testDatabaseURLEnv))
-}
+// allowUnsafeTestDatabaseEnv opts out of the "_test database name" guard. Only
+// use it for throwaway instances: the helper creates tables and deletes rows.
+const allowUnsafeTestDatabaseEnv = "TEST_DATABASE_URL_ALLOW_ANY"
 
-// skipMessage is the reason reported when no test database is configured.
-func skipMessage() string {
-	return fmt.Sprintf("%s not set; skipping database-backed test", testDatabaseURLEnv)
+// testDatabaseConfig validates the configured DSN and returns a pool config.
+// skip=true means no DSN is configured and the caller should skip the test.
+//
+// The guard exists because this helper is destructive (DDL + DELETE): the
+// target database name must contain "test" unless explicitly overridden.
+func testDatabaseConfig(raw string, allowUnsafe bool) (cfg *pgxpool.Config, skip bool, err error) {
+	dsn := strings.TrimSpace(raw)
+	if dsn == "" {
+		return nil, true, nil
+	}
+
+	cfg, err = pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid %s: %w", testDatabaseURLEnv, err)
+	}
+
+	name := cfg.ConnConfig.Database
+	if !allowUnsafe && !strings.Contains(strings.ToLower(name), "test") {
+		return nil, false, fmt.Errorf(
+			"%s points at database %q, but the test helper creates tables and deletes rows; "+
+				"the database name must contain \"test\" (set %s=1 to override)",
+			testDatabaseURLEnv, name, allowUnsafeTestDatabaseEnv,
+		)
+	}
+
+	return cfg, false, nil
 }
 
 // SetupTestDB connects to the PostgreSQL instance configured by
@@ -33,19 +55,20 @@ func skipMessage() string {
 func SetupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 	t.Helper()
 
-	dsn := databaseURLFromEnv(os.Getenv)
-	if dsn == "" {
-		t.Skip(skipMessage())
+	cfg, skip, err := testDatabaseConfig(
+		os.Getenv(testDatabaseURLEnv),
+		os.Getenv(allowUnsafeTestDatabaseEnv) != "",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if skip {
+		t.Skipf("%s not set; skipping database-backed test", testDatabaseURLEnv)
 	}
 
 	ctx := context.Background()
 
-	config, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		t.Fatalf("invalid %s: %v", testDatabaseURLEnv, err)
-	}
-
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatalf("could not create test database pool: %v", err)
 	}
@@ -65,12 +88,16 @@ func SetupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 	return pool, cleanup
 }
 
-// waitForDatabase retries the ping until PostgreSQL accepts connections.
+// waitForDatabase retries the ping until PostgreSQL accepts connections. Each
+// attempt is bounded so one hung connect cannot exceed the overall 30s budget.
 func waitForDatabase(ctx context.Context, pool *pgxpool.Pool) error {
 	deadline := time.Now().Add(30 * time.Second)
 	var lastErr error
 	for time.Now().Before(deadline) {
-		if lastErr = pool.Ping(ctx); lastErr == nil {
+		attemptCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		lastErr = pool.Ping(attemptCtx)
+		cancel()
+		if lastErr == nil {
 			return nil
 		}
 		time.Sleep(time.Second)
@@ -176,14 +203,6 @@ func InsertTestData(t *testing.T, db *pgxpool.Pool) {
 // runMigrations runs the database schema migrations
 func runMigrations(db *pgxpool.Pool) error {
 	ctx := context.Background()
-
-	// Wait for database to be ready
-	for i := 0; i < 30; i++ {
-		if err := db.Ping(ctx); err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
 
 	// Enable UUID extension
 	_, err := db.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
