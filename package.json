@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/tahopetis/porta#readme",
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^24.6.2"
   }
 }
