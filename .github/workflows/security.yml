@@ -8,8 +8,8 @@ name: security
 #   - npm audit: BLOCKING (high/critical). 4 moderate advisories remain, all
 #     dev-only via @vue/test-utils -> js-beautify -> editorconfig/glob -> minimatch;
 #     they clear when @vue/test-utils updates js-beautify, so they are accepted.
-#   - govulncheck: report-only for 2 residual findings in github.com/docker/docker,
-#     which has no fixed release; tracked in #40 (drop dockertest).
+#   - govulncheck: BLOCKING. The last two findings (retired docker/docker
+#     module via dockertest) were cleared by #55; no vulnerabilities remain.
 #   - gosec / Trivy: report-only (SARIF to the Security tab); flip later.
 
 on:
@@ -44,7 +44,7 @@ jobs:
           fail-on-severity: high
 
   govulncheck:
-    name: Go vulnerability check (report-only)
+    name: Go vulnerability check
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -59,11 +59,9 @@ jobs:
           cache-dependency-path: go.sum
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      # Down to 2 findings, both in github.com/docker/docker (retired module, no
-      # fixed release), pulled in via dockertest. See #40; remove
-      # continue-on-error once that dependency is gone.
+      # Blocks on any finding the code actually calls. dockertest/docker tree
+      # removed in #55, so the previous 2 findings are gone.
       - name: Run govulncheck
-        continue-on-error: true
         run: govulncheck $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$|amortization_tests')
 
   npm-audit:
