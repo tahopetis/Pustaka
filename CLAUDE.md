@@ -54,13 +54,14 @@ go mod tidy                   # Clean up modules
 Dependency bumps run in CI, not locally (the dev host is a low-power arm64
 machine; no local Go toolchain is needed):
 
-1. Actions → **go-deps** → *Run workflow* with `module@version` specs
+1. Actions → **go-deps** → *Run workflow* with `module@version` specifiers
    (space-separated; `@latest` works).
-2. `gh run download <run-id> -n go-deps-patch`
-3. `git checkout -b chore/go-deps && git apply go-deps.patch`, commit and push.
-
-The push then triggers the normal required-check gate (build/test, CodeQL,
-dependency review, image builds).
+2. If the run reports "No dependency changes", stop here — there is no artifact.
+3. `gh run download <run-id> -n go-deps-patch`
+4. `git checkout -b chore/go-deps && git apply go-deps.patch`, commit, push the
+   branch and **open a pull request**. Opening the PR triggers the required
+   checks (build/test, CodeQL, dependency review, image builds); a plain branch
+   push triggers nothing under this repo's workflow triggers.
 
 ### Frontend (Vue.js)
 ```bash
