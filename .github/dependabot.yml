@@ -1,0 +1,41 @@
+version: 2
+updates:
+  # Go modules
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  # Frontend packages
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  # Root tooling (Playwright, types)
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+
+  # Workflow actions themselves
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  # Base images in docker/Dockerfile.{api,frontend}
+  - package-ecosystem: docker
+    directory: "/docker"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
