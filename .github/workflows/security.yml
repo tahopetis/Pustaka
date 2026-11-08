@@ -5,8 +5,9 @@ name: security
 # Disposition in this first iteration:
 #   - dependency-review: BLOCKING. It only judges the PR's own dependency/action
 #     changes, so it catches new vulnerable dependencies without freezing work.
-#   - govulncheck / npm audit: report-only until the pre-existing backlog is
-#     upgraded (issues #10 and #12), then flip to blocking.
+#   - npm audit: report-only until the frontend major upgrades land (#12/#35).
+#   - govulncheck: report-only for 2 residual findings in github.com/docker/docker,
+#     which has no fixed release; tracked in #40 (drop dockertest).
 #   - gosec / Trivy: report-only (SARIF to the Security tab); flip later.
 
 on:
@@ -56,8 +57,9 @@ jobs:
           cache-dependency-path: go.sum
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      # Pre-existing backlog: 37 findings on main (issue #10). Report-only until
-      # the dependency upgrades land, then remove continue-on-error.
+      # Down to 2 findings, both in github.com/docker/docker (retired module, no
+      # fixed release), pulled in via dockertest. See #40; remove
+      # continue-on-error once that dependency is gone.
       - name: Run govulncheck
         continue-on-error: true
         run: govulncheck $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$|amortization_tests')
