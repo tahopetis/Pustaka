@@ -1,6 +1,7 @@
-package amortization
+package handlers
 
 import (
+	. "github.com/tahopetis/porta/internal/amortization"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -748,18 +749,5 @@ func TestAmortizationIntegrationTestSuite(t *testing.T) {
 
 // Helper functions
 
-func stringPtr(s string) *string {
-	return &s
-}
 
-func timePtr(t time.Time) *time.Time {
-	return &t
-}
 
-func intPtr(i int) *int {
-	return &i
-}
-
-func floatPtr(f float64) *float64 {
-	return &f
-}

@@ -29,21 +29,19 @@ jobs:
           cache-dependency-path: go.sum
 
       # The Go test suite has pre-existing drift that is unrelated to the app:
-      #   - internal/api/handlers/amortization_tests: misfiled helpers that have
-      #     never compiled (see issue #4)
       #   - internal/api, internal/ci: tests call constructors with outdated
       #     signatures and stale model fields (issue #5)
       #   - internal/auth: tests spin up testcontainers
       # All production packages still build. Remove entries from this filter as
       # the suites are repaired.
       - name: Build
-        run: go build $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$|amortization_tests')
+        run: go build $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$')
 
       - name: Vet
-        run: go vet $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$|amortization_tests')
+        run: go vet $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$')
 
       - name: Test
-        run: go test $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$|amortization_tests') -count=1
+        run: go test $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$') -count=1
 
   frontend:
     name: Frontend unit tests + production build

@@ -1,6 +1,7 @@
-package amortization
+package handlers
 
 import (
+	. "github.com/tahopetis/porta/internal/amortization"
 	"context"
 	"fmt"
 	"flag"

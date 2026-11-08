@@ -1,6 +1,7 @@
-package amortization
+package handlers
 
 import (
+	. "github.com/tahopetis/porta/internal/amortization"
 	"context"
 	"fmt"
 	"strings"
@@ -713,18 +714,6 @@ func indexOf(s, substr string) int {
 	return -1
 }
 
-func timePtr(t time.Time) *time.Time {
-	return &t
-}
 
-func intPtr(i int) *int {
-	return &i
-}
 
-func floatPtr(f float64) *float64 {
-	return &f
-}
 
-func stringPtr(s string) *string {
-	return &s
-}
