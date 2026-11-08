@@ -25,10 +25,13 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['vue', 'vue-router', 'pinia'],
-          ui: ['@headlessui/vue', '@heroicons/vue'],
-          charts: ['d3', 'vis-network'],
+        // Vite 8 builds with Rolldown, which only accepts the function form
+        // (the object/array shorthand was removed).
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (/node_modules\/(vue|@vue\/|vue-router|pinia)\//.test(id)) return 'vendor'
+          if (/node_modules\/(@headlessui\/vue|@heroicons\/vue)\//.test(id)) return 'ui'
+          if (/node_modules\/(d3|d3-[^/]+|vis-network|vis-data|vis-util)\//.test(id)) return 'charts'
         },
       },
     },
