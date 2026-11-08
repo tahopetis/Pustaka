@@ -1,6 +1,6 @@
 # Porta — Configuration Management Database Makefile
 
-.PHONY: help build run test test-integration clean pull images-build docker-build docker-up docker-down migrate fmt lint dev prod deps security create-admin
+.PHONY: help build run test test-integration docs-check clean pull images-build docker-build docker-up docker-down migrate fmt lint dev prod deps security create-admin
 
 # Default target
 help:
@@ -10,6 +10,8 @@ help:
 	@echo "  build          Build the API binary"
 	@echo "  run            Run the API server"
 	@echo "  test           Run all tests"
+	@echo "  test-integration  Run database-backed integration tests"
+	@echo "  docs-check     Check relative Markdown links in the docs"
 	@echo "  clean          Clean build artifacts"
 	@echo "  pull           Pull published multi-arch images from GHCR"
 	@echo "  images-build   Build Docker images locally (slow; CI normally does this)"
@@ -23,7 +25,7 @@ help:
 	@echo "  prod           Start production environment"
 	@echo "  deps           Install dependencies"
 	@echo "  security       Run security scan"
-	@echo "  create-admin   Create initial admin user"
+	@echo "  create-admin   Verify the bootstrapped admin user (optional)"
 
 # Build the API binary
 build:
@@ -54,6 +56,12 @@ test-integration:
 test:
 	@echo "Running tests..."
 	go test -v ./...
+
+# Check that relative Markdown links in the maintained docs resolve. The
+# script ignores docs/archive/**, external URLs and bare anchors.
+docs-check:
+	@echo "Checking documentation links..."
+	@bash scripts/check-doc-links.sh
 
 # Clean build artifacts
 clean:
@@ -98,11 +106,14 @@ docker-down:
 	@echo "✅ Services stopped"
 
 # Run database migrations
+# The API applies pending migrations itself on startup; this host-side target
+# is for environments with the golang-migrate CLI installed. It targets the
+# published PostgreSQL port (5433) and honours an exported DATABASE_URL.
 migrate:
 	@echo "Running database migrations..."
 	@echo "Note: Make sure PostgreSQL is running before running migrations"
 	@if command -v migrate >/dev/null 2>&1; then \
-		migrate -path cmd/migrations -database "postgres://porta:password@localhost:5432/porta?sslmode=disable" up; \
+		migrate -path cmd/migrations -database "$${DATABASE_URL:-postgres://porta:password@localhost:5433/porta?sslmode=disable}" up; \
 	else \
 		echo "❌ migrate command not found. Please install golang-migrate: https://github.com/golang-migrate/migrate"; \
 	fi
@@ -166,18 +177,16 @@ security:
 		echo "❌ gosec not found. Please install: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest"; \
 	fi
 
-# Create initial admin user
+# Verify the bootstrapped admin user (optional).
+# The API creates or updates the admin user on every startup from
+# ADMIN_USERNAME / ADMIN_EMAIL / ADMIN_PASSWORD (compose sets admin,
+# admin@porta.dev and Admin@123). This target only checks those credentials
+# against the containerised API; it is not needed during a normal install.
 create-admin:
-	@echo "Creating initial admin user..."
-	@echo "Note: Make sure the API is running before executing this"
-	curl -X POST http://localhost:8080/api/v1/users/admin \
+	@echo "Porta creates the admin user automatically at API startup."
+	@echo "Verifying the default credentials (admin / Admin@123) on the compose API..."
+	@curl -fsS -X POST http://localhost:8081/api/v1/auth/login \
 		-H "Content-Type: application/json" \
-		-d '{
-			"username": "admin",
-			"email": "admin@example.com",
-			"password": "admin123",
-			"role": "admin"
-		}'
+		-d '{"username":"admin","password":"Admin@123"}'
 	@echo ""
-	@echo "✅ Admin user created (username: admin, password: admin123)"
-	@echo "⚠️  Please change the default password after first login"
+	@echo "Change the bootstrap values with ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_PASSWORD."
