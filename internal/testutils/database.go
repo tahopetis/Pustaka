@@ -3,111 +3,79 @@ package testutils
 import (
 	"context"
 	"fmt"
-	"log"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/ory/dockertest/v3"
-	"github.com/redis/go-redis/v9"
 )
 
-// TestDB holds database connection and cleanup function
-type TestDB struct {
-	Pool   *pgxpool.Pool
-	Cleanup func()
+// testDatabaseURLEnv names the DSN of the PostgreSQL instance used by
+// database-backed tests. When it is unset those tests skip instead of starting
+// a container: the previous dockertest helper required a Docker daemon and
+// pulled the retired github.com/docker/docker module into the module graph.
+const testDatabaseURLEnv = "TEST_DATABASE_URL"
+
+// databaseURLFromEnv resolves the test DSN, trimming accidental whitespace.
+func databaseURLFromEnv(getenv func(string) string) string {
+	return strings.TrimSpace(getenv(testDatabaseURLEnv))
 }
 
-// SetupTestDB creates a test database using Docker
+// skipMessage is the reason reported when no test database is configured.
+func skipMessage() string {
+	return fmt.Sprintf("%s not set; skipping database-backed test", testDatabaseURLEnv)
+}
+
+// SetupTestDB connects to the PostgreSQL instance configured by
+// TEST_DATABASE_URL and applies the minimal test schema. It skips the test when
+// the variable is unset, so the default suite needs no Docker daemon.
 func SetupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 	t.Helper()
 
-	// Use Docker to spin up a test PostgreSQL database
-	pool, err := dockertest.NewPool("")
+	dsn := databaseURLFromEnv(os.Getenv)
+	if dsn == "" {
+		t.Skip(skipMessage())
+	}
+
+	ctx := context.Background()
+
+	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		log.Fatalf("Could not connect to Docker: %s", err)
+		t.Fatalf("invalid %s: %v", testDatabaseURLEnv, err)
 	}
 
-	// Pull postgres image
-	resource, err := pool.Run("postgres", "15-alpine", []string{
-		"POSTGRES_PASSWORD=postgres",
-		"POSTGRES_DB=testdb",
-		"POSTGRES_USER=testuser",
-	})
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
-		log.Fatalf("Could not start resource: %s", err)
+		t.Fatalf("could not create test database pool: %v", err)
 	}
 
-	// Set cleanup function
-	cleanup := func() {
-		if err := pool.Purge(resource); err != nil {
-			log.Printf("Could not purge resource: %s", err)
-		}
-	}
+	cleanup := func() { pool.Close() }
 
-	// Exponential retry to connect to database
-	var db *pgxpool.Pool
-	if err := pool.Retry(func() error {
-		connStr := fmt.Sprintf("postgres://testuser:postgres@localhost:%s/testdb?sslmode=disable", resource.GetPort("5432/tcp"))
-
-		config, err := pgxpool.ParseConfig(connStr)
-		if err != nil {
-			return err
-		}
-
-		db, err = pgxpool.NewWithConfig(context.Background(), config)
-		if err != nil {
-			return err
-		}
-
-		return db.Ping(context.Background())
-	}); err != nil {
+	if err := waitForDatabase(ctx, pool); err != nil {
 		cleanup()
-		log.Fatalf("Could not connect to database: %s", err)
+		t.Fatalf("could not connect to test database: %v", err)
 	}
 
-	// Run migrations
-	if err := runMigrations(db); err != nil {
+	if err := runMigrations(pool); err != nil {
 		cleanup()
-		log.Fatalf("Could not run migrations: %s", err)
+		t.Fatalf("could not apply test schema: %v", err)
 	}
 
-	return db, cleanup
+	return pool, cleanup
 }
 
-// SetupTestRedis creates a test Redis instance using Docker
-func SetupTestRedis(t *testing.T) (*redis.Client, func()) {
-	t.Helper()
-
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("Could not connect to Docker: %s", err)
-	}
-
-	resource, err := pool.Run("redis", "7-alpine", []string{})
-	if err != nil {
-		log.Fatalf("Could not start resource: %s", err)
-	}
-
-	cleanup := func() {
-		if err := pool.Purge(resource); err != nil {
-			log.Printf("Could not purge resource: %s", err)
+// waitForDatabase retries the ping until PostgreSQL accepts connections.
+func waitForDatabase(ctx context.Context, pool *pgxpool.Pool) error {
+	deadline := time.Now().Add(30 * time.Second)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		if lastErr = pool.Ping(ctx); lastErr == nil {
+			return nil
 		}
+		time.Sleep(time.Second)
 	}
-
-	var client *redis.Client
-	if err := pool.Retry(func() error {
-		client = redis.NewClient(&redis.Options{
-			Addr: fmt.Sprintf("localhost:%s", resource.GetPort("6379/tcp")),
-		})
-
-		return client.Ping(context.Background()).Err()
-	}); err != nil {
-		cleanup()
-		log.Fatalf("Could not connect to Redis: %s", err)
-	}
-
-	return client, cleanup
+	return lastErr
 }
 
 // CleanupDB cleans up all data from test database
