@@ -11,31 +11,28 @@ name: go-deps
 #   protection. Instead the job resolves the modules, verifies sums, and uploads
 #   a ready-to-apply patch. Applying it is a git-only operation:
 #
-#     gh run download <run-id> -n go-deps-patch
-#     git checkout -b chore/go-deps-<something>
+#     gh run download <run-id> -n go-deps-patch   # only if the run produced a patch
+#     git checkout -b chore/go-deps
 #     git apply go-deps.patch
 #     git commit -am "build(deps): ..." && git push
 #
-#   The subsequent push triggers the full required-check gate as usual.
+#   Opening a pull request from that branch triggers the full required-check
+#   gate (a plain branch push triggers nothing under this repo's workflow
+#   triggers). If the run reports "No dependency changes", stop here.
 
 on:
   workflow_dispatch:
     inputs:
-      packages:
-        description: "Space-separated module@version specifiers, e.g. github.com/spf13/viper@latest golang.org/x/text@v0.41.0"
+      modules:
+        description: "Space-separated module@version specifiers, e.g. github.com/spf13/viper@v1.21.0 golang.org/x/text@latest"
         required: true
         type: string
-      tidy:
-        description: "Run `go mod tidy` after `go get`"
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: go-deps
+  group: go-deps-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -57,14 +54,13 @@ jobs:
 
       - name: Resolve modules
         env:
-          PACKAGES: ${{ inputs.packages }}
+          MODULES: ${{ inputs.modules }}
         run: |
           set -euo pipefail
-          echo "go get $PACKAGES"
-          go get $PACKAGES
+          echo "go get $MODULES"
+          go get $MODULES
 
-      - name: Tidy module file
-        if: inputs.tidy
+      - name: Tidy module files
         run: go mod tidy
 
       - name: Verify checksums
@@ -83,8 +79,6 @@ jobs:
           fi
           echo "--- diff stat ---"
           git diff --stat -- go.mod go.sum
-          echo "--- go.mod head ---"
-          head -5 go.mod
 
       - name: Upload patch
         if: steps.patch.outputs.changed == 'true'
@@ -96,13 +90,16 @@ jobs:
           if-no-files-found: error
 
       - name: Summarize
+        env:
+          MODULES: ${{ inputs.modules }}
+          CHANGED: ${{ steps.patch.outputs.changed }}
         run: |
           {
             echo "## go-deps run"
             echo ""
-            echo "Requested: \`${{ inputs.packages }}\`"
+            echo "Requested: \`$MODULES\`"
             echo ""
-            if [ "${{ steps.patch.outputs.changed }}" = "true" ]; then
+            if [ "$CHANGED" = "true" ]; then
               echo "Apply with:"
               echo '```sh'
               echo "gh run download ${{ github.run_id }} -n go-deps-patch"
