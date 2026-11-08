@@ -1,767 +1,379 @@
 # Porta API Examples
 
-This document provides practical examples for using the Porta CMDB API, including curl commands, JavaScript SDK usage, and common integration patterns.
+Runnable `curl` recipes for the Porta CMDB API. The base URL is
+**http://localhost:8081/api/v1** (the docker compose host port; the API listens on 8080
+inside the container). Every example assumes a shell with `curl` (and optionally `jq`).
 
-## Table of Contents
+> The documented contract is explicitly partial. Graph, QR, audit, analytics, dashboard
+> and the public CI page are out of scope here; see [`openapi.yaml`](./openapi.yaml) for
+> the verified paths and [`api-guide.md`](./api-guide.md) for auth and conventions.
 
-1. [Authentication Examples](#authentication-examples)
-2. [User Management Examples](#user-management-examples)
-3. [CI Type Examples](#ci-type-examples)
-4. [Configuration Item Examples](#configuration-item-examples)
-5. [Relationship Examples](#relationship-examples)
-6. [Search and Filtering Examples](#search-and-filtering-examples)
-7. [Graph API Examples](#graph-api-examples)
-8. [Audit Examples](#audit-examples)
-9. [SDK Integration Examples](#sdk-integration-examples)
-10. [Common Workflows](#common-workflows)
-
-## Authentication Examples
-
-### Basic Login
+## 0. Set up a token
 
 ```bash
-# Login and store tokens
-response=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
+BASE=http://localhost:8081/api/v1
+
+TOKEN=$(curl -s -X POST "$BASE/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"Admin@123"}' | jq -r '.access_token')
+
+REFRESH=$(curl -s -X POST "$BASE/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"Admin@123"}' | jq -r '.refresh_token')
+
+echo "token: ${TOKEN:0:20}..."
+```
+
+`docker compose` seeds the admin user from `PORTA_ADMIN_USERNAME` / `PORTA_ADMIN_PASSWORD`
+(`admin` / `Admin@123` in the provided compose file). Login uses `username`, not email.
+
+### Refresh the token pair
+
+```bash
+curl -s -X POST "$BASE/auth/refresh" \
+  -H 'Content-Type: application/json' \
+  -d "{\"refresh_token\":\"$REFRESH\"}"
+```
+
+The response rotates **both** tokens: `access_token`, `refresh_token`, `token_type`,
+`expires_in`. No user object is returned.
+
+### Current user
+
+```bash
+curl -s "$BASE/me" -H "Authorization: Bearer $TOKEN"
+```
+
+Returns `{"user": {...}}` with `roles` and `permissions`.
+
+## 1. Users
+
+Requires `user:read` / `user:create` (admin by default).
+
+```bash
+# Create
+curl -s -X POST "$BASE/users" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"username":"jdoe","email":"jdoe@example.com","password":"ChangeMe123","roles":["viewer"]}'
+
+# List (search is accepted but currently ignored)
+curl -s "$BASE/users?page=1&limit=20&search=jdoe" -H "Authorization: Bearer $TOKEN"
+```
+
+`PUT /users/{id}` and `DELETE /users/{id}` are registered but **not implemented**: the
+first returns the unchanged user, the second returns `204` without deleting.
+
+## 2. CI types
+
+A CI type defines the attribute schema that every CI of that type must satisfy. The
+migrations seed `Server`, `Application`, `Database`, and the EA types; you can add your
+own. `is_amortizable` opts a type into the amortization module.
+
+```bash
+# Create an amortizable Laptop type
+curl -s -X POST "$BASE/ci-types" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{
-    "email": "admin@porta.dev",
-    "password": "securePassword123"
-  }')
-
-# Extract tokens using jq
-access_token=$(echo $response | jq -r '.access_token')
-refresh_token=$(echo $response | jq -r '.refresh_token')
-
-echo "Access Token: $access_token"
-echo "Refresh Token: $refresh_token"
-```
-
-### Token Refresh
-
-```bash
-# Refresh access token
-response=$(curl -s -X POST http://localhost:8080/api/v1/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d "{\"refresh_token\": \"$refresh_token\"}")
-
-new_access_token=$(echo $response | jq -r '.access_token')
-echo "New Access Token: $new_access_token"
-```
-
-### JavaScript SDK Authentication
-
-```javascript
-import { PortaAPI } from '@porta/api-client';
-
-// Initialize the API client
-const api = new PortaAPI({
-  baseURL: 'http://localhost:8080/api/v1',
-  apiKey: 'your-access-token'
-});
-
-// Or authenticate with credentials
-const user = await api.auth.login({
-  email: 'admin@porta.dev',
-  password: 'securePassword123'
-});
-
-// Automatically refresh tokens
-api.setAuthToken(user.access_token);
-api.setRefreshToken(user.refresh_token);
-```
-
-## User Management Examples
-
-### Create User
-
-```bash
-curl -X POST http://localhost:8080/api/v1/users \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "newuser@porta.dev",
-    "password": "securePassword123",
-    "name": "Jane Smith",
-    "role": "user"
-  }'
-```
-
-### List Users with Pagination
-
-```bash
-curl -X GET "http://localhost:8080/api/v1/users?page=1&limit=10&search=jane" \
-  -H "Authorization: Bearer $access_token"
-```
-
-### Update User Role
-
-```bash
-curl -X PUT http://localhost:8080/api/v1/users/550e8400-e29b-41d4-a716-446655440000 \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "role": "admin",
-    "is_active": true
-  }'
-```
-
-## CI Type Examples
-
-### Create Server CI Type
-
-```bash
-curl -X POST http://localhost:8080/api/v1/ci-types \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Server",
-    "description": "Physical or virtual server",
+    "name": "Laptop",
+    "description": "Employee laptop",
+    "is_amortizable": true,
     "required_attributes": [
-      {
-        "name": "hostname",
-        "type": "string",
-        "description": "Server hostname",
-        "validation": {
-          "min_length": 1,
-          "max_length": 255,
-          "pattern": "^[a-zA-Z0-9.-]+$"
-        }
-      },
-      {
-        "name": "ip_address",
-        "type": "string",
-        "description": "Primary IP address",
-        "validation": {
-          "format": "ipv4"
-        }
-      }
+      {"name": "serial_number", "type": "string", "description": "Manufacturer serial number",
+       "validation": {"min_length": 3, "max_length": 64}}
     ],
     "optional_attributes": [
-      {
-        "name": "cpu_cores",
-        "type": "integer",
-        "description": "Number of CPU cores",
-        "validation": {
-          "min": 1,
-          "max": 256
-        }
-      },
-      {
-        "name": "environment",
-        "type": "string",
-        "description": "Environment type",
-        "validation": {
-          "enum": ["development", "staging", "production"]
-        }
-      }
+      {"name": "model", "type": "string", "description": "Hardware model"},
+      {"name": "purchase_year", "type": "integer", "description": "Year purchased",
+       "validation": {"min": 2000, "max": 2100}}
     ]
   }'
+
+# List / search
+curl -s "$BASE/ci-types?search=Laptop&page=1&limit=20" -H "Authorization: Bearer $TOKEN"
+
+# Get one
+CT_ID=$(curl -s "$BASE/ci-types?search=Laptop" -H "Authorization: Bearer $TOKEN" | jq -r '.ci_types[0].id')
+curl -s "$BASE/ci-types/$CT_ID" -H "Authorization: Bearer $TOKEN"
 ```
 
-### Create Application CI Type
+`PUT /ci-types/{id}` cannot rename the type; it updates the description, the
+`is_amortizable` flag and the attribute lists. `DELETE` returns `409` while CIs of the
+type exist.
+
+## 3. Configuration items
+
+For the seeded `Server` type the required attributes are `hostname`, `ip_address`, and
+`os`; unknown attributes are rejected by schema validation.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/ci-types \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Application",
-    "description": "Software application",
-    "required_attributes": [
-      {
-        "name": "name",
-        "type": "string",
-        "validation": {
-          "min_length": 1,
-          "max_length": 100
-        }
-      },
-      {
-        "name": "version",
-        "type": "string",
-        "validation": {
-          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
-        }
-      }
-    ],
-    "optional_attributes": [
-      {
-        "name": "dependencies",
-        "type": "array",
-        "description": "Application dependencies",
-        "validation": {
-          "min_length": 0,
-          "max_length": 50
-        }
-      },
-      {
-        "name": "configuration",
-        "type": "object",
-        "description": "Application configuration"
-      }
-    ]
-  }'
-```
-
-### List CI Types
-
-```bash
-curl -X GET "http://localhost:8080/api/v1/ci-types?limit=50" \
-  -H "Authorization: Bearer $access_token"
-```
-
-## Configuration Item Examples
-
-### Create a Server CI
-
-```bash
-curl -X POST http://localhost:8080/api/v1/ci \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
+# Create a Server CI
+CI_ID=$(curl -s -X POST "$BASE/ci" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{
     "name": "web-server-01",
     "ci_type": "Server",
     "attributes": {
-      "hostname": "web01.example.com",
+      "hostname": "web01",
       "ip_address": "192.168.1.10",
+      "os": "Ubuntu",
       "cpu_cores": 8,
-      "memory_gb": 32,
-      "environment": "production"
+      "memory_gb": 32
     },
-    "tags": ["production", "web", "critical"]
-  }'
+    "tags": ["production", "web"]
+  }' | jq -r '.id')
+
+# Create a Laptop CI (uses the type created above)
+LAPTOP_ID=$(curl -s -X POST "$BASE/ci" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{
+    "name": "lt-0042",
+    "ci_type": "Laptop",
+    "attributes": {"serial_number": "SN-44213", "model": "T14 Gen 4", "purchase_year": 2025},
+    "tags": ["laptop"]
+  }' | jq -r '.id')
+
+# Get
+curl -s "$BASE/ci/$CI_ID" -H "Authorization: Bearer $TOKEN"
+
+# List with filters: ci_type, search, repeatable tags, sort/order, page/limit
+curl -s "$BASE/ci?ci_type=Server&search=web&tags=production&sort=name&order=asc&page=1&limit=50" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Update attributes/tags/lifecycle_status_id (name and ci_type are immutable)
+curl -s -X PUT "$BASE/ci/$CI_ID" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"attributes":{"hostname":"web01","ip_address":"192.168.1.11","os":"Ubuntu","cpu_cores":16,"memory_gb":64},"tags":["production","web","upgraded"]}'
+
+# Delete (409 while relationships exist)
+curl -s -X DELETE "$BASE/ci/$CI_ID" -H "Authorization: Bearer $TOKEN"
 ```
 
-### Create an Application CI
+## 4. Relationships
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/ci \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
+# Create a dependency
+curl -s -X POST "$BASE/relationships" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"source_id\":\"$LAPTOP_ID\",\"target_id\":\"$CI_ID\",\"relationship_type\":\"depends_on\"}"
+
+# List with filters
+curl -s "$BASE/relationships?source_id=$LAPTOP_ID&page=1&limit=20" -H "Authorization: Bearer $TOKEN"
+
+# Bulk: many sources -> one target (max 50 sources, no duplicates)
+curl -s -X POST "$BASE/relationships/bulk-sources" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"source_ids\":[\"$LAPTOP_ID\"],\"target_id\":\"$CI_ID\",\"relationship_type\":\"depends_on\"}"
+
+# Bulk: cartesian product many sources x many targets (max 50 each)
+curl -s -X POST "$BASE/relationships/bulk-matrix" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"source_ids\":[\"$LAPTOP_ID\"],\"target_ids\":[\"$CI_ID\"],\"relationship_type\":\"depends_on\"}"
+
+# Update only attributes
+curl -s -X PUT "$BASE/relationships/$REL_ID" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"attributes":{"criticality":"high"}}'
+```
+
+`GET /ci/{id}/relationships` is registered but currently returns `400 Invalid CI ID`
+(the handler reads path parameters with the wrong router library). Use
+`GET /relationships?source_id=...` or `?target_id=...` instead.
+
+## 5. Relationship types
+
+```bash
+curl -s "$BASE/relationship-types?page=1&limit=50" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/relationship-types/active" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/relationship-types/categories" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/relationship-types/usage" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/relationship-types/statistics" -H "Authorization: Bearer $TOKEN"
+
+# Create a custom type
+curl -s -X POST "$BASE/relationship-types" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{
+    "name": "hosts",
+    "display_name": "Hosts",
+    "description": "Source hosts the target",
+    "forward_label": "hosts",
+    "reverse_label": "hosted on",
+    "category": "infrastructure",
+    "cardinality_source": "one",
+    "cardinality_target": "many",
+    "bidirectional": false
+  }'
+
+# Validate a combination before creating an edge
+curl -s -X POST "$BASE/relationship-types/validate" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"relationship_type":"hosts","source_type":"Server","target_type":"Application"}'
+```
+
+Note: create/update validation failures are reported as `500`, and the boolean list
+filters `is_active`/`is_system` only apply when set to `true`.
+
+## 6. Lifecycle statuses
+
+The migrations seed ten statuses (`planned`, `on_order`, `in_stock`, `pending_install`,
+`operational`, `in_maintenance`, `defective_repair`, `retired`, `disposed`,
+`missing_stolen`). `amortization_behavior` on a status is `pending`, `active`, or
+`terminal` and drives the amortization module.
+
+```bash
+curl -s "$BASE/lifecycle-status?page=1&limit=20&is_active=true" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/lifecycle-status/active" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/lifecycle-status/usage" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/lifecycle-status/distribution" -H "Authorization: Bearer $TOKEN"
+
+# Create a custom status (system statuses cannot be deleted)
+curl -s -X POST "$BASE/lifecycle-status" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"in_use","display_name":"In Use","color":"#22c55e","sort_order":55,"amortization_behavior":"active"}'
+
+# Attach a status to a CI
+curl -s -X PUT "$BASE/ci/$CI_ID" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"lifecycle_status_id\":\"$STATUS_ID\"}"
+```
+
+## 7. Enterprise architecture
+
+EA entities are CI records of the seeded `EA.<Domain>-<Type>` CI types, owned by an EA
+team. List the catalogue first:
+
+```bash
+curl -s "$BASE/ea/teams" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/ea/ci-types" -H "Authorization: Bearer $TOKEN"
+```
+
+```bash
+# Create an EA entity (owner must be a seeded team; lifecycle_status_id is required by the model)
+EA_ID=$(curl -s -X POST "$BASE/ea/entities" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{
     "name": "customer-portal",
-    "ci_type": "Application",
-    "attributes": {
-      "name": "Customer Portal",
-      "version": "2.3.1",
-      "dependencies": ["postgresql", "redis", "nginx"],
-      "configuration": {
-        "port": 8080,
-        "max_connections": 1000,
-        "cache_ttl": 3600
-      }
-    },
-    "tags": ["production", "web", "customer-facing"]
-  }'
-```
-
-### Update CI Attributes
-
-```bash
-curl -X PUT http://localhost:8080/api/v1/ci/550e8400-e29b-41d4-a716-446655440002 \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "attributes": {
-      "cpu_cores": 16,
-      "memory_gb": 64,
-      "environment": "production"
-    },
-    "tags": ["production", "web", "critical", "upgraded"]
-  }'
-```
-
-### Get CI Details
-
-```bash
-curl -X GET http://localhost:8080/api/v1/ci/550e8400-e29b-41d4-a716-446655440002 \
-  -H "Authorization: Bearer $access_token"
-```
-
-## Relationship Examples
-
-### Create Dependencies
-
-```bash
-# Application depends on database
-curl -X POST http://localhost:8080/api/v1/relationships \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source_id": "550e8400-e29b-41d4-a716-446655440001",
-    "target_id": "550e8400-e29b-41d4-a716-446655440000",
-    "relationship_type": "depends_on",
-    "description": "Web application depends on database server"
-  }'
-
-# Server hosts application
-curl -X POST http://localhost:8080/api/v1/relationships \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source_id": "550e8400-e29b-41d4-a716-446655440003",
-    "target_id": "550e8400-e29b-41d4-a716-446655440001",
-    "relationship_type": "hosts",
-    "description": "Web server hosts customer portal application"
-  }'
-```
-
-### Get CI Relationships
-
-```bash
-curl -X GET http://localhost:8080/api/v1/ci/550e8400-e29b-41d4-a716-446655440001/relationships \
-  -H "Authorization: Bearer $access_token"
-```
-
-## Search and Filtering Examples
-
-### Basic Search
-
-```bash
-# Search by name
-curl -X GET "http://localhost:8080/api/v1/ci?search=web" \
-  -H "Authorization: Bearer $access_token"
-
-# Filter by CI type
-curl -X GET "http://localhost:8080/api/v1/ci?ci_type=Server" \
-  -H "Authorization: Bearer $access_token"
-
-# Filter by tags
-curl -X GET "http://localhost:8080/api/v1/ci?tags=production,critical" \
-  -H "Authorization: Bearer $access_token"
-```
-
-### Advanced Attribute Search
-
-```bash
-# Search servers with specific CPU range
-curl -X GET "http://localhost:8080/api/v1/ci?attributes=%7B%22cpu_cores%22%3A%7B%22min%22%3A8%2C%22max%22%3A16%7D%7D" \
-  -H "Authorization: Bearer $access_token"
-
-# The URL-encoded attributes JSON: {"cpu_cores":{"min":8,"max":16}}
-
-# Search by environment and minimum memory
-curl -X GET "http://localhost:8080/api/v1/ci?attributes=%7B%22environment%22%3A%22production%22%2C%22memory_gb%22%3A%7B%22min%22%3A32%7D%7D" \
-  -H "Authorization: Bearer $access_token"
-
-# The URL-encoded attributes JSON: {"environment":"production","memory_gb":{"min":32}}
-```
-
-### Complex Search Examples
-
-```bash
-# Find production servers with specific CPU and memory
-attributes='{
-  "ci_type": "Server",
-  "environment": "production",
-  "cpu_cores": {"min": 8},
-  "memory_gb": {"min": 32}
-}'
-
-curl -X GET "http://localhost:8080/api/v1/ci?attributes=$(echo $attributes | jq -sRr @uri)" \
-  -H "Authorization: Bearer $access_token"
-
-# Find applications with specific dependencies
-attributes='{
-  "ci_type": "Application",
-  "dependencies": {"contains": "postgresql"}
-}'
-
-curl -X GET "http://localhost:8080/api/v1/ci?attributes=$(echo $attributes | jq -sRr @uri)" \
-  -H "Authorization: Bearer $access_token"
-```
-
-## Graph API Examples
-
-### Get Full Graph
-
-```bash
-curl -X GET "http://localhost:8080/api/v1/graph?limit=50" \
-  -H "Authorization: Bearer $access_token"
-```
-
-### Explore Graph from Specific CI
-
-```bash
-# Explore 2 levels deep from a specific CI
-curl -X GET "http://localhost:8080/api/v1/graph/explore?start_id=550e8400-e29b-41d4-a716-446655440001&depth=2" \
-  -H "Authorization: Bearer $access_token"
-
-# Explore specific relationship types
-curl -X GET "http://localhost:8080/api/v1/graph/explore?start_id=550e8400-e29b-41d4-a716-446655440001&depth=3&relationship_types=depends_on,hosts" \
-  -H "Authorization: Bearer $access_token"
-```
-
-## Audit Examples
-
-### Get Recent Activity
-
-```bash
-curl -X GET "http://localhost:8080/api/v1/audit/logs?page=1&limit=20" \
-  -H "Authorization: Bearer $access_token"
-```
-
-### Filter Audit Logs
-
-```bash
-# Get creation events only
-curl -X GET "http://localhost:8080/api/v1/audit/logs?action=create&limit=50" \
-  -H "Authorization: Bearer $access_token"
-
-# Get CI-related events
-curl -X GET "http://localhost:8080/api/v1/audit/logs?resource_type=ci&limit=50" \
-  -H "Authorization: Bearer $access_token"
-
-# Get events by date range
-curl -X GET "http://localhost:8080/api/v1/audit/logs?start_date=2023-01-01T00:00:00Z&end_date=2023-01-31T23:59:59Z" \
-  -H "Authorization: Bearer $access_token"
-```
-
-### Get Audit Statistics
-
-```bash
-curl -X GET "http://localhost:8080/api/v1/audit/stats?period=month" \
-  -H "Authorization: Bearer $access_token"
-```
-
-### Export Audit Logs
-
-```bash
-# Export as CSV
-curl -X GET "http://localhost:8080/api/v1/audit/export?start_date=2023-01-01T00:00:00Z&end_date=2023-01-31T23:59:59Z&format=csv" \
-  -H "Authorization: Bearer $access_token" \
-  -o audit-logs-jan-2023.csv
-
-# Export as JSON
-curl -X GET "http://localhost:8080/api/v1/audit/export?start_date=2023-01-01T00:00:00Z&end_date=2023-01-31T23:59:59Z&format=json" \
-  -H "Authorization: Bearer $access_token" \
-  -o audit-logs-jan-2023.json
-```
-
-## SDK Integration Examples
-
-### JavaScript SDK Basic Usage
-
-```javascript
-import { PortaAPI } from '@porta/api-client';
-
-const api = new PortaAPI({
-  baseURL: 'http://localhost:8080/api/v1',
-  apiKey: 'your-access-token'
-});
-
-// List CIs with filtering
-const servers = await api.ci.list({
-  ci_type: 'Server',
-  attributes: {
-    environment: 'production'
-  },
-  limit: 50
-});
-
-// Create a new CI
-const newServer = await api.ci.create({
-  name: 'app-server-02',
-  ci_type: 'Server',
-  attributes: {
-    hostname: 'app02.example.com',
-    cpu_cores: 4,
-    memory_gb: 16
-  },
-  tags: ['production', 'app']
-});
-
-// Create relationships
-await api.relationships.create({
-  source_id: newServer.id,
-  target_id: 'database-server-01',
-  relationship_type: 'depends_on',
-  description: 'Application server depends on database'
-});
-
-// Get graph data
-const graph = await api.graph.get({ limit: 100 });
-console.log(`Found ${graph.nodes.length} nodes and ${graph.edges.length} edges`);
-```
-
-### Python SDK Integration
-
-```python
-import porta_sdk
-import json
-
-# Initialize client
-client = porta_sdk.Client(
-    base_url='http://localhost:8080/api/v1',
-    api_key='your-access-token'
-)
-
-# Create CI Type
-server_type = client.ci_types.create(
-    name="Database Server",
-    description="Database server configuration",
-    required_attributes=[
-        {
-            "name": "hostname",
-            "type": "string",
-            "validation": {"min_length": 1}
-        },
-        {
-            "name": "database_type",
-            "type": "string",
-            "validation": {"enum": ["postgresql", "mysql", "mongodb"]}
-        }
-    ]
-)
-
-# Create multiple CIs
-servers = []
-for i in range(1, 4):
-    server = client.ci.create(
-        name=f"db-server-{i:02d}",
-        ci_type="Database Server",
-        attributes={
-            "hostname": f"db{i:02d}.example.com",
-            "database_type": "postgresql"
-        },
-        tags=["database", "production"]
-    )
-    servers.append(server)
-
-# Search for specific CIs
-production_dbs = client.ci.list(
-    attributes={
-        "ci_type": "Database Server",
-        "environment": "production"
-    }
-)
-
-print(f"Found {len(production_dbs)} production database servers")
-```
-
-### Go SDK Integration
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "log"
-
-    "github.com/tahopetis/porta-go"
-    "github.com/tahopetis/porta-go/models"
-)
-
-func main() {
-    // Initialize client
-    client := porta.NewClient(&porta.ClientConfig{
-        BaseURL: "http://localhost:8080/api/v1",
-        APIKey:  "your-access-token",
-    })
-
-    ctx := context.Background()
-
-    // Create CI Type
-    ciType := &models.CIType{
-        Name:        "Network Device",
-        Description: "Network infrastructure device",
-        RequiredAttributes: []*models.AttributeDefinition{
-            {
-                Name: "device_name",
-                Type: "string",
-                Validation: &models.ValidationRules{
-                    MinLength: 1,
-                    MaxLength: 100,
-                },
-            },
-            {
-                Name: "ip_address",
-                Type: "string",
-                Validation: &models.ValidationRules{
-                    Format: "ipv4",
-                },
-            },
-        },
-    }
-
-    createdType, err := client.CITypes.Create(ctx, ciType)
-    if err != nil {
-        log.Fatalf("Failed to create CI type: %v", err)
-    }
-
-    // Create CI
-    ci := &models.ConfigurationItem{
-        Name:     "switch-01",
-        CIType:   "Network Device",
-        Attributes: map[string]interface{}{
-            "device_name": "core-switch-01",
-            "ip_address": "192.168.1.1",
-        },
-        Tags: []string{"network", "core", "production"},
-    }
-
-    createdCI, err := client.CI.Create(ctx, ci)
-    if err != nil {
-        log.Fatalf("Failed to create CI: %v", err)
-    }
-
-    fmt.Printf("Created CI: %s (ID: %s)\n", createdCI.Name, createdCI.ID)
-}
-```
-
-## Common Workflows
-
-### 1. Onboarding New Application Infrastructure
-
-```bash
-#!/bin/bash
-
-# Create CI types
-server_type_id=$(curl -s -X POST http://localhost:8080/api/v1/ci-types \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Application Server",
-    "description": "Application hosting server",
-    "required_attributes": [{"name": "hostname", "type": "string"}],
-    "optional_attributes": [{"name": "environment", "type": "string"}]
+    "ci_type": "EA.Application-BusinessApplication",
+    "owner": "enterprise-architecture",
+    "lifecycle_status_id": "'"$STATUS_ID"'",
+    "attributes": {"criticality": "high", "version": "2.3.1"},
+    "tags": ["customer-facing"]
   }' | jq -r '.id')
 
-app_type_id=$(curl -s -X POST http://localhost:8080/api/v1/ci-types \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Web Application",
-    "description": "Web application service",
-    "required_attributes": [{"name": "name", "type": "string"}]
-  }' | jq -r '.id')
+# List/filter
+curl -s "$BASE/ea/entities?domain=Application&search=portal&page=1&page_size=25" \
+  -H "Authorization: Bearer $TOKEN"
 
-# Create servers
-server1_id=$(curl -s -X POST http://localhost:8080/api/v1/ci \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\": \"app-server-01\", \"ci_type\": \"Application Server\", \"attributes\": {\"hostname\": \"app01.example.com\"}, \"tags\": [\"application\", \"server\"]}" | jq -r '.id')
+# Get / validate / audit
+curl -s "$BASE/ea/entities/$EA_ID" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/ea/entities/$EA_ID/validate" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/ea/entities/$EA_ID/audit?page=1&page_size=50" -H "Authorization: Bearer $TOKEN"
 
-server2_id=$(curl -s -X POST http://localhost:8080/api/v1/ci \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\": \"app-server-02\", \"ci_type\": \"Application Server\", \"attributes\": {\"hostname\": \"app02.example.com\"}, \"tags\": [\"application\", \"server\"]}" | jq -r '.id')
-
-# Create applications
-app_id=$(curl -s -X POST http://localhost:8080/api/v1/ci \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\": \"customer-portal\", \"ci_type\": \"Web Application\", \"attributes\": {\"name\": \"Customer Portal\"}, \"tags\": [\"application\", \"web\"]}" | jq -r '.id')
-
-# Create relationships
-curl -s -X POST http://localhost:8080/api/v1/relationships \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d "{\"source_id\": \"$app_id\", \"target_id\": \"$server1_id\", \"relationship_type\": \"hosts_on\"}"
-
-curl -s -X POST http://localhost:8080/api/v1/relationships \
-  -H "Authorization: Bearer $access_token" \
-  -H "Content-Type: application/json" \
-  -d "{\"source_id\": \"$app_id\", \"target_id\": \"$server2_id\", \"relationship_type\": \"hosts_on\"}"
-
-echo "Infrastructure onboarded successfully!"
-echo "Application ID: $app_id"
-echo "Server IDs: $server1_id, $server2_id"
+# Delete (400 + relationship_count when relationships exist; force bypasses the check)
+curl -s -X DELETE "$BASE/ea/entities/$EA_ID?force=true" -H "Authorization: Bearer $TOKEN"
 ```
 
-### 2. Impact Analysis
+### EA data quality
 
 ```bash
-#!/bin/bash
-
-# Get relationships for a specific CI
-ci_id="550e8400-e29b-41d4-a716-446655440001"
-
-echo "=== Impact Analysis for CI: $ci_id ==="
-
-# Get all relationships
-relationships=$(curl -s -X GET "http://localhost:8080/api/v1/ci/$ci_id/relationships" \
-  -H "Authorization: Bearer $access_token")
-
-# Analyze dependencies
-echo "Dependencies:"
-echo "$relationships" | jq -r '.relationships[] | select(.relationship_type == "depends_on") | "  \(.source_ci.name) depends on \(.target_ci.name)"'
-
-echo ""
-echo "Dependents:"
-echo "$relationships" | jq -r '.relationships[] | select(.relationship_type == "depends_on") | "  \(.target_ci.name) is depended upon by \(.source_ci.name)"'
-
-# Get graph for deeper analysis
-graph=$(curl -s -X GET "http://localhost:8080/api/v1/graph/explore?start_id=$ci_id&depth=3" \
-  -H "Authorization: Bearer $access_token")
-
-echo ""
-echo "=== Full Impact Graph (3 levels deep) ==="
-echo "Total nodes: $(echo $graph | jq '.metadata.total_nodes')"
-echo "Total edges: $(echo $graph | jq '.metadata.total_edges')"
-
-# Export detailed impact report
-echo "$graph" > impact-analysis-$(date +%Y%m%d).json
-echo "Impact analysis saved to impact-analysis-$(date +%Y%m%d).json"
+curl -s "$BASE/ea/data-quality" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/ea/data-quality?domain=Application" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/ea/data-quality/stale?days_threshold=90&include_incomplete=true" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/ea/data-quality/errors?domain=Application" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/ea/data-quality/lifecycle?domain=Application" -H "Authorization: Bearer $TOKEN"
 ```
 
-### 3. Daily Compliance Check
+### EA CSV import
+
+Only the template download works today (JSON request, CSV response):
 
 ```bash
-#!/bin/bash
-
-# Check for compliance issues
-
-echo "=== Daily Compliance Check ==="
-date=$(date +%Y-%m-%d)
-
-# Get all production servers
-servers=$(curl -s -X GET "http://localhost:8080/api/v1/ci?attributes=%7B%22environment%22%3A%22production%22%2C%22ci_type%22%3A%22Server%22%7D" \
-  -H "Authorization: Bearer $access_token")
-
-echo "Production Servers Found:"
-echo "$servers" | jq -r '.cis[].name'
-
-# Check for servers without monitoring tag
-echo ""
-echo "=== Servers Without Monitoring Tag ==="
-echo "$servers" | jq -r '.cis[] | select(.tags | index("monitoring") | not) | .name'
-
-# Get audit statistics
-stats=$(curl -s -X GET "http://localhost:8080/api/v1/audit/stats?period=day" \
-  -H "Authorization: Bearer $access_token")
-
-echo ""
-echo "=== Daily Activity Summary ==="
-echo "Total actions: $(echo $stats | jq '.total_actions')"
-echo "Actions by type:"
-echo "$stats" | jq -r '.actions_by_type | to_entries[] | "  \(.key): \(.value)"'
-
-# Generate compliance report
-{
-  echo "Compliance Report - $date"
-  echo "=================================="
-  echo ""
-  echo "Production Servers: $(echo $servers | jq '.cis | length')"
-  echo "Servers Without Monitoring: $(echo "$servers" | jq '.cis[] | select(.tags | index("monitoring") | not) | length')"
-  echo ""
-  echo "Daily Actions: $(echo $stats | jq '.total_actions')"
-  echo "Creations: $(echo $stats | jq '.actions_by_type.create // 0')"
-  echo "Updates: $(echo $stats | jq '.actions_by_type.update // 0')"
-  echo "Deletions: $(echo $stats | jq '.actions_by_type.delete // 0')"
-} > compliance-report-$date.txt
-
-echo "Compliance report saved to compliance-report-$date.txt"
+curl -s -X POST "$BASE/ea/import/template" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"ci_type":"EA.Application-BusinessApplication"}' \
+  -o ea-application-template.csv
 ```
 
-These examples provide a comprehensive foundation for integrating with the Porta CMDB API. Remember to:
+`POST /ea/import/validate` and `POST /ea/import/execute` are designed for
+`multipart/form-data` (`file` + `ci_type`), but the global JSON content-type middleware
+rejects them with `415` before the handler runs. Do not rely on them yet.
 
-1. Always handle authentication securely
-2. Implement proper error handling
-3. Use pagination for large datasets
-4. Cache frequently accessed data
-5. Monitor API usage and rate limits
-6. Follow the best practices outlined in the API guide
+## 8. Amortization
 
-For more detailed information, refer to the [OpenAPI specification](./openapi.yaml) and [API guide](./api-guide.md).
+Every amortization route requires `amortization:read`; changes to configuration,
+adjustments, restructuring and settings additionally require
+`amortization:configure`; triggering runs requires `amortization:run`.
+
+```bash
+CI=$LAPTOP_ID
+
+# Configure the financials of an amortizable CI
+curl -s -X PUT "$BASE/amortization/configuration-items/$CI" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"purchase_cost":2400.00,"salvage_value":200.00,"amort_start_date":"2025-01-01T00:00:00Z","useful_life_months":36}'
+
+# Details (list, filter, details, ledger)
+curl -s "$BASE/amortization/configuration-items?search=lt-0042&page=1&limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/amortization/configuration-items/$CI" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/amortization/ledger?ci_id=$CI&page=1&limit=20" -H "Authorization: Bearer $TOKEN"
+
+# Manual adjustment
+curl -s -X POST "$BASE/amortization/adjustments" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"ci_id\":\"$CI\",\"amount\":50.00,\"description\":\"Correction after inventory audit\"}"
+
+# Manual run (202; then poll the run)
+RUN_ID=$(curl -s -X POST "$BASE/amortization/runs" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"dry_run":false}' | jq -r '.run_id')
+curl -s "$BASE/amortization/runs/$RUN_ID" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/amortization/runs?status=completed,failed&page=1&limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Reports: summary, depreciation schedule (JSON or CSV)
+curl -s "$BASE/amortization/summaries?group_by=ci_type" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/amortization/reports/depreciation-schedule?date_from=2025-01-01&date_to=2025-12-31&format=csv" \
+  -H "Authorization: Bearer $TOKEN" -o depreciation-2025.csv
+
+# Settings: the handlers exist but query an amortization_settings table that no
+# migration creates, so both calls currently return 500 on a migrated database.
+curl -s "$BASE/amortization/settings" -H "Authorization: Bearer $TOKEN"
+curl -s -X PUT "$BASE/amortization/settings" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"currency":"EUR","default_useful_life_months":48}'
+
+# Preview then execute a useful-life restructuring
+curl -s -X POST "$BASE/amortization/restructuring/preview" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"ci_id\":\"$CI\",\"new_useful_life_months\":48}"
+curl -s -X POST "$BASE/amortization/restructuring" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"ci_id\":\"$CI\",\"new_useful_life_months\":48,\"reason\":\"Extended support contract\"}"
+```
+
+Amortization failures (including unknown IDs) are returned as `500` with the nested body
+`{"error": {"message": "...", "code": "...", "details": "..."}}`; only malformed UUIDs
+and query parameters produce `400`.
+
+## 9. Error handling
+
+```bash
+# 401 - missing/expired token (plain text from middleware)
+curl -s -i "$BASE/ci" | head -5
+
+# 403 - authenticated but missing permission (plain text)
+curl -s -i "$BASE/users" -H "Authorization: Bearer $VIEWER_TOKEN" | head -5
+
+# 400 - schema validation failure (JSON)
+curl -s -i -X POST "$BASE/ci" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"broken","ci_type":"Server","attributes":{}}' | tail -3
+
+# 409 - deleting a CI type that still has CIs
+curl -s -i -X DELETE "$BASE/ci-types/$CT_ID" -H "Authorization: Bearer $TOKEN" | tail -3
+```
+
+Recommended client behaviour: branch on HTTP status first; parse
+`{"error": ...}` when the response is JSON, otherwise show the text body. There is no
+rate limiting, `/metrics`, or Redis session store in this codebase, so no
+retry-after/rate-limit headers or server-side session invalidation should be assumed.

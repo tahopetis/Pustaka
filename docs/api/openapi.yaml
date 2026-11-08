@@ -1,1079 +1,107 @@
 openapi: 3.0.3
 info:
-  title: Porta CMDB API
+  title: Porta CMDB API (partial contract)
   description: |
-    Configuration Management Database (CMDB) API for managing IT infrastructure components.
+    **This contract is explicitly partial.** It documents only the endpoint groups that
+    were verified against the live router and handlers in this repository
+    (`cmd/api/main.go`, `internal/api/`, `internal/api/handlers/`). Endpoint groups that
+    are not listed here are intentionally out of scope for this pass and must not be
+    assumed to be covered: **graph, qr, audit, analytics, dashboard, and the public CI
+    page**. Their routes exist but are incomplete as a documented contract.
 
-    Porta provides flexible schema definition for configuration items, comprehensive relationship
-    management, and advanced search capabilities with JSONB attribute support.
+    Every documented operation carries an `x-status` marker:
+    - `implemented` - the route is registered and the handler matches this description.
+    - `partial` - the route is registered, but a known limitation is stated in the
+      operation description.
+    - `planned` - the documented behaviour is not fully wired up yet.
 
-    ## Key Features
-    - **Dynamic CI Types**: Define custom schemas with validation rules
-    - **Flexible Attributes**: JSONB attributes with type-safe validation
-    - **Relationship Management**: Track dependencies and impacts
-    - **Advanced Search**: Search within CI attributes with type-specific filters
-    - **Audit Logging**: Complete change tracking and compliance
-    - **Graph Visualization**: Interactive relationship graphs
-    - **Role-Based Access Control**: Fine-grained permissions
+    ## Base URL
+
+    The API process listens on port 8080 inside its container; docker compose publishes
+    it on the host as `http://localhost:8081`. All API routes are under `/api/v1`.
+    `GET /health` is the only documented route outside that prefix.
 
     ## Authentication
-    The API uses JWT (JSON Web Token) authentication. Include the token in the Authorization header:
-    ```
-    Authorization: Bearer <your-jwt-token>
-    ```
 
-    ## Rate Limiting
-    API requests are limited to 1000 requests per hour per user.
+    Public endpoints are only `GET /health`, `POST /api/v1/auth/login`,
+    `POST /api/v1/auth/refresh`, and `GET /public/ci/{id}` (not documented here).
+    Every other route requires `Authorization: Bearer <access_token>`.
 
-    ## Pagination
-    List endpoints support pagination with the following parameters:
-    - `page` (int): Page number (default: 1)
-    - `limit` (int): Items per page (default: 20, max: 100)
+    Login takes a `username` (not an email address). Default token lifetimes are 24h for
+    the access token (`JWT_ACCESS_TOKEN_TTL`) and 168h for the refresh token
+    (`JWT_REFRESH_TOKEN_TTL`). `POST /auth/refresh` rotates both tokens.
 
-    Response format:
-    ```json
-    {
-      "data": [...],
-      "page": 1,
-      "limit": 20,
-      "total": 150,
-      "total_pages": 8
-    }
-    ```
+    Authorization is enforced by RBAC middleware keyed on permission strings seeded in
+    `cmd/migrations` (for example `ci:read`, `ci:create`, `relationship_type:update`,
+    `amortization:configure`, `ea:read`). The required permission chain is listed in
+    each operation description. A request missing a permission returns `403`.
+
+    ## Conventions
+
+    - **JSON only.** The router applies `AllowContentType("application/json")` globally.
+      Requests with a body must send `Content-Type: application/json`; any other media
+      type is rejected with `415` before the handler runs. This also affects the
+      multipart import endpoints (see their `x-status`).
+    - **Pagination.** List endpoints use `page` (default 1, minimum 1) and `limit`
+      (default 20, maximum 100). Page sizes are clamped by the handlers.
+    - **Pagination response fields** differ per group: `page`/`limit`/`total`/
+      `total_pages` for CMDB lists, `page`/`page_size`/`total_count`/`total_pages` for
+      amortization, and `page`/`page_size`/`total` for EA entities.
+    - **Errors.** Most handlers return `{"error": "<message>"}`. Authentication
+      endpoints and the JWT/RBAC middleware return `text/plain`. Amortization returns a
+      nested object: `{"error": {"message": "...", "code": "...", "details": "..."}}`.
+      This is noted on the shared error responses; clients should branch on the HTTP
+      status first.
+    - **Request IDs.** Send `X-Request-ID` if you need correlation; the router otherwise
+      generates one and echoes it as `X-Request-Id`.
+    - **Not implemented.** There is no rate limiting, no Prometheus `/metrics` endpoint,
+      and no Redis session store. Redis is used only for caching. Do not rely on them.
+
+    The OpenAPI description is the machine-readable contract; `api-guide.md` covers the
+    auth flow and conventions in prose, and `api-examples.md` has runnable curl recipes.
   version: 1.0.0
-  contact:
-    name: Porta Team
-    email: support@porta.dev
-    url: https://porta.dev
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
 servers:
-  - url: https://api.porta.dev/v1
-    description: Production server
-  - url: https://staging-api.porta.dev/v1
-    description: Staging server
-  - url: http://localhost:8080/api/v1
-    description: Development server
+  - url: http://localhost:8081
+    description: Host address of the docker compose API service (container port 8080)
 tags:
-  - name: authentication
-    description: Authentication and token management
+  - name: health
+    description: Liveness probe
+  - name: auth
+    description: Login, token refresh, current user
   - name: users
-    description: User management operations
+    description: User accounts and roles
   - name: ci-types
-    description: CI type schema management
-  - name: configuration-items
-    description: Configuration item CRUD operations
+    description: CI type schemas
+  - name: ci
+    description: Configuration items
   - name: relationships
-    description: CI relationship management
-  - name: graph
-    description: Graph visualization and exploration
-  - name: audit
-    description: Audit logging and compliance
-  - name: analytics
-    description: Usage analytics and insights
-
+    description: CI relationships
+  - name: relationship-types
+    description: Relationship type catalogue
+  - name: lifecycle-status
+    description: Lifecycle status catalogue
+  - name: ea
+    description: Enterprise architecture entities, CI types, teams and import
+  - name: ea-data-quality
+    description: Enterprise architecture data quality reporting
+  - name: amortization
+    description: IT asset amortization
 paths:
-  # Authentication endpoints
-  /auth/login:
-    post:
-      tags:
-        - authentication
-      summary: Authenticate user
-      description: Authenticate with email and password to receive JWT tokens
-      operationId: loginUser
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-                - password
-              properties:
-                email:
-                  type: string
-                  format: email
-                  description: User email address
-                password:
-                  type: string
-                  format: password
-                  description: User password
-              example:
-                email: admin@porta.dev
-                password: securePassword123
-      responses:
-        '200':
-          description: Authentication successful
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  access_token:
-                    type: string
-                    description: JWT access token
-                  refresh_token:
-                    type: string
-                    description: JWT refresh token
-                  expires_in:
-                    type: integer
-                    description: Token expiration time in seconds
-                  user:
-                    $ref: '#/components/schemas/User'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalError'
-
-  /auth/refresh:
-    post:
-      tags:
-        - authentication
-      summary: Refresh access token
-      description: Use refresh token to get a new access token
-      operationId: refreshToken
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - refresh_token
-              properties:
-                refresh_token:
-                  type: string
-                  description: Valid refresh token
-      responses:
-        '200':
-          description: Token refreshed successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  access_token:
-                    type: string
-                  expires_in:
-                    type: integer
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  # User management endpoints
-  /users:
-    get:
-      tags:
-        - users
-      summary: List users
-      description: Retrieve a paginated list of users
-      operationId: listUsers
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Search'
-      responses:
-        '200':
-          description: Users retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  users:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/User'
-                  page:
-                    type: integer
-                  limit:
-                    type: integer
-                  total:
-                    type: integer
-                  total_pages:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-    post:
-      tags:
-        - users
-      summary: Create user
-      description: Create a new user account
-      operationId: createUser
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateUserRequest'
-      responses:
-        '201':
-          description: User created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/Conflict'
-
-  /users/{id}:
-    get:
-      tags:
-        - users
-      summary: Get user
-      description: Retrieve user details by ID
-      operationId: getUser
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
-      responses:
-        '200':
-          description: User retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-    put:
-      tags:
-        - users
-      summary: Update user
-      description: Update user information
-      operationId: updateUser
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateUserRequest'
-      responses:
-        '200':
-          description: User updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-    delete:
-      tags:
-        - users
-      summary: Delete user
-      description: Delete a user account
-      operationId: deleteUser
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
-      responses:
-        '204':
-          description: User deleted successfully
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  # Current user endpoint
-  /me:
-    get:
-      tags:
-        - users
-      summary: Get current user
-      description: Retrieve the current authenticated user's profile
-      operationId: getCurrentUser
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Current user retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  # CI Type management endpoints
-  /ci-types:
-    get:
-      tags:
-        - ci-types
-      summary: List CI types
-      description: Retrieve a paginated list of CI type schemas
-      operationId: listCITypes
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Search'
-      responses:
-        '200':
-          description: CI types retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ci_types:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/CIType'
-                  page:
-                    type: integer
-                  limit:
-                    type: integer
-                  total:
-                    type: integer
-                  total_pages:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-    post:
-      tags:
-        - ci-types
-      summary: Create CI type
-      description: Create a new CI type schema with attribute definitions
-      operationId: createCIType
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateCITypeRequest'
-      responses:
-        '201':
-          description: CI type created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CIType'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/Conflict'
-
-  /ci-types/{id}:
-    get:
-      tags:
-        - ci-types
-      summary: Get CI type
-      description: Retrieve CI type schema by ID
-      operationId: getCIType
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CITypeId'
-      responses:
-        '200':
-          description: CI type retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CIType'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-    put:
-      tags:
-        - ci-types
-      summary: Update CI type
-      description: Update CI type schema
-      operationId: updateCIType
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CITypeId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateCITypeRequest'
-      responses:
-        '200':
-          description: CI type updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CIType'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-    delete:
-      tags:
-        - ci-types
-      summary: Delete CI type
-      description: Delete a CI type schema
-      operationId: deleteCIType
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CITypeId'
-      responses:
-        '204':
-          description: CI type deleted successfully
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Cannot delete CI type with existing CIs
-
-  # Configuration Item endpoints
-  /ci:
-    get:
-      tags:
-        - configuration-items
-      summary: List configuration items
-      description: Retrieve a paginated list of configuration items with advanced filtering
-      operationId: listCIs
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/CIType'
-        - $ref: '#/components/parameters/Tags'
-        - $ref: '#/components/parameters/Attributes'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
-      responses:
-        '200':
-          description: Configuration items retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  cis:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/ConfigurationItem'
-                  page:
-                    type: integer
-                  limit:
-                    type: integer
-                  total:
-                    type: integer
-                  total_pages:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-    post:
-      tags:
-        - configuration-items
-      summary: Create configuration item
-      description: Create a new configuration item with validation against CI type schema
-      operationId: createCI
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateCIRequest'
-      responses:
-        '201':
-          description: Configuration item created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConfigurationItem'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          description: Validation failed for CI attributes
-
-  /ci/{id}:
-    get:
-      tags:
-        - configuration-items
-      summary: Get configuration item
-      description: Retrieve configuration item details by ID
-      operationId: getCI
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CIId'
-      responses:
-        '200':
-          description: Configuration item retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConfigurationItem'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-    put:
-      tags:
-        - configuration-items
-      summary: Update configuration item
-      description: Update configuration item attributes and metadata
-      operationId: updateCI
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CIId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateCIRequest'
-      responses:
-        '200':
-          description: Configuration item updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConfigurationItem'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          description: Validation failed for CI attributes
-
-    delete:
-      tags:
-        - configuration-items
-      summary: Delete configuration item
-      description: Delete a configuration item
-      operationId: deleteCI
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CIId'
-      responses:
-        '204':
-          description: Configuration item deleted successfully
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /ci/{id}/relationships:
-    get:
-      tags:
-        - configuration-items
-        - relationships
-      summary: Get CI relationships
-      description: Retrieve all relationships for a specific configuration item
-      operationId: getCIRelationships
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CIId'
-      responses:
-        '200':
-          description: CI relationships retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  relationships:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Relationship'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  # Relationship endpoints
-  /relationships:
-    get:
-      tags:
-        - relationships
-      summary: List relationships
-      description: Retrieve a paginated list of CI relationships
-      operationId: listRelationships
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/SourceCI'
-        - $ref: '#/components/parameters/TargetCI'
-        - $ref: '#/components/parameters/RelationshipType'
-      responses:
-        '200':
-          description: Relationships retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  relationships:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Relationship'
-                  page:
-                    type: integer
-                  limit:
-                    type: integer
-                  total:
-                    type: integer
-                  total_pages:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-    post:
-      tags:
-        - relationships
-      summary: Create relationship
-      description: Create a new relationship between configuration items
-      operationId: createRelationship
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateRelationshipRequest'
-      responses:
-        '201':
-          description: Relationship created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Relationship'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          description: Source or target CI not found
-
-  /relationships/{id}:
-    get:
-      tags:
-        - relationships
-      summary: Get relationship
-      description: Retrieve relationship details by ID
-      operationId: getRelationship
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/RelationshipId'
-      responses:
-        '200':
-          description: Relationship retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Relationship'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-    put:
-      tags:
-        - relationships
-      summary: Update relationship
-      description: Update relationship details
-      operationId: updateRelationship
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/RelationshipId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateRelationshipRequest'
-      responses:
-        '200':
-          description: Relationship updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Relationship'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-    delete:
-      tags:
-        - relationships
-      summary: Delete relationship
-      description: Delete a relationship
-      operationId: deleteRelationship
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/RelationshipId'
-      responses:
-        '204':
-          description: Relationship deleted successfully
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  # Graph endpoints
-  /graph:
-    get:
-      tags:
-        - graph
-      summary: Get graph data
-      description: Retrieve graph visualization data for all configuration items
-      operationId: getGraphData
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-      responses:
-        '200':
-          description: Graph data retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GraphData'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-  /graph/explore:
-    get:
-      tags:
-        - graph
-      summary: Explore graph
-      description: Interactive graph exploration starting from a specific CI
-      operationId: exploreGraph
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: start_id
-          in: query
-          description: Starting CI ID for exploration
-          schema:
-            type: string
-            format: uuid
-        - name: depth
-          in: query
-          description: Maximum depth of exploration (default: 2)
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 5
-        - name: relationship_types
-          in: query
-          description: Filter by relationship types
-          schema:
-            type: array
-            items:
-              type: string
-      responses:
-        '200':
-          description: Graph exploration completed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GraphData'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-  # Audit endpoints
-  /audit/logs:
-    get:
-      tags:
-        - audit
-      summary: List audit logs
-      description: Retrieve a paginated list of audit logs
-      operationId: listAuditLogs
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Search'
-        - name: action
-          in: query
-          description: Filter by action type
-          schema:
-            type: string
-            enum: [create, update, delete]
-        - name: resource_type
-          in: query
-          description: Filter by resource type
-          schema:
-            type: string
-            enum: [ci, ci_type, relationship, user]
-        - name: user_id
-          in: query
-          description: Filter by user ID
-          schema:
-            type: string
-            format: uuid
-        - name: start_date
-          in: query
-          description: Filter by start date (ISO 8601)
-          schema:
-            type: string
-            format: date-time
-        - name: end_date
-          in: query
-          description: Filter by end date (ISO 8601)
-          schema:
-            type: string
-            format: date-time
-      responses:
-        '200':
-          description: Audit logs retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  audit_logs:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/AuditLog'
-                  page:
-                    type: integer
-                  limit:
-                    type: integer
-                  total:
-                    type: integer
-                  total_pages:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-  /audit/logs/{id}:
-    get:
-      tags:
-        - audit
-      summary: Get audit log
-      description: Retrieve audit log details by ID
-      operationId: getAuditLog
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/AuditLogId'
-      responses:
-        '200':
-          description: Audit log retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuditLog'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-    delete:
-      tags:
-        - audit
-      summary: Delete audit log
-      description: Delete a specific audit log entry
-      operationId: deleteAuditLog
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/AuditLogId'
-      responses:
-        '204':
-          description: Audit log deleted successfully
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /audit/stats:
-    get:
-      tags:
-        - audit
-      summary: Get audit statistics
-      description: Retrieve audit statistics and metrics
-      operationId: getAuditStats
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: period
-          in: query
-          description: Time period for statistics
-          schema:
-            type: string
-            enum: [day, week, month, year]
-            default: month
-      responses:
-        '200':
-          description: Audit statistics retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuditStats'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-  /audit/export:
-    get:
-      tags:
-        - audit
-      summary: Export audit logs
-      description: Export audit logs in CSV format
-      operationId: exportAuditLogs
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: start_date
-          in: query
-          description: Export start date (ISO 8601)
-          required: true
-          schema:
-            type: string
-            format: date-time
-        - name: end_date
-          in: query
-          description: Export end date (ISO 8601)
-          required: true
-          schema:
-            type: string
-            format: date-time
-        - name: format
-          in: query
-          description: Export format
-          schema:
-            type: string
-            enum: [csv, json]
-            default: csv
-      responses:
-        '200':
-          description: Audit logs exported successfully
-          content:
-            text/csv:
-              schema:
-                type: string
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-  # Health check endpoint
   /health:
     get:
       tags:
-        - system
-      summary: Health check
-      description: Check API health status
-      operationId: healthCheck
+        - health
+      summary: Liveness probe
+      description: |
+        Unauthenticated. The router answers directly; no database calls are made.
+      operationId: getHealth
+      x-status: implemented
       responses:
         '200':
-          description: System is healthy
+          description: Service is up
           content:
             application/json:
               schema:
@@ -1086,151 +114,2945 @@ paths:
                     type: string
                     format: date-time
 
+  /api/v1/auth/login:
+    post:
+      tags:
+        - auth
+      summary: Log in and obtain JWTs
+      description: |
+        Unauthenticated. Looks the user up by **username** (the field is `username`,
+        not `email`), checks `is_active`, verifies the password, and returns an access
+        token and a refresh token together with the user record.
+
+        Requires `Content-Type: application/json`. A bad body returns plain-text
+        `Invalid request body`; bad credentials, an unknown user, or an inactive
+        account return plain-text `401`.
+      operationId: login
+      x-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/PlainTextBadRequest'
+        '401':
+          $ref: '#/components/responses/PlainTextUnauthorized'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/PlainTextInternalError'
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - auth
+      summary: Rotate access and refresh tokens
+      description: |
+        Unauthenticated. Validates the supplied refresh token, reloads the user, and
+        issues a new access token **and** a new refresh token. The response does not
+        include the user object.
+      operationId: refreshToken
+      x-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '400':
+          $ref: '#/components/responses/PlainTextBadRequest'
+        '401':
+          $ref: '#/components/responses/PlainTextUnauthorized'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/PlainTextInternalError'
+
+  /api/v1/me:
+    get:
+      tags:
+        - auth
+      summary: Get the current user
+      description: |
+        Returns the authenticated user's full record. Requires a valid JWT only; no
+        additional RBAC permission is checked.
+      operationId: getCurrentUser
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/users:
+    get:
+      tags:
+        - users
+      summary: List users
+      description: |
+        Requires `user:read`.
+
+        `page` and `limit` are applied to the response metadata, but the underlying
+        user service currently loads every user and the `search` parameter is accepted
+        and ignored.
+      operationId: listUsers
+      x-status: partial
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - users
+      summary: Create a user
+      description: |
+        Requires `user:read` **and** `user:create`. Roles are supplied by name and must
+        already exist (`admin`, `editor`, `viewer` are seeded). A duplicate username or
+        email returns plain-text `409`.
+      operationId: createUser
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/users/{id}:
+    get:
+      tags:
+        - users
+      summary: Get a user
+      description: Requires `user:read`.
+      operationId: getUser
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - users
+      summary: Update a user
+      description: |
+        Requires `user:read` **and** `user:update`.
+
+        **Not implemented.** The handler decodes the body, ignores it, and returns the
+        current user record unchanged. Do not rely on it changing anything.
+      operationId: updateUser
+      x-status: planned
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Current (unchanged) user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - users
+      summary: Delete a user
+      description: |
+        Requires `user:read` **and** `user:delete`.
+
+        **Not implemented.** The handler validates the ID and returns `204` without
+        deleting the user.
+      operationId: deleteUser
+      x-status: planned
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204':
+          description: Returned even though nothing is deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/ci-types:
+    get:
+      tags:
+        - ci-types
+      summary: List CI types
+      description: Requires `ci_type:read`. Supports `search` over name and description.
+      operationId: listCITypes
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: CI type list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CITypeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - ci-types
+      summary: Create a CI type
+      description: |
+        Requires `ci_type:read` and `ci_type:create`. Attribute definitions become the
+        validation schema for configuration items of this type. `is_amortizable`
+        enables amortization for CIs of the type. A duplicate name returns `409`.
+      operationId: createCIType
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCITypeRequest'
+      responses:
+        '201':
+          description: Created CI type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CITypeDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ci-types/{id}:
+    get:
+      tags:
+        - ci-types
+      summary: Get a CI type
+      description: Requires `ci_type:read`.
+      operationId: getCIType
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: CI type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CITypeDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - ci-types
+      summary: Update a CI type
+      description: |
+        Requires `ci_type:read` and `ci_type:update`. `name` cannot be changed; only
+        description, `is_amortizable`, and the attribute schema are updated.
+      operationId: updateCIType
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCITypeRequest'
+      responses:
+        '200':
+          description: Updated CI type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CITypeDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - ci-types
+      summary: Delete a CI type
+      description: |
+        Requires `ci_type:read` and `ci_type:delete`. Refused with `409` while CIs of
+        the type exist.
+      operationId: deleteCIType
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ci:
+    get:
+      tags:
+        - ci
+      summary: List configuration items
+      description: |
+        Requires `ci:read`.
+
+        Filters: `ci_type`, free-text `search` (name and attributes), repeatable
+        `tags`, and `created_by`. Sorting accepts `sort=name|type|created_at|updated_at`
+        and `order=asc|desc` (defaults to created_at DESC).
+      operationId: listCIs
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ci_type
+          in: query
+          description: Exact CI type name
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Case-insensitive search over name and attributes
+          schema:
+            type: string
+        - name: tags
+          in: query
+          description: Repeat the parameter for multiple tags
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+        - name: created_by
+          in: query
+          description: Creator user ID
+          schema:
+            type: string
+            format: uuid
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, type, created_at, updated_at]
+            default: created_at
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: CI list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CIListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - ci
+      summary: Create a configuration item
+      description: |
+        Requires `ci:read` and `ci:create`. `name` and `ci_type` are mandatory and
+        `attributes` must validate against the CI type schema; validation failures
+        return `400` with the message `Attribute validation failed` (details are logged,
+        not returned in the body).
+      operationId: createCI
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCIRequest'
+      responses:
+        '201':
+          description: Created configuration item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ci/{id}:
+    get:
+      tags:
+        - ci
+      summary: Get a configuration item
+      description: Requires `ci:read`.
+      operationId: getCI
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Configuration item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - ci
+      summary: Update a configuration item
+      description: |
+        Requires `ci:read` and `ci:update`. Only `attributes`, `tags`, and
+        `lifecycle_status_id` can be changed; `name` and `ci_type` are immutable.
+        Attributes are re-validated against the CI type schema.
+      operationId: updateCI
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCIRequest'
+      responses:
+        '200':
+          description: Updated configuration item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - ci
+      summary: Delete a configuration item
+      description: |
+        Requires `ci:read` and `ci:delete`. Refused with `409` while the CI still has
+        relationships.
+      operationId: deleteCI
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ci/{id}/relationships:
+    get:
+      tags:
+        - ci
+        - relationships
+      summary: Get all relationships for a configuration item
+      description: |
+        Requires `relationship:read`. Returns relationships in which the CI is either
+        source or target, each with the related CI embedded.
+
+        **Known limitation (partial).** The route is registered, but this handler reads
+        path parameters through the gorilla/mux helpers while the live router is chi,
+        so the ID is not resolved and the endpoint currently answers `400`
+        `Invalid CI ID`.
+      operationId: getCIRelationships
+      x-status: partial
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Relationships for the CI
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RelationshipGraph'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationships:
+    get:
+      tags:
+        - relationships
+      summary: List relationships
+      description: |
+        Requires `relationship:read`.
+
+        Filters: `source_id`, `target_id`, `relationship_type`, and free-text
+        `search` (matches relationship id, type, and attributes). Results are always
+        ordered by creation time, newest first.
+      operationId: listRelationships
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: source_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: target_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: relationship_type
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Relationship list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - relationships
+      summary: Create a relationship
+      description: |
+        Requires `relationship:read` and `relationship:create`. Both CIs must exist
+        (otherwise `404`) and self-referencing relationships are rejected with `400`.
+        The relationship type is not validated against the relationship-type catalogue
+        here.
+      operationId: createRelationship
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRelationshipRequest'
+      responses:
+        '201':
+          description: Created relationship
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Relationship'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationships/bulk-sources:
+    post:
+      tags:
+        - relationships
+      summary: Create relationships from many sources to one target
+      description: |
+        Requires `relationship:read` and `relationship:create`. Creates one
+        relationship per source CI to the same target atomically. At most 50 source IDs
+        are allowed and duplicates are rejected with `400`. Upstream failures are
+        reported as `500` with the error message in the body.
+      operationId: createRelationshipsFromSources
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCreateRelationshipsFromSourcesRequest'
+      responses:
+        '201':
+          description: Bulk creation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkCreateRelationshipResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationships/bulk-matrix:
+    post:
+      tags:
+        - relationships
+      summary: Create relationships from many sources to many targets
+      description: |
+        Requires `relationship:read` and `relationship:create`. Creates the cartesian
+        product of source and target CIs with the same relationship type. Both lists
+        are capped at 50 entries and duplicate IDs are rejected with `400`.
+      operationId: createRelationshipsMatrix
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCreateRelationshipsMatrixRequest'
+      responses:
+        '201':
+          description: Bulk creation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkCreateRelationshipResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationships/{id}:
+    get:
+      tags:
+        - relationships
+      summary: Get a relationship
+      description: Requires `relationship:read`.
+      operationId: getRelationship
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Relationship
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Relationship'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - relationships
+      summary: Update a relationship
+      description: |
+        Requires `relationship:read` and `relationship:update`. Only `attributes` can
+        be updated; endpoints and type are immutable.
+      operationId: updateRelationship
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRelationshipRequest'
+      responses:
+        '200':
+          description: Updated relationship
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Relationship'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - relationships
+      summary: Delete a relationship
+      description: |
+        Requires `relationship:read` and `relationship:delete`. A missing relationship
+        is reported as `500`, not `404`.
+      operationId: deleteRelationship
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationship-types:
+    get:
+      tags:
+        - relationship-types
+      summary: List relationship types
+      description: |
+        Requires `relationship_type:read`.
+
+        Filters: `search`, `category`, `is_active`, `is_system`, and sorting via
+        `sort`/`order`. Note that the boolean filters are only applied when their value
+        is the literal string `true`; `false` is ignored.
+      operationId: listRelationshipTypes
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: is_active
+          in: query
+          description: Only `true` is honoured
+          schema:
+            type: boolean
+        - name: is_system
+          in: query
+          description: Only `true` is honoured
+          schema:
+            type: boolean
+        - name: sort
+          in: query
+          description: When omitted the list is ordered by created_at descending
+          schema:
+            type: string
+            enum: [name, category, created_at, updated_at]
+        - name: order
+          in: query
+          description: Only applied when sort is provided; otherwise descending
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        '200':
+          description: Relationship type list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipTypeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - relationship-types
+      summary: Create a relationship type
+      description: |
+        Requires `relationship_type:read` and `relationship_type:create`.
+
+        Validation errors from the service are surfaced as `500`, not `400`, so check
+        the error message. `forward_label` and `reverse_label` describe the two
+        directions of the edge.
+      operationId: createRelationshipType
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRelationshipTypeRequest'
+      responses:
+        '201':
+          description: Created relationship type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationship-types/active:
+    get:
+      tags:
+        - relationship-types
+      summary: List active relationship types
+      description: Requires `relationship_type:read`. Served from the Redis cache when warm.
+      operationId: getActiveRelationshipTypes
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Active relationship types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RelationshipType'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationship-types/usage:
+    get:
+      tags:
+        - relationship-types
+      summary: Relationship type usage
+      description: Requires `relationship_type:read`.
+      operationId: getRelationshipTypeUsage
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Usage per relationship type
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RelationshipTypeUsage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationship-types/statistics:
+    get:
+      tags:
+        - relationship-types
+      summary: Relationship type statistics
+      description: |
+        Requires `relationship_type:read`. Aggregated counts for the catalogue.
+        `total_relationships` is currently always `0` in the repository implementation.
+      operationId: getRelationshipTypeStatistics
+      x-status: partial
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Catalogue statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipTypeStatistics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationship-types/categories:
+    get:
+      tags:
+        - relationship-types
+      summary: List relationship type categories
+      description: Requires `relationship_type:read`. Derived from the catalogue statistics.
+      operationId: getRelationshipTypeCategories
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationship-types/validate:
+    post:
+      tags:
+        - relationship-types
+      summary: Validate a source type / type / target type combination
+      description: |
+        Requires `relationship_type:read` only (this is a POST under the read
+        permission). Checks the relationship type's allowed source/target CI types and
+        reports whether the combination is valid.
+      operationId: validateRelationshipType
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipCompatibilityRequest'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipCompatibilityResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/relationship-types/{id}:
+    get:
+      tags:
+        - relationship-types
+      summary: Get a relationship type
+      description: Requires `relationship_type:read`.
+      operationId: getRelationshipType
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Relationship type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - relationship-types
+      summary: Update a relationship type
+      description: |
+        Requires `relationship_type:read` and `relationship_type:update`. The `name` is
+        immutable. Service failures (including validation) are returned as `500`.
+      operationId: updateRelationshipType
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRelationshipTypeRequest'
+      responses:
+        '200':
+          description: Updated relationship type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - relationship-types
+      summary: Delete a relationship type
+      description: |
+        Requires `relationship_type:read` and `relationship_type:delete`. Returns a
+        JSON confirmation body (not `204`). System types cannot be deleted; the failure
+        surfaces as `500`.
+      operationId: deleteRelationshipType
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Deletion confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Relationship type deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/lifecycle-status:
+    get:
+      tags:
+        - lifecycle-status
+      summary: List lifecycle statuses
+      description: |
+        Requires `lifecycle_status:read`. Filters: `search`, `is_active`, `is_system`,
+        `sort`, `order`. `amortization_behavior` on each record is one of `pending`,
+        `active`, `terminal`.
+      operationId: listLifecycleStatuses
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+        - name: is_system
+          in: query
+          schema:
+            type: boolean
+        - name: sort
+          in: query
+          description: When omitted the list is ordered by sort_order then display_name
+          schema:
+            type: string
+            enum: [name, display_name, sort_order, created_at, updated_at]
+        - name: order
+          in: query
+          description: Only applied when sort is provided
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        '200':
+          description: Lifecycle status list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleStatusListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - lifecycle-status
+      summary: Create a lifecycle status
+      description: |
+        Requires `lifecycle_status:read` and `lifecycle_status:create`.
+        `display_name` is required. `amortization_behavior` defaults to `pending` and
+        controls how the amortization module treats CIs in this status.
+      operationId: createLifecycleStatus
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLifecycleStatusRequest'
+      responses:
+        '201':
+          description: Created lifecycle status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/lifecycle-status/active:
+    get:
+      tags:
+        - lifecycle-status
+      summary: List active lifecycle statuses
+      description: Requires `lifecycle_status:read`. Served from the Redis cache when warm.
+      operationId: getActiveLifecycleStatuses
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Active lifecycle statuses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LifecycleStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/lifecycle-status/usage:
+    get:
+      tags:
+        - lifecycle-status
+      summary: Lifecycle status usage
+      description: Requires `lifecycle_status:read`. Per-status CI counts plus totals.
+      operationId: getLifecycleStatusUsage
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Usage statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleStatusUsageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/lifecycle-status/distribution:
+    get:
+      tags:
+        - lifecycle-status
+      summary: CI status distribution
+      description: |
+        Requires `lifecycle_status:read`. Returns the distribution of CIs across
+        lifecycle statuses for dashboard use.
+      operationId: getCIStatusDistribution
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Status distribution
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CIStatusDistribution'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/lifecycle-status/{id}:
+    get:
+      tags:
+        - lifecycle-status
+      summary: Get a lifecycle status
+      description: Requires `lifecycle_status:read`.
+      operationId: getLifecycleStatus
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Lifecycle status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - lifecycle-status
+      summary: Update a lifecycle status
+      description: |
+        Requires `lifecycle_status:read` and `lifecycle_status:update`. `name` is
+        immutable. Service failures (including validation) are returned as `500`.
+      operationId: updateLifecycleStatus
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLifecycleStatusRequest'
+      responses:
+        '200':
+          description: Updated lifecycle status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - lifecycle-status
+      summary: Delete a lifecycle status
+      description: |
+        Requires `lifecycle_status:read` and `lifecycle_status:delete`. Deletion of a
+        system status or one in use fails and is reported as `500`.
+      operationId: deleteLifecycleStatus
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/entities:
+    get:
+      tags:
+        - ea
+      summary: List EA entities
+      description: |
+        Requires `ea:read`. Filters: `domain` (e.g. `Application`), `ci_type`,
+        free-text `search`, and repeatable `tags`. Uses `page`/`page_size` (max 100)
+        rather than `limit`.
+      operationId: listEAEntities
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: domain
+          in: query
+          description: EA domain name, e.g. Strategy, Business, Application, Data, Technology, Infrastructure, Security, Governance
+          schema:
+            type: string
+        - name: ci_type
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 25
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: EA entity list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EAEntityListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - ea
+      summary: Create an EA entity
+      description: |
+        Requires `ea:read` and `ea:create`. `name`, `ci_type`, and `owner` are required.
+        `ci_type` must be an EA type (`EA.<Domain>-<Type>`), `owner` must match a seeded
+        EA team name, and `lifecycle_status_id` must reference an existing status.
+        The response is a summary object that also reports `validation_warnings`.
+        A critical validation failure returns `422`.
+      operationId: createEAEntity
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEAEntityRequest'
+      responses:
+        '201':
+          description: Created EA entity summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EAEntityMutationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/entities/{id}:
+    get:
+      tags:
+        - ea
+      summary: Get an EA entity
+      description: Requires `ea:read`.
+      operationId: getEAEntity
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: EA entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EAEntity'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - ea
+      summary: Update an EA entity
+      description: |
+        Requires `ea:read` and `ea:update`. Lifecycle status transitions are validated;
+        an invalid transition or a critical validation failure surfaces as `500` or
+        `422` respectively. `owner`, when supplied, must match a seeded EA team.
+      operationId: updateEAEntity
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEAEntityRequest'
+      responses:
+        '200':
+          description: Updated EA entity summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EAEntityMutationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - ea
+      summary: Delete an EA entity
+      description: |
+        Requires `ea:read` and `ea:delete`. If the entity still has relationships the
+        request fails with `400` and a body of
+        `{"error": "...", "relationship_count": <n>}`. Pass `force=true` to bypass the
+        relationship check after confirmation.
+      operationId: deleteEAEntity
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - name: force
+          in: query
+          description: Bypass the relationship check
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: Entity has relationships or the ID is invalid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  relationship_count:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/entities/{id}/validate:
+    get:
+      tags:
+        - ea
+      summary: Validate an EA entity
+      description: |
+        Requires `ea:read`. Runs the EA attribute and cross-field validation and
+        returns the result with the data quality score.
+      operationId: validateEAEntity
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EAValidationResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/entities/{id}/audit:
+    get:
+      tags:
+        - ea
+      summary: Audit log for an EA entity
+      description: |
+        Requires `ea:read`. Paginated audit entries for one entity, enriched with the
+        actor's user ID.
+      operationId: getEAEntityAuditLogs
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  audit_logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EAAuditLogEntry'
+                  total:
+                    type: integer
+                    format: int64
+                  page:
+                    type: integer
+                  page_size:
+                    type: integer
+                  total_pages:
+                    type: integer
+                    format: int64
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/ci-types:
+    get:
+      tags:
+        - ea
+      summary: List EA CI types
+      description: |
+        Requires `ea:read`. Only the seeded EA CI types (`EA.<Domain>-<Type>`). This
+        route takes no pagination parameters and returns the full list.
+      operationId: listEACITypes
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: EA CI types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EACITypeDefinition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/teams:
+    get:
+      tags:
+        - ea
+      summary: List EA teams
+      description: Requires `ea:read`. These team names are the valid `owner` values
+        accepted when creating or updating EA entities.
+      operationId: listEATeams
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: EA teams
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EATeam'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/import/template:
+    post:
+      tags:
+        - ea
+      summary: Download a CSV import template
+      description: |
+        Requires `ea:create`. `ci_type` must start with `EA.`. The response is a CSV
+        file attachment (not JSON), despite the global JSON content-type rule because
+        the request itself has a JSON body.
+      operationId: generateImportTemplate
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateRequest'
+      responses:
+        '200':
+          description: CSV template
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/PlainTextBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+
+  /api/v1/ea/import/validate:
+    post:
+      tags:
+        - ea
+      summary: Validate an EA import file
+      description: |
+        Requires `ea:create`. The handler expects `multipart/form-data` with a `file`
+        part and a `ci_type` form field, parses the CSV, and returns per-row results.
+
+        **Known limitation (partial).** The global `AllowContentType("application/json")`
+        middleware runs before this handler and rejects `multipart/form-data` with
+        `415`, so this route cannot currently receive its documented request.
+      operationId: validateImport
+      x-status: partial
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, ci_type]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                ci_type:
+                  type: string
+                  description: EA CI type name, e.g. EA.Application-BusinessApp
+      responses:
+        '200':
+          description: Per-row validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+        '400':
+          $ref: '#/components/responses/PlainTextBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/PlainTextUnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/PlainTextInternalError'
+
+  /api/v1/ea/import/execute:
+    post:
+      tags:
+        - ea
+      summary: Execute an EA import
+      description: |
+        Requires `ea:create`. Same `multipart/form-data` shape as the validate route;
+        creates the entities and returns an `ImportResult`.
+
+        **Known limitation (partial).** Blocked by the global JSON content-type
+        middleware exactly like `/ea/import/validate` and currently answers `415`.
+      operationId: executeImport
+      x-status: partial
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, ci_type]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                ci_type:
+                  type: string
+                  description: EA CI type name, e.g. EA.Application-BusinessApp
+      responses:
+        '200':
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+        '400':
+          $ref: '#/components/responses/PlainTextBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/PlainTextUnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/PlainTextInternalError'
+
+  /api/v1/ea/import/errors/download:
+    post:
+      tags:
+        - ea
+      summary: Download validation errors as CSV
+      description: |
+        Requires `ea:create`. The request body is a JSON array of error objects (the
+        `errors` array from a validation result); the response is a CSV attachment.
+      operationId: downloadImportErrors
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ImportError'
+      responses:
+        '200':
+          description: CSV of errors
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/PlainTextBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+
+  /api/v1/ea/import/status/{batch_id}:
+    get:
+      tags:
+        - ea
+      summary: Import batch status
+      description: |
+        Requires `ea:create`. Async imports are not implemented yet; this returns a
+        fixed `completed` placeholder for any batch ID.
+      operationId: getImportStatus
+      x-status: planned
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BatchIdParam'
+      responses:
+        '200':
+          description: Placeholder status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportStatusResponse'
+        '400':
+          $ref: '#/components/responses/PlainTextBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/ea/data-quality:
+    get:
+      tags:
+        - ea-data-quality
+      summary: EA data quality metrics
+      description: |
+        Requires `ea:read`. Optional `domain` narrows completeness,
+        lifecycle breakdown, and error count to one EA domain.
+      operationId: getEADataQuality
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: domain
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Data quality metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EADataQualityResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/data-quality/stale:
+    get:
+      tags:
+        - ea-data-quality
+      summary: List stale EA entities
+      description: |
+        Requires `ea:read`. `days_threshold` defaults to 90; `include_incomplete`
+        defaults to true and also flags entities with a data quality score below 100.
+      operationId: getStaleEAEntities
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: days_threshold
+          in: query
+          schema:
+            type: integer
+            default: 90
+            minimum: 1
+        - name: include_incomplete
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Stale entities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaleEAEntitiesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/data-quality/errors:
+    get:
+      tags:
+        - ea-data-quality
+      summary: List EA entities with validation errors
+      description: Requires `ea:read`. Optional `domain` filter.
+      operationId: getEAEntitiesWithErrors
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: domain
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Entities with errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EAEntitiesWithErrorsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/ea/data-quality/lifecycle:
+    get:
+      tags:
+        - ea-data-quality
+      summary: EA lifecycle breakdown
+      description: Requires `ea:read`. Optional `domain` filter.
+      operationId: getEALifecycleBreakdown
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: domain
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lifecycle status counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  breakdown:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  domain:
+                    type: string
+                  generated_at:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/amortization/configuration-items:
+    get:
+      tags:
+        - amortization
+      summary: List amortizable configuration items
+      description: |
+        Requires `amortization:read`.
+
+        Query parsing is minimal in the handler: only `search`, `sort`, `order`,
+        `page`, and `limit` are read. The service-level filter model also has fields
+        such as `ci_type_ids` and `lifecycle_status_ids`, but they cannot be supplied
+        over HTTP yet.
+      operationId: listAmortizableCIs
+      x-status: partial
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Amortizable CI list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationCIList'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/configuration-items/{ciId}:
+    get:
+      tags:
+        - amortization
+      summary: Get amortization details for a CI
+      description: |
+        Requires `amortization:read`. Returns the financial fields plus calculated
+        `monthly_depreciation` and `remaining_life_months`. Lookup failures (including
+        an unknown CI) surface as `500`; only a malformed UUID returns `400`.
+      operationId: getAmortizationDetails
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CiIdParam'
+      responses:
+        '200':
+          description: Amortization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationDetails'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+    put:
+      tags:
+        - amortization
+      summary: Update amortization configuration for a CI
+      description: |
+        Requires `amortization:read` and `amortization:configure`. All request fields
+        are optional. Changing `purchase_cost` resets `current_book_value` to the new
+        cost and zeroes accumulated depreciation.
+      operationId: updateAmortizationConfig
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CiIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAmortizationConfigRequest'
+      responses:
+        '200':
+          description: Updated amortization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationDetails'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/ledger:
+    get:
+      tags:
+        - amortization
+      summary: List amortization ledger entries
+      description: |
+        Requires `amortization:read`.
+
+        Filters: `ci_id`, `ci_type_id`, `ci_name_search`, comma-separated
+        `entry_types`, `date_from`/`date_to` (YYYY-MM-DD), and `sort`/`order`.
+      operationId: getLedgerEntries
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ci_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: ci_type_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: ci_name_search
+          in: query
+          schema:
+            type: string
+        - name: entry_types
+          in: query
+          description: Comma-separated list, e.g. depreciation,adjustment
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: sort
+          in: query
+          schema:
+            type: string
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Ledger entry list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerEntryList'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/ledger/{entryId}:
+    get:
+      tags:
+        - amortization
+      summary: Get one ledger entry
+      description: Requires `amortization:read`.
+      operationId: getLedgerEntry
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EntryIdParam'
+      responses:
+        '200':
+          description: Ledger entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationLedgerEntry'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/adjustments:
+    post:
+      tags:
+        - amortization
+      summary: Create a manual adjustment
+      description: |
+        Requires `amortization:read` and `amortization:configure` (not
+        `amortization:adjust` — the route uses the configure permission). Creates a
+        ledger adjustment entry against the CI.
+      operationId: createAmortizationAdjustment
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdjustmentRequest'
+      responses:
+        '201':
+          description: Created ledger entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationLedgerEntry'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/runs:
+    get:
+      tags:
+        - amortization
+      summary: List amortization runs
+      description: |
+        Requires `amortization:read`. Filters: comma-separated `status`,
+        `date_from`/`date_to` (YYYY-MM-DD), `page`, `limit`.
+      operationId: listAmortizationRuns
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Comma-separated statuses, e.g. completed,failed
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Run list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationRunList'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+    post:
+      tags:
+        - amortization
+      summary: Trigger a manual amortization run
+      description: |
+        Requires `amortization:read` and `amortization:run`. Returns `202` as soon as
+        the run is created; poll `/amortization/runs/{runId}` for progress.
+      operationId: triggerManualAmortizationRun
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualRunRequest'
+      responses:
+        '202':
+          description: Run accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: started
+                  message:
+                    type: string
+                    example: Amortization run initiated
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/runs/{runId}:
+    get:
+      tags:
+        - amortization
+      summary: Get an amortization run
+      description: Requires `amortization:read`.
+      operationId: getAmortizationRun
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RunIdParam'
+      responses:
+        '200':
+          description: Run details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationRun'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/summaries:
+    get:
+      tags:
+        - amortization
+      summary: Amortization summary
+      description: |
+        Requires `amortization:read`. `group_by` and the date range are accepted by the
+        handler but currently ignored by the repository: the response always reports
+        `group_by: "all"` with an empty `groups` array and totals across all amortizable
+        CIs. Only the aggregate fields are meaningful here.
+      operationId: getAmortizationSummaries
+      x-status: partial
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: group_by
+          in: query
+          description: Accepted but ignored (repository always groups by "all")
+          schema:
+            type: string
+            default: ci_type
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Summarized amortization data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationSummary'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/reports/depreciation-schedule:
+    get:
+      tags:
+        - amortization
+      summary: Depreciation schedule report
+      description: |
+        Requires `amortization:read`. `date_from` and `date_to` are required
+        (YYYY-MM-DD). `ci_type_ids` takes a single UUID; `ci_ids` is comma-separated.
+        `format=csv` switches the response to a text/csv attachment.
+      operationId: generateDepreciationSchedule
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: date_from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: ci_ids
+          in: query
+          description: Comma-separated CI UUIDs
+          schema:
+            type: string
+        - name: ci_type_ids
+          in: query
+          description: Single CI type UUID
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: Schedule as JSON, or CSV when format=csv
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepreciationScheduleResponse'
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/restructuring/preview:
+    post:
+      tags:
+        - amortization
+      summary: Preview a useful-life restructuring
+      description: |
+        Requires `amortization:read` and `amortization:configure`. Returns the
+        prospective recalculation without persisting anything.
+      operationId: previewAmortizationRestructuring
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestructuringPreviewRequest'
+      responses:
+        '200':
+          description: Restructuring calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestructuringCalculation'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/restructuring:
+    post:
+      tags:
+        - amortization
+      summary: Execute a useful-life restructuring
+      description: |
+        Requires `amortization:read` and `amortization:configure`. `reason` is
+        mandatory. Writes a restructuring ledger entry and adjusts the prospectively
+        remaining depreciation.
+      operationId: executeAmortizationRestructuring
+      x-status: implemented
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestructureRequest'
+      responses:
+        '200':
+          description: Restructuring result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestructureResult'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
+  /api/v1/amortization/settings:
+    get:
+      tags:
+        - amortization
+      summary: Get global amortization settings
+      description: |
+        Requires `amortization:read`.
+
+        **Known limitation (partial).** The repository reads a hard-coded `global`
+        row from an `amortization_settings` table that no migration creates, so on a
+        migrated database this request fails and the handler returns `500`. The schema
+        below describes the intended shape.
+      operationId: getAmortizationSettings
+      x-status: partial
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+    put:
+      tags:
+        - amortization
+      summary: Update global amortization settings
+      description: |
+        Requires `amortization:read` and `amortization:configure`. Both fields are
+        optional; omitted values fall back to the defaults `USD` and 36 months.
+
+        **Known limitation (partial).** The write targets the `amortization_settings`
+        table, which no migration creates, so on a migrated database this request
+        fails and the handler returns `500`.
+      operationId: updateAmortizationSettings
+      x-status: partial
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAmortizationSettingsRequest'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmortizationSettings'
+        '400':
+          $ref: '#/components/responses/AmortizationBadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/AmortizationInternalError'
+
 components:
-  # Security schemes
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT authentication token
+      description: |
+        Access token obtained from `POST /api/v1/auth/login`, sent as
+        `Authorization: Bearer <token>`.
 
-  # Parameters
   parameters:
     Page:
       name: page
       in: query
-      description: Page number for pagination
+      description: Page number (1-based)
       schema:
         type: integer
-        minimum: 1
         default: 1
+        minimum: 1
     Limit:
       name: limit
       in: query
-      description: Number of items per page
+      description: Page size, capped at 100
       schema:
         type: integer
+        default: 20
         minimum: 1
         maximum: 100
-        default: 20
     Search:
       name: search
       in: query
-      description: Search query
       schema:
         type: string
-    CIType:
-      name: ci_type
-      in: query
-      description: Filter by CI type
-      schema:
-        type: string
-    Tags:
-      name: tags
-      in: query
-      description: Filter by tags (comma-separated)
-      schema:
-        type: string
-    Attributes:
-      name: attributes
-      in: query
-      description: Filter by attributes (JSON object)
-      schema:
-        type: string
-    Sort:
-      name: sort
-      in: query
-      description: Sort field
-      schema:
-        type: string
-        enum: [name, ci_type, created_at, updated_at]
-        default: name
-    Order:
-      name: order
-      in: query
-      description: Sort order
-      schema:
-        type: string
-        enum: [asc, desc]
-        default: asc
-    UserId:
+    IdParam:
       name: id
       in: path
-      description: User ID
       required: true
       schema:
         type: string
         format: uuid
-    CIId:
-      name: id
+    CiIdParam:
+      name: ciId
       in: path
-      description: Configuration Item ID
       required: true
       schema:
         type: string
         format: uuid
-    CITypeId:
-      name: id
+    EntryIdParam:
+      name: entryId
       in: path
-      description: CI Type ID
       required: true
       schema:
         type: string
         format: uuid
-    RelationshipId:
-      name: id
+    RunIdParam:
+      name: runId
       in: path
-      description: Relationship ID
       required: true
       schema:
         type: string
         format: uuid
-    AuditLogId:
-      name: id
+    BatchIdParam:
+      name: batch_id
       in: path
-      description: Audit Log ID
       required: true
-      schema:
-        type: string
-        format: uuid
-    SourceCI:
-      name: source_id
-      in: query
-      description: Source CI ID
-      schema:
-        type: string
-        format: uuid
-    TargetCI:
-      name: target_id
-      in: query
-      description: Target CI ID
-      schema:
-        type: string
-        format: uuid
-    RelationshipType:
-      name: relationship_type
-      in: query
-      description: Relationship type
       schema:
         type: string
 
-  # Schemas
   schemas:
+    ErrorResponse:
+      type: object
+      description: Standard JSON error body used by most handlers.
+      properties:
+        error:
+          type: string
+    AmortizationErrorResponse:
+      type: object
+      description: Nested error body returned by the amortization handlers.
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+            details:
+              type: string
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          format: int64
+          description: Access token lifetime in seconds (default 86400)
+        user:
+          $ref: '#/components/schemas/User'
+    RefreshTokenRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+    RefreshResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          format: int64
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
     User:
       type: object
       properties:
         id:
           type: string
           format: uuid
+        username:
+          type: string
         email:
           type: string
-          format: email
-        name:
-          type: string
-        role:
-          type: string
-          enum: [admin, user, viewer]
         is_active:
           type: boolean
         created_at:
@@ -1239,28 +3061,25 @@ components:
         updated_at:
           type: string
           format: date-time
-        last_login:
+        last_active:
           type: string
           format: date-time
-          nullable: true
-      example:
-        id: "550e8400-e29b-41d4-a716-446655440000"
-        email: "admin@porta.dev"
-        name: "John Doe"
-        role: "admin"
-        is_active: true
-        created_at: "2023-01-01T00:00:00Z"
-        updated_at: "2023-01-01T00:00:00Z"
-        last_login: "2023-01-01T12:00:00Z"
-
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        permissions:
+          type: array
+          items:
+            type: string
     CreateUserRequest:
       type: object
-      required:
-        - email
-        - password
-        - name
-        - role
+      required: [username, email, password]
       properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 100
         email:
           type: string
           format: email
@@ -1268,113 +3087,62 @@ components:
           type: string
           format: password
           minLength: 8
-        name:
-          type: string
-        role:
-          type: string
-          enum: [admin, user, viewer]
-      example:
-        email: "newuser@porta.dev"
-        password: "securePassword123"
-        name: "Jane Smith"
-        role: "user"
-
+        roles:
+          type: array
+          items:
+            type: string
     UpdateUserRequest:
       type: object
+      description: Accepted but currently ignored by the handler.
       properties:
-        name:
+        email:
           type: string
-        role:
-          type: string
-          enum: [admin, user, viewer]
+          format: email
         is_active:
           type: boolean
-      example:
-        name: "Jane Doe"
-        role: "admin"
-        is_active: true
-
-    CIType:
+        roles:
+          type: array
+          items:
+            type: string
+    UserListResponse:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        description:
-          type: string
-        required_attributes:
+        users:
           type: array
           items:
-            $ref: '#/components/schemas/AttributeDefinition'
-        optional_attributes:
-          type: array
-          items:
-            $ref: '#/components/schemas/AttributeDefinition'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-      example:
-        id: "550e8400-e29b-41d4-a716-446655440001"
-        name: "Server"
-        description: "Physical or virtual server"
-        required_attributes:
-          - name: "hostname"
-            type: "string"
-            description: "Server hostname"
-            validation:
-              min_length: 1
-              max_length: 255
-        optional_attributes:
-          - name: "cpu_cores"
-            type: "integer"
-            description: "Number of CPU cores"
-            validation:
-              min: 1
-              max: 128
+            $ref: '#/components/schemas/User'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        total_pages:
+          type: integer
 
-    CreateCITypeRequest:
-      type: object
-      required:
-        - name
-        - required_attributes
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-        required_attributes:
-          type: array
-          items:
-            $ref: '#/components/schemas/AttributeDefinition'
-        optional_attributes:
-          type: array
-          items:
-            $ref: '#/components/schemas/AttributeDefinition'
-
-    UpdateCITypeRequest:
+    AttributeValidation:
       type: object
       properties:
-        description:
+        pattern:
           type: string
-        required_attributes:
+        min_length:
+          type: integer
+        max_length:
+          type: integer
+        min:
+          type: integer
+        max:
+          type: integer
+        enum:
           type: array
           items:
-            $ref: '#/components/schemas/AttributeDefinition'
-        optional_attributes:
-          type: array
-          items:
-            $ref: '#/components/schemas/AttributeDefinition'
-
+            type: string
+        format:
+          type: string
+          enum: [email, url, ipv4, date, datetime]
     AttributeDefinition:
       type: object
-      required:
-        - name
-        - type
+      required: [name, type, description]
       properties:
         name:
           type: string
@@ -1384,43 +3152,86 @@ components:
         description:
           type: string
         validation:
-          $ref: '#/components/schemas/ValidationRules'
-      example:
-        name: "ip_address"
-        type: "string"
-        description: "Server IP address"
-        validation:
-          format: "ipv4"
-          pattern: "^192\\.168\\."
-
-    ValidationRules:
+          $ref: '#/components/schemas/AttributeValidation'
+    CITypeDefinition:
       type: object
       properties:
-        pattern:
+        id:
           type: string
-          description: Regular expression pattern for string validation
-        min_length:
-          type: integer
-          description: Minimum length for string attributes
-        max_length:
-          type: integer
-          description: Maximum length for string attributes
-        min:
-          type: integer
-          description: Minimum value for numeric attributes
-        max:
-          type: integer
-          description: Maximum value for numeric attributes
-        enum:
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        is_amortizable:
+          type: boolean
+        required_attributes:
           type: array
           items:
-            type: string
-          description: Allowed values for enum validation
-        format:
+            $ref: '#/components/schemas/AttributeDefinition'
+        optional_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+        created_by:
           type: string
-          enum: [email, url, ipv4, date, datetime]
-          description: Predefined format validation
-
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateCITypeRequest:
+      type: object
+      required: [name, required_attributes]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        is_amortizable:
+          type: boolean
+          default: false
+        required_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+        optional_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+    UpdateCITypeRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        is_amortizable:
+          type: boolean
+        required_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+        optional_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+    CITypeListResponse:
+      type: object
+      properties:
+        ci_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/CITypeDefinition'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+          format: int64
+        total_pages:
+          type: integer
     ConfigurationItem:
       type: object
       properties:
@@ -1434,11 +3245,15 @@ components:
         attributes:
           type: object
           additionalProperties: true
-          description: Flexible attributes based on CI type schema
         tags:
           type: array
           items:
             type: string
+        lifecycle_status_id:
+          type: string
+          format: uuid
+        lifecycle_status:
+          $ref: '#/components/schemas/LifecycleStatus'
         created_at:
           type: string
           format: date-time
@@ -1451,27 +3266,9 @@ components:
         updated_by:
           type: string
           format: uuid
-      example:
-        id: "550e8400-e29b-41d4-a716-446655440002"
-        name: "web-server-01"
-        ci_type: "Server"
-        attributes:
-          hostname: "web01.example.com"
-          cpu_cores: 8
-          memory_gb: 32
-          os_type: "Ubuntu"
-        tags:
-          - "production"
-          - "web"
-        created_at: "2023-01-01T00:00:00Z"
-        updated_at: "2023-01-01T00:00:00Z"
-
     CreateCIRequest:
       type: object
-      required:
-        - name
-        - ci_type
-        - attributes
+      required: [name, ci_type, attributes]
       properties:
         name:
           type: string
@@ -1484,7 +3281,9 @@ components:
           type: array
           items:
             type: string
-
+        lifecycle_status_id:
+          type: string
+          format: uuid
     UpdateCIRequest:
       type: object
       properties:
@@ -1495,6 +3294,25 @@ components:
           type: array
           items:
             type: string
+        lifecycle_status_id:
+          type: string
+          format: uuid
+    CIListResponse:
+      type: object
+      properties:
+        cis:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfigurationItem'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+          format: int64
+        total_pages:
+          type: integer
 
     Relationship:
       type: object
@@ -1502,11 +3320,749 @@ components:
         id:
           type: string
           format: uuid
-        source_ci:
-          $ref: '#/components/schemas/ConfigurationItem'
-        target_ci:
-          $ref: '#/components/schemas/ConfigurationItem'
+        source_id:
+          type: string
+          format: uuid
+        target_id:
+          type: string
+          format: uuid
         relationship_type:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+    CreateRelationshipRequest:
+      type: object
+      required: [source_id, target_id, relationship_type]
+      properties:
+        source_id:
+          type: string
+          format: uuid
+        target_id:
+          type: string
+          format: uuid
+        relationship_type:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+    UpdateRelationshipRequest:
+      type: object
+      properties:
+        attributes:
+          type: object
+          additionalProperties: true
+    RelationshipListResponse:
+      type: object
+      properties:
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+          format: int64
+        total_pages:
+          type: integer
+    RelationshipGraph:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        relationship_type:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        related_ci:
+          $ref: '#/components/schemas/ConfigurationItem'
+    BulkCreateRelationshipsFromSourcesRequest:
+      type: object
+      required: [source_ids, target_id, relationship_type]
+      properties:
+        source_ids:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+        target_id:
+          type: string
+          format: uuid
+        relationship_type:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+    BulkCreateRelationshipsMatrixRequest:
+      type: object
+      required: [source_ids, target_ids, relationship_type]
+      properties:
+        source_ids:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+        target_ids:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+        relationship_type:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+    BulkCreateRelationshipResponse:
+      type: object
+      properties:
+        created:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+        total_created:
+          type: integer
+        total_requested:
+          type: integer
+
+    RelationshipType:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        display_name:
+          type: string
+        description:
+          type: string
+        forward_label:
+          type: string
+        reverse_label:
+          type: string
+        color:
+          type: string
+          example: '#3b82f6'
+        icon:
+          type: string
+        category:
+          type: string
+        is_active:
+          type: boolean
+        is_system:
+          type: boolean
+        allowed_source_types:
+          type: array
+          items:
+            type: string
+        allowed_target_types:
+          type: array
+          items:
+            type: string
+        cardinality_source:
+          type: string
+          enum: [one, many]
+        cardinality_target:
+          type: string
+          enum: [one, many]
+        bidirectional:
+          type: boolean
+        attributes:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+    CreateRelationshipTypeRequest:
+      type: object
+      required: [name, forward_label, reverse_label, cardinality_source, cardinality_target]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        display_name:
+          type: string
+        description:
+          type: string
+        forward_label:
+          type: string
+          minLength: 1
+          maxLength: 100
+        reverse_label:
+          type: string
+          minLength: 1
+          maxLength: 100
+        color:
+          type: string
+          description: 7-character hex colour, e.g. #3b82f6
+          pattern: '^#[0-9a-fA-F]{6}$'
+        icon:
+          type: string
+          maxLength: 50
+        category:
+          type: string
+          maxLength: 50
+        allowed_source_types:
+          type: array
+          items:
+            type: string
+        allowed_target_types:
+          type: array
+          items:
+            type: string
+        cardinality_source:
+          type: string
+          enum: [one, many]
+        cardinality_target:
+          type: string
+          enum: [one, many]
+        bidirectional:
+          type: boolean
+          default: false
+        attributes:
+          type: object
+          additionalProperties: true
+    UpdateRelationshipTypeRequest:
+      type: object
+      properties:
+        display_name:
+          type: string
+        description:
+          type: string
+        forward_label:
+          type: string
+        reverse_label:
+          type: string
+        color:
+          type: string
+        icon:
+          type: string
+        category:
+          type: string
+        is_active:
+          type: boolean
+        allowed_source_types:
+          type: array
+          items:
+            type: string
+        allowed_target_types:
+          type: array
+          items:
+            type: string
+        cardinality_source:
+          type: string
+          enum: [one, many]
+        cardinality_target:
+          type: string
+          enum: [one, many]
+        bidirectional:
+          type: boolean
+        attributes:
+          type: object
+          additionalProperties: true
+    RelationshipTypeListResponse:
+      type: object
+      properties:
+        relationship_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationshipType'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+          format: int64
+        total_pages:
+          type: integer
+    RelationshipTypeUsage:
+      type: object
+      properties:
+        relationship_type:
+          $ref: '#/components/schemas/RelationshipType'
+        usage_count:
+          type: integer
+          format: int64
+    RelationshipTypeStatistics:
+      type: object
+      properties:
+        total_types:
+          type: integer
+          format: int64
+        active_types:
+          type: integer
+          format: int64
+        system_types:
+          type: integer
+          format: int64
+        custom_types:
+          type: integer
+          format: int64
+        total_relationships:
+          type: integer
+          format: int64
+          description: Always 0 in the current repository implementation
+        categories:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        cardinality_distribution:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+    RelationshipCompatibilityRequest:
+      type: object
+      required: [relationship_type, source_type, target_type]
+      properties:
+        relationship_type:
+          type: string
+        source_type:
+          type: string
+        target_type:
+          type: string
+    RelationshipCompatibilityResponse:
+      type: object
+      properties:
+        is_valid:
+          type: boolean
+        message:
+          type: string
+        reason:
+          type: string
+
+    LifecycleStatus:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        display_name:
+          type: string
+        description:
+          type: string
+        color:
+          type: string
+        icon:
+          type: string
+        sort_order:
+          type: integer
+        is_active:
+          type: boolean
+        is_system:
+          type: boolean
+        amortization_behavior:
+          type: string
+          enum: [pending, active, terminal]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+    CreateLifecycleStatusRequest:
+      type: object
+      required: [name, display_name]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        display_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        color:
+          type: string
+          pattern: '^#[0-9a-fA-F]{6}$'
+        icon:
+          type: string
+          maxLength: 50
+        sort_order:
+          type: integer
+          minimum: 0
+        amortization_behavior:
+          type: string
+          enum: [pending, active, terminal]
+          default: pending
+    UpdateLifecycleStatusRequest:
+      type: object
+      properties:
+        display_name:
+          type: string
+        description:
+          type: string
+        color:
+          type: string
+        icon:
+          type: string
+        sort_order:
+          type: integer
+          minimum: 0
+        is_active:
+          type: boolean
+        amortization_behavior:
+          type: string
+          enum: [pending, active, terminal]
+    LifecycleStatusListResponse:
+      type: object
+      properties:
+        lifecycle_statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/LifecycleStatus'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+          format: int64
+        total_pages:
+          type: integer
+    LifecycleStatusUsage:
+      type: object
+      properties:
+        lifecycle_status:
+          $ref: '#/components/schemas/LifecycleStatus'
+        usage_count:
+          type: integer
+          format: int64
+    LifecycleStatusUsageResponse:
+      type: object
+      properties:
+        total_cis:
+          type: integer
+          format: int64
+        cis_with_status:
+          type: integer
+          format: int64
+        cis_without_status:
+          type: integer
+          format: int64
+        status_usage:
+          type: array
+          items:
+            $ref: '#/components/schemas/LifecycleStatusUsage'
+        status_distribution:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+    CIStatusDistribution:
+      type: object
+      properties:
+        status_name:
+          type: string
+        display_name:
+          type: string
+        color:
+          type: string
+        icon:
+          type: string
+        count:
+          type: integer
+          format: int64
+        percentage:
+          type: number
+          format: double
+
+    EAEntity:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        ci_type:
+          type: string
+          description: EA CI type name, e.g. EA.Application-BusinessApp
+        description:
+          type: string
+        owner:
+          type: string
+          description: EA team name
+        attributes:
+          type: object
+          additionalProperties: true
+        tags:
+          type: array
+          items:
+            type: string
+        lifecycle_status_id:
+          type: string
+          format: uuid
+        lifecycle_status:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            display_name:
+              type: string
+            description:
+              type: string
+            color:
+              type: string
+            icon:
+              type: string
+        data_quality_score:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+    CreateEAEntityRequest:
+      type: object
+      required: [name, ci_type, owner]
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+        ci_type:
+          type: string
+          description: EA CI type name, e.g. EA.Application-BusinessApp
+        description:
+          type: string
+          maxLength: 1000
+        owner:
+          type: string
+          description: EA team name
+        attributes:
+          type: object
+          additionalProperties: true
+        tags:
+          type: array
+          items:
+            type: string
+        lifecycle_status_id:
+          type: string
+          format: uuid
+        override_validation:
+          type: boolean
+          default: false
+        override_justification:
+          type: string
+          description: Required when override_validation is true
+    UpdateEAEntityRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        owner:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+        tags:
+          type: array
+          items:
+            type: string
+        lifecycle_status_id:
+          type: string
+          format: uuid
+        override_validation:
+          type: boolean
+        override_justification:
+          type: string
+    EAEntityMutationResponse:
+      type: object
+      description: Summary returned by the EA create/update handlers, with validation warnings.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        ci_type:
+          type: string
+        owner:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+        tags:
+          type: array
+          items:
+            type: string
+        lifecycle_status:
+          type: object
+          additionalProperties: true
+        data_quality_score:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        validation_warnings:
+          type: array
+          items:
+            type: string
+    EAEntityListResponse:
+      type: object
+      properties:
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/EAEntity'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+          format: int64
+    EAValidationResult:
+      type: object
+      properties:
+        is_valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              severity:
+                type: string
+                enum: [error, warning]
+        data_quality_score:
+          type: number
+          format: double
+        valid_attributes:
+          type: integer
+        total_required:
+          type: integer
+    EAAuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        action:
+          type: string
+        user_id:
+          type: string
+          format: uuid
+        details:
+          type: object
+          additionalProperties: true
+        ip_address:
+          type: string
+        user_agent:
+          type: string
+    EACITypeDefinition:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        required_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+        optional_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttributeDefinition'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+    EATeam:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
           type: string
         description:
           type: string
@@ -1519,216 +4075,841 @@ components:
         created_by:
           type: string
           format: uuid
-
-    CreateRelationshipRequest:
+    ImportTemplateRequest:
       type: object
-      required:
-        - source_id
-        - target_id
-        - relationship_type
+      required: [ci_type]
       properties:
-        source_id:
+        ci_type:
           type: string
-          format: uuid
-        target_id:
-          type: string
-          format: uuid
-        relationship_type:
-          type: string
-        description:
-          type: string
-
-    UpdateRelationshipRequest:
+          description: EA CI type name; must start with "EA."
+    ImportError:
       type: object
       properties:
-        relationship_type:
+        row_number:
+          type: integer
+        field_name:
           type: string
-        description:
+        error_message:
           type: string
-
-    GraphData:
+        expected_format:
+          type: string
+        actual_value:
+          type: string
+    ImportResult:
       type: object
       properties:
-        nodes:
+        success_count:
+          type: integer
+        error_count:
+          type: integer
+        errors:
           type: array
           items:
-            $ref: '#/components/schemas/GraphNode'
-        edges:
+            $ref: '#/components/schemas/ImportError'
+        row_errors:
+          type: object
+          description: Map of row number to validation errors
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              additionalProperties: true
+        total_rows:
+          type: integer
+    ImportStatusResponse:
+      type: object
+      properties:
+        batch_id:
+          type: string
+        status:
+          type: string
+          example: completed
+        progress:
+          type: integer
+        total_rows:
+          type: integer
+        processed:
+          type: integer
+        success_count:
+          type: integer
+        error_count:
+          type: integer
+        message:
+          type: string
+
+    EAEntitySummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        ci_type:
+          type: string
+        ea_domain:
+          type: string
+        data_quality_score:
+          type: number
+          format: double
+        updated_at:
+          type: string
+    EADataQualityResponse:
+      type: object
+      properties:
+        total_entities:
+          type: integer
+          format: int64
+        completeness_pct:
+          type: number
+          format: double
+        stale_entities_count:
+          type: integer
+        entities_with_errors_count:
+          type: integer
+        lifecycle_breakdown:
+          type: object
+          additionalProperties:
+            type: integer
+        error_breakdown_by_domain:
+          type: object
+          additionalProperties:
+            type: integer
+        generated_at:
+          type: string
+          format: date-time
+    StaleEAEntitiesResponse:
+      type: object
+      properties:
+        entities:
           type: array
           items:
-            $ref: '#/components/schemas/GraphEdge'
-        metadata:
+            $ref: '#/components/schemas/EAEntitySummary'
+        total:
+          type: integer
+        query:
           type: object
           properties:
-            total_nodes:
+            days_threshold:
               type: integer
-            total_edges:
-              type: integer
-            layout:
-              type: string
-              enum: [force, hierarchical, circular]
-
-    GraphNode:
+            include_incomplete:
+              type: boolean
+    EAEntitiesWithErrorsResponse:
       type: object
       properties:
-        id:
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/EAEntitySummary'
+        total:
+          type: integer
+        domain:
           type: string
-        label:
-          type: string
-        type:
-          type: string
-        group:
-          type: string
-        metadata:
-          type: object
-          additionalProperties: true
 
-    GraphEdge:
-      type: object
-      properties:
-        id:
-          type: string
-        source:
-          type: string
-        target:
-          type: string
-        label:
-          type: string
-        type:
-          type: string
-        metadata:
-          type: object
-          additionalProperties: true
-
-    AuditLog:
+    AmortizableCI:
       type: object
       properties:
         id:
           type: string
           format: uuid
-        user_id:
+        name:
+          type: string
+        ci_type:
+          type: string
+        ci_type_id:
           type: string
           format: uuid
-        action:
-          type: string
-          enum: [create, update, delete]
-        resource_type:
-          type: string
-          enum: [ci, ci_type, relationship, user]
-        resource_id:
-          type: string
-          format: uuid
-        details:
+        attributes:
           type: object
           additionalProperties: true
-        ip_address:
+        tags:
+          type: array
+          items:
+            type: string
+        lifecycle_status_id:
           type: string
-          format: ipv4
-        user_agent:
+          format: uuid
+        lifecycle_status:
+          $ref: '#/components/schemas/LifecycleStatus'
+        purchase_cost:
+          type: number
+          format: double
+        salvage_value:
+          type: number
+          format: double
+        amort_start_date:
           type: string
+          format: date-time
+        useful_life_months:
+          type: integer
+        current_book_value:
+          type: number
+          format: double
+        accumulated_depreciation:
+          type: number
+          format: double
+        monthly_depreciation:
+          type: number
+          format: double
+        ci_id:
+          type: string
+        ci_name:
+          type: string
+        ci_type_name:
+          type: string
+        remaining_months:
+          type: integer
+          format: int64
+        status:
+          type: string
+        depreciation_method:
+          type: string
+          enum: [straight_line, declining_balance]
+        amortization_behavior:
+          type: string
+          enum: [pending, active, terminal]
+        is_amortizable:
+          type: boolean
         created_at:
           type: string
           format: date-time
-
-    AuditStats:
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+    AmortizationDetails:
+      description: |
+        AmortizableCI (including its calculated `monthly_depreciation` field) plus the
+        calculated remaining life returned by the details handler.
+      allOf:
+        - $ref: '#/components/schemas/AmortizableCI'
+        - type: object
+          properties:
+            remaining_life_months:
+              type: integer
+    AmortizationCIList:
       type: object
       properties:
-        total_actions:
+        cis:
+          type: array
+          items:
+            $ref: '#/components/schemas/AmortizableCI'
+        total_count:
           type: integer
-        actions_by_type:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+    AmortizationLedgerEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ci_id:
+          type: string
+          format: uuid
+        ci_name:
+          type: string
+        amortization_run_id:
+          type: string
+          format: uuid
+        entry_type:
+          type: string
+          description: >-
+            One of depreciation, monthly_depreciation, catch_up_depreciation,
+            write_off, adjustment, correction, restructuring
+        entry_date:
+          type: string
+          format: date-time
+        description:
+          type: string
+        amount:
+          type: number
+          format: double
+        book_value_before:
+          type: number
+          format: double
+        book_value_after:
+          type: number
+          format: double
+        accumulated_depreciation:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        created_by_name:
+          type: string
+        metadata:
           type: object
-          additionalProperties:
-            type: integer
-        actions_by_resource:
-          type: object
-          additionalProperties:
-            type: integer
-        top_users:
+          additionalProperties: true
+    LedgerEntryList:
+      type: object
+      properties:
+        entries:
           type: array
           items:
-            type: object
-            properties:
-              user_id:
-                type: string
-                format: uuid
-              action_count:
-                type: integer
-        time_series:
+            $ref: '#/components/schemas/AmortizationLedgerEntry'
+        total_count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+    AmortizationRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [started, completed, failed, partial]
+        processing_date:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        total_amortizable_cis:
+          type: integer
+        processed_cis:
+          type: integer
+        failed_cis:
+          type: integer
+        skipped_cis:
+          type: integer
+        total_depreciation:
+          type: number
+          format: double
+        error_summary:
+          type: string
+        is_manual:
+          type: boolean
+        dry_run:
+          type: boolean
+        triggered_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+    AmortizationRunList:
+      type: object
+      properties:
+        runs:
           type: array
           items:
-            type: object
-            properties:
-              date:
-                type: string
-                format: date
-              count:
-                type: integer
+            $ref: '#/components/schemas/AmortizationRun'
+        total_count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+    AmortizationGroup:
+      type: object
+      properties:
+        group_name:
+          type: string
+        group_id:
+          type: string
+        ci_count:
+          type: integer
+        total_book_value:
+          type: number
+          format: double
+        total_depreciation:
+          type: number
+          format: double
+        average_age:
+          type: number
+          format: double
+    AmortizationSummary:
+      type: object
+      properties:
+        group_by:
+          type: string
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/AmortizationGroup'
+        total_cis:
+          type: integer
+        total_original_cost:
+          type: number
+          format: double
+        total_gross_book_value:
+          type: number
+          format: double
+        total_net_book_value:
+          type: number
+          format: double
+        total_accumulated_depreciation:
+          type: number
+          format: double
+        total_salvage_value:
+          type: number
+          format: double
+        total_monthly_depreciation:
+          type: number
+          format: double
+        generated_at:
+          type: string
+          format: date-time
+    AmortizationSettings:
+      type: object
+      properties:
+        id:
+          type: string
+          example: global
+        currency:
+          type: string
+        default_useful_life_months:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+    UpdateAmortizationSettingsRequest:
+      type: object
+      properties:
+        currency:
+          type: string
+        default_useful_life_months:
+          type: integer
+    UpdateAmortizationConfigRequest:
+      type: object
+      properties:
+        purchase_cost:
+          type: number
+          format: double
+        salvage_value:
+          type: number
+          format: double
+        amort_start_date:
+          type: string
+          format: date-time
+        useful_life_months:
+          type: integer
+        depreciation_method:
+          type: string
+          enum: [straight_line, declining_balance]
+          description: Accepted by the decoder but currently ignored when the configuration is saved
+    CreateAdjustmentRequest:
+      type: object
+      required: [ci_id, amount, description]
+      properties:
+        ci_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        description:
+          type: string
+        effective_date:
+          type: string
+          format: date-time
+    ManualRunRequest:
+      type: object
+      properties:
+        date_override:
+          type: string
+          format: date-time
+        ci_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        dry_run:
+          type: boolean
+          default: false
+    PeriodSummary:
+      type: object
+      properties:
+        opening_book_value:
+          type: number
+          format: double
+        closing_book_value:
+          type: number
+          format: double
+        period_depreciation:
+          type: number
+          format: double
+        period_write_offs:
+          type: number
+          format: double
+        period_adjustments:
+          type: number
+          format: double
+        average_monthly_expense:
+          type: number
+          format: double
+        opening_date:
+          type: string
+        closing_date:
+          type: string
+        months_count:
+          type: integer
+    ScheduleSummary:
+      type: object
+      properties:
+        total_original_cost:
+          type: number
+          format: double
+        total_gross_book_value:
+          type: number
+          format: double
+        total_net_book_value:
+          type: number
+          format: double
+        total_depreciation:
+          type: number
+          format: double
+        total_write_offs:
+          type: number
+          format: double
+        total_adjustments:
+          type: number
+          format: double
+        total_salvage_value:
+          type: number
+          format: double
+        average_monthly_expense:
+          type: number
+          format: double
+        projected_end_value:
+          type: number
+          format: double
+        depreciation_percentage:
+          type: number
+          format: double
+        remaining_percentage:
+          type: number
+          format: double
+    MonthlyScheduleEntry:
+      type: object
+      properties:
+        month:
+          type: string
+          format: date-time
+        is_projected:
+          type: boolean
+        opening_book_value:
+          type: number
+          format: double
+        gross_book_value:
+          type: number
+          format: double
+        depreciation_amount:
+          type: number
+          format: double
+        write_off_amount:
+          type: number
+          format: double
+        adjustment_amount:
+          type: number
+          format: double
+        accumulated_depreciation:
+          type: number
+          format: double
+        closing_book_value:
+          type: number
+          format: double
+        active_assets_count:
+          type: integer
+    CITypeScheduleSummary:
+      type: object
+      properties:
+        ci_type_id:
+          type: string
+          format: uuid
+        ci_type_name:
+          type: string
+        asset_count:
+          type: integer
+        total_book_value:
+          type: number
+          format: double
+        monthly_depreciation:
+          type: number
+          format: double
+    AssetScheduleSummary:
+      type: object
+      properties:
+        ci_id:
+          type: string
+          format: uuid
+        ci_name:
+          type: string
+        ci_type_name:
+          type: string
+        current_book_value:
+          type: number
+          format: double
+        monthly_depreciation:
+          type: number
+          format: double
+        remaining_months:
+          type: integer
+        projected_end_date:
+          type: string
+          format: date-time
+    DepreciationScheduleResponse:
+      type: object
+      properties:
+        currency:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        total_original_cost:
+          type: number
+          format: double
+        total_gross_book_value:
+          type: number
+          format: double
+        total_net_book_value:
+          type: number
+          format: double
+        total_salvage_value:
+          type: number
+          format: double
+        total_accumulated_depreciation:
+          type: number
+          format: double
+        period_summary:
+          $ref: '#/components/schemas/PeriodSummary'
+        summary:
+          $ref: '#/components/schemas/ScheduleSummary'
+        monthly_data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MonthlyScheduleEntry'
+        by_ci_type:
+          type: array
+          items:
+            $ref: '#/components/schemas/CITypeScheduleSummary'
+        by_asset:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetScheduleSummary'
+    RestructuringPreviewRequest:
+      type: object
+      required: [ci_id, new_useful_life_months]
+      properties:
+        ci_id:
+          type: string
+          format: uuid
+        new_useful_life_months:
+          type: integer
+          minimum: 1
+    RestructuringCalculation:
+      type: object
+      properties:
+        current_useful_life_months:
+          type: integer
+        current_monthly_depreciation:
+          type: number
+          format: double
+        current_book_value:
+          type: number
+          format: double
+        accumulated_depreciation:
+          type: number
+          format: double
+        remaining_months_old:
+          type: integer
+        new_useful_life_months:
+          type: integer
+        remaining_months_new:
+          type: integer
+        new_monthly_depreciation:
+          type: number
+          format: double
+        monthly_depreciation_change:
+          type: number
+          format: double
+        percent_change:
+          type: number
+          format: double
+        remaining_life_extension:
+          type: integer
+        new_end_date:
+          type: string
+          format: date-time
+        is_valid:
+          type: boolean
+        validation_message:
+          type: string
+    RestructureRequest:
+      type: object
+      required: [ci_id, new_useful_life_months, reason]
+      properties:
+        ci_id:
+          type: string
+          format: uuid
+        new_useful_life_months:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+        effective_date:
+          type: string
+          format: date-time
+    RestructureResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        calculation:
+          $ref: '#/components/schemas/RestructuringCalculation'
+        ledger_entry_id:
+          type: string
+          format: uuid
+        updated_details:
+          $ref: '#/components/schemas/AmortizationDetails'
+        message:
+          type: string
 
-  # Responses
   responses:
     BadRequest:
-      description: Bad request - Invalid input data
+      description: |
+        Invalid request. Most handlers return `{"error": "..."}`; the users handlers
+        return plain text.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              error:
-                type: string
-              details:
-                type: object
-
+            $ref: '#/components/schemas/ErrorResponse'
+        text/plain:
+          schema:
+            type: string
+    PlainTextBadRequest:
+      description: Invalid request, plain-text body.
+      content:
+        text/plain:
+          schema:
+            type: string
     Unauthorized:
-      description: Unauthorized - Authentication required
+      description: |
+        Missing or invalid JWT. The JWT middleware returns plain text; some handlers
+        return JSON.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              error:
-                type: string
-                example: "Unauthorized - Invalid or missing token"
-
+            $ref: '#/components/schemas/ErrorResponse'
+        text/plain:
+          schema:
+            type: string
+    PlainTextUnauthorized:
+      description: Authentication failed, plain-text body.
+      content:
+        text/plain:
+          schema:
+            type: string
     Forbidden:
-      description: Forbidden - Insufficient permissions
+      description: |
+        The JWT is valid but the RBAC middleware rejected the request for lack of the
+        required permission. Body is plain text.
       content:
-        application/json:
+        text/plain:
           schema:
-            type: object
-            properties:
-              error:
-                type: string
-                example: "Forbidden - Insufficient permissions"
-
+            type: string
     NotFound:
-      description: Resource not found
+      description: Resource not found.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              error:
-                type: string
-                example: "Resource not found"
-
+            $ref: '#/components/schemas/ErrorResponse'
     Conflict:
-      description: Resource conflict - Already exists
+      description: |
+        Conflict with existing state (duplicate type name, CI with relationships).
+        Most handlers return JSON; the users handler returns plain text.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              error:
-                type: string
-                example: "Resource already exists"
-
+            $ref: '#/components/schemas/ErrorResponse'
+        text/plain:
+          schema:
+            type: string
+    UnprocessableEntity:
+      description: Critical validation failure (EA entities).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PlainTextUnprocessableEntity:
+      description: CSV parsing/validation failure, plain-text body.
+      content:
+        text/plain:
+          schema:
+            type: string
+    UnsupportedMediaType:
+      description: |
+        Rejected by the global `AllowContentType("application/json")` middleware
+        because the request body was not JSON.
+      content:
+        text/plain:
+          schema:
+            type: string
     InternalError:
-      description: Internal server error
+      description: |
+        Server error. Most handlers return JSON; authentication handlers and middleware
+        return plain text.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              error:
-                type: string
-                example: "Internal server error"
+            $ref: '#/components/schemas/ErrorResponse'
+        text/plain:
+          schema:
+            type: string
+    PlainTextInternalError:
+      description: Server error, plain-text body.
+      content:
+        text/plain:
+          schema:
+            type: string
+    AmortizationBadRequest:
+      description: Invalid query/body or a malformed UUID (amortization nested error body).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AmortizationErrorResponse'
+    AmortizationInternalError:
+      description: |
+        Amortization handlers map every service failure (including "not found") to
+        `500`; body is the nested amortization error object.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AmortizationErrorResponse'

@@ -1,578 +1,142 @@
 # Porta API Guide
 
-This guide provides comprehensive documentation for using the Porta CMDB API, including authentication, usage examples, and best practices.
+Practical guide to the Porta CMDB HTTP API. The machine-readable contract is
+[`openapi.yaml`](./openapi.yaml); this page covers the authentication flow, RBAC
+permissions, pagination/filtering conventions and error shapes. For endpoint-by-endpoint
+recipes see [`api-examples.md`](./api-examples.md), and for the server architecture
+(middleware stack, service wiring) see [`docs/architecture/api.md`](../architecture/api.md).
 
-## Table of Contents
+> **The contract is explicitly partial.** It documents only the groups verified against
+> the handlers in this repository. Graph, QR, audit, analytics, dashboard and the public
+> CI page are intentionally out of scope for this pass. Do not treat the OpenAPI file as
+> full API coverage.
 
-1. [Getting Started](#getting-started)
-2. [Authentication](#authentication)
-3. [Rate Limiting](#rate-limiting)
-4. [Error Handling](#error-handling)
-5. [Pagination](#pagination)
-6. [Search and Filtering](#search-and-filtering)
-7. [Working with CI Types](#working-with-ci-types)
-8. [Configuration Items](#configuration-items)
-9. [Relationships](#relationships)
-10. [Graph API](#graph-api)
-11. [Audit Logs](#audit-logs)
-12. [SDKs and Tools](#sdks-and-tools)
-13. [Best Practices](#best-practices)
+## Base URL and transport
 
-## Getting Started
+The API process listens on port **8080 inside its container**. `docker compose`
+publishes it on the host as **http://localhost:8081**. All versioned routes live under
+`/api/v1`; `GET /health` is the only route outside that prefix.
 
-### Base URL
-```
-Production: https://api.porta.dev/v1
-Staging: https://staging-api.porta.dev/v1
-Development: http://localhost:8080/api/v1
-```
+- `GET http://localhost:8081/health` - unauthenticated liveness probe
+- `http://localhost:8081/api/v1/...` - everything else
 
-### Quick Start Example
-
-```bash
-# 1. Authenticate
-curl -X POST https://api.porta.dev/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@porta.dev",
-    "password": "your-password"
-  }'
-
-# Response contains access_token and refresh_token
-
-# 2. Use the access token to make authenticated requests
-curl -X GET https://api.porta.dev/v1/ci \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "Content-Type: application/json"
-```
+Every request with a body must send `Content-Type: application/json`. The router applies
+`AllowContentType("application/json")` globally; other media types are rejected with
+`415` before the handler runs.
 
 ## Authentication
 
-Porta uses JWT (JSON Web Token) authentication. You'll receive two tokens when logging in:
-
-- **Access Token**: Short-lived (15 minutes by default) token for API requests
-- **Refresh Token**: Long-lived (7 days by default) token for obtaining new access tokens
-
-### Login Endpoint
-
-```http
-POST /auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "securePassword123"
-}
-```
-
-### Response
-
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expires_in": 900,
-  "user": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "user@example.com",
-    "name": "John Doe",
-    "role": "user",
-    "is_active": true
-  }
-}
-```
-
-### Using the Access Token
-
-Include the access token in the Authorization header for all authenticated requests:
-
-```http
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-### Refreshing Tokens
-
-When your access token expires, use the refresh token to get a new one:
-
-```http
-POST /auth/refresh
-Content-Type: application/json
-
-{
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-## Rate Limiting
-
-The API implements rate limiting to ensure fair usage:
-
-- **Default limit**: 1000 requests per hour per user
-- **Rate limit headers** are included in responses:
-  - `X-RateLimit-Limit`: Total requests allowed per hour
-  - `X-RateLimit-Remaining`: Remaining requests in current window
-  - `X-RateLimit-Reset`: Unix timestamp when rate limit resets
-
-### Rate Limit Response (429)
-
-```json
-{
-  "error": "Rate limit exceeded",
-  "details": {
-    "limit": 1000,
-    "remaining": 0,
-    "reset_time": 1640995200
-  }
-}
-```
-
-## Error Handling
-
-The API uses standard HTTP status codes and provides detailed error information:
-
-### Standard Error Response Format
-
-```json
-{
-  "error": "Human-readable error message",
-  "details": {
-    "field": "Additional error details",
-    "code": "ERROR_CODE"
-  }
-}
-```
-
-### Common HTTP Status Codes
-
-- `200 OK`: Request successful
-- `201 Created`: Resource created successfully
-- `400 Bad Request`: Invalid request data
-- `401 Unauthorized`: Authentication required or invalid
-- `403 Forbidden`: Insufficient permissions
-- `404 Not Found`: Resource not found
-- `409 Conflict`: Resource already exists
-- `422 Unprocessable Entity`: Validation failed
-- `429 Too Many Requests`: Rate limit exceeded
-- `500 Internal Server Error`: Server error
-
-## Pagination
-
-List endpoints support pagination using the following parameters:
-
-### Parameters
-
-- `page` (int): Page number (default: 1)
-- `limit` (int): Items per page (default: 20, max: 100)
-
-### Example
-
-```http
-GET /ci?page=2&limit=50
-```
-
-### Response Format
-
-```json
-{
-  "cis": [...],
-  "page": 2,
-  "limit": 50,
-  "total": 150,
-  "total_pages": 3
-}
-```
-
-## Search and Filtering
-
-### Basic Search
-
-Most list endpoints support a `search` parameter for basic text search:
-
-```http
-GET /ci?search=web-server
-```
-
-### Advanced Filtering
-
-#### CI List Filtering
-
-```http
-GET /ci?ci_type=Server&tags=production,critical&sort=created_at&order=desc
-```
-
-#### Attribute-based Search
-
-For searching within CI attributes, use the `attributes` parameter with JSON:
-
-```http
-GET /ci?attributes={"cpu_cores":{"min":8,"max":16},"os_type":"Ubuntu"}
-```
-
-#### Audit Log Filtering
-
-```http
-GET /audit/logs?action=create&resource_type=ci&start_date=2023-01-01T00:00:00Z&end_date=2023-01-31T23:59:59Z
-```
-
-## Working with CI Types
-
-CI Types define the schema for Configuration Items, including required and optional attributes with validation rules.
-
-### Creating a CI Type
-
-```http
-POST /ci-types
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "name": "Server",
-  "description": "Physical or virtual server",
-  "required_attributes": [
-    {
-      "name": "hostname",
-      "type": "string",
-      "description": "Server hostname",
-      "validation": {
-        "min_length": 1,
-        "max_length": 255,
-        "pattern": "^[a-zA-Z0-9.-]+$"
-      }
-    },
-    {
-      "name": "ip_address",
-      "type": "string",
-      "description": "Primary IP address",
-      "validation": {
-        "format": "ipv4"
-      }
-    }
-  ],
-  "optional_attributes": [
-    {
-      "name": "cpu_cores",
-      "type": "integer",
-      "description": "Number of CPU cores",
-      "validation": {
-        "min": 1,
-        "max": 128
-      }
-    },
-    {
-      "name": "environment",
-      "type": "string",
-      "description": "Environment type",
-      "validation": {
-        "enum": ["development", "staging", "production"]
-      }
-    }
-  ]
-}
-```
-
-### Attribute Validation Types
-
-#### String Attributes
-- `pattern`: Regular expression pattern
-- `min_length`, `max_length`: Length constraints
-- `format`: Predefined formats (email, url, ipv4, date, datetime)
-- `enum`: List of allowed values
-
-#### Integer Attributes
-- `min`, `max`: Value range constraints
-
-#### Boolean Attributes
-- Simple true/false values
-
-#### Array Attributes
-- JSON arrays with optional length validation
-
-#### Object Attributes
-- JSON objects with optional property count validation
-
-## Configuration Items
-
-Configuration Items (CIs) are instances of CI Types with specific attribute values.
-
-### Creating a CI
-
-```http
-POST /ci
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "name": "web-server-01",
-  "ci_type": "Server",
-  "attributes": {
-    "hostname": "web01.example.com",
-    "ip_address": "192.168.1.10",
-    "cpu_cores": 8,
-    "memory_gb": 32,
-    "environment": "production"
-  },
-  "tags": ["production", "web", "critical"]
-}
-```
-
-### Updating a CI
-
-```http
-PUT /ci/550e8400-e29b-41d4-a716-446655440002
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "attributes": {
-    "cpu_cores": 16,
-    "memory_gb": 64
-  },
-  "tags": ["production", "web", "critical", "upgraded"]
-}
-```
-
-### Advanced CI Search
-
-```http
-GET /ci?ci_type=Server&attributes={"cpu_cores":{"min":8},"environment":"production"}
-```
-
-## Relationships
-
-Relationships define connections between Configuration Items.
-
-### Creating a Relationship
-
-```http
-POST /relationships
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "source_id": "550e8400-e29b-41d4-a716-446655440002",
-  "target_id": "550e8400-e29b-41d4-a716-446655440003",
-  "relationship_type": "depends_on",
-  "description": "Web server depends on database server"
-}
-```
-
-### Relationship Types
-
-Common relationship types include:
-- `depends_on`: One CI depends on another
-- `hosts`: One CI hosts another
-- `connects_to`: Network connectivity
-- `manages`: Management relationship
-- `contains`: Physical containment
-- Custom types as needed
-
-## Graph API
-
-The Graph API provides network visualization data for understanding CI relationships.
-
-### Getting Full Graph Data
-
-```http
-GET /graph?limit=100
-Authorization: Bearer YOUR_TOKEN
-```
-
-### Interactive Graph Exploration
-
-```http
-GET /graph/explore?start_id=550e8400-e29b-41d4-a716-446655440002&depth=3&relationship_types=depends_on,hosts
-Authorization: Bearer YOUR_TOKEN
-```
-
-### Graph Data Format
-
-```json
-{
-  "nodes": [
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440002",
-      "label": "web-server-01",
-      "type": "Server",
-      "group": "production",
-      "metadata": {
-        "cpu_cores": 8,
-        "environment": "production"
-      }
-    }
-  ],
-  "edges": [
-    {
-      "id": "rel-001",
-      "source": "550e8400-e29b-41d4-a716-446655440002",
-      "target": "550e8400-e29b-41d4-a716-446655440003",
-      "label": "depends_on",
-      "type": "depends_on"
-    }
-  ],
-  "metadata": {
-    "total_nodes": 25,
-    "total_edges": 40,
-    "layout": "force"
-  }
-}
-```
-
-## Audit Logs
-
-Audit logs provide a complete history of all changes made in the system.
-
-### Retrieving Audit Logs
-
-```http
-GET /audit/logs?page=1&limit=50&action=create&resource_type=ci&start_date=2023-01-01T00:00:00Z
-Authorization: Bearer YOUR_TOKEN
-```
-
-### Audit Log Entry
-
-```json
-{
-  "id": "audit-001",
-  "user_id": "550e8400-e29b-41d4-a716-446655440001",
-  "action": "create",
-  "resource_type": "ci",
-  "resource_id": "550e8400-e29b-41d4-a716-446655440002",
-  "details": {
-    "name": "web-server-01",
-    "ci_type": "Server",
-    "changed_attributes": ["hostname", "ip_address"]
-  },
-  "ip_address": "192.168.1.100",
-  "user_agent": "Mozilla/5.0...",
-  "created_at": "2023-01-01T12:00:00Z"
-}
-```
-
-### Audit Statistics
-
-```http
-GET /audit/stats?period=month
-Authorization: Bearer YOUR_TOKEN
-```
-
-### Exporting Audit Logs
-
-```http
-GET /audit/export?start_date=2023-01-01T00:00:00Z&end_date=2023-01-31T23:59:59Z&format=csv
-Authorization: Bearer YOUR_TOKEN
-```
-
-## SDKs and Tools
-
-### Official SDKs
-
-- **JavaScript/TypeScript**: `npm install @porta/api-client`
-- **Python**: `pip install porta-sdk`
-- **Go**: `go get github.com/tahopetis/porta-go`
-
-### Third-Party Tools
-
-- **Terraform Provider**: Manage CIs as infrastructure
-- **Ansible Modules**: Automate CI management
-- **Grafana Plugin**: Visualize CMDB data
-
-### Example: JavaScript SDK
-
-```javascript
-import { PortaAPI } from '@porta/api-client';
-
-const client = new PortaAPI({
-  baseURL: 'https://api.porta.dev/v1',
-  apiKey: 'your-access-token'
-});
-
-// List configuration items
-const cis = await client.ci.list({
-  ci_type: 'Server',
-  attributes: {
-    environment: 'production'
-  }
-});
-
-// Create a new CI
-const newCI = await client.ci.create({
-  name: 'app-server-01',
-  ci_type: 'Server',
-  attributes: {
-    hostname: 'app01.example.com',
-    cpu_cores: 4
-  }
-});
-```
-
-## Best Practices
-
-### 1. Authentication
-- Store refresh tokens securely
-- Implement automatic token refresh in your client
-- Use short-lived access tokens
-- Revoke tokens when user sessions end
-
-### 2. Error Handling
-- Always check HTTP status codes
-- Implement exponential backoff for rate limits
-- Log error responses for debugging
-- Handle network timeouts gracefully
-
-### 3. Pagination
-- Use reasonable page sizes (20-100 items)
-- Implement pagination controls in UI
-- Cache pagination metadata
-- Handle empty result sets gracefully
-
-### 4. Performance
-- Use specific filters instead of broad searches
-- Cache frequently accessed CI types
-- Implement client-side caching for static data
-- Use conditional requests when possible
-
-### 5. Data Integrity
-- Validate data client-side before sending
-- Use transaction patterns for related changes
-- Implement conflict resolution for concurrent updates
-- Always include meaningful descriptions in relationships
-
-### 6. Security
-- Never expose tokens in client-side code
-- Use HTTPS for all API calls
-- Implement proper role-based access control
-- Audit access to sensitive operations
-
-### 7. Monitoring
-- Monitor API usage and rate limits
-- Track error rates and response times
-- Set up alerts for unusual activity
-- Use audit logs for compliance
-
-### 8. CI Type Design
-- Keep attribute names consistent
-- Use appropriate data types and validation
-- Document attribute purposes and constraints
-- Plan for future extensibility
-
-### 9. Relationship Management
-- Use meaningful relationship types
-- Avoid circular dependencies when possible
-- Document relationship purposes
-- Regularly review and clean up outdated relationships
-
-### 10. Bulk Operations
-- Use batching for large imports
-- Implement progress tracking for long operations
-- Handle partial failures gracefully
-- Provide rollback capabilities for critical operations
-
-## Support and Resources
-
-- **Documentation**: https://docs.porta.dev
-- **API Reference**: https://api.porta.dev/docs
-- **Community**: https://community.porta.dev
-- **Support**: support@porta.dev
-- **Status Page**: https://status.porta.dev
-
-For additional help, check the [OpenAPI specification](./openapi.yaml) for detailed endpoint documentation.
+Authentication is JWT-based. The only public API endpoints are `POST /auth/login`,
+`POST /auth/refresh` and `GET /public/ci/{id}` (the last one is not part of the documented
+contract). Everything else needs `Authorization: Bearer <access_token>`.
+
+1. **Log in** with `username` and `password`. The field is `username`, not `email`:
+
+   ```bash
+   curl -s -X POST http://localhost:8081/api/v1/auth/login \
+     -H 'Content-Type: application/json' \
+     -d '{"username":"admin","password":"Admin@123"}'
+   ```
+
+   The response contains `access_token`, `refresh_token`, `token_type: "Bearer"`,
+   `expires_in`, and the full `user` object (roles and permissions).
+
+2. **Use** the access token on subsequent calls:
+
+   ```bash
+   curl -s http://localhost:8081/api/v1/me -H "Authorization: Bearer $TOKEN"
+   ```
+
+3. **Refresh** before or after expiry. The refresh endpoint validates the refresh token
+   and returns a **new access token and a new refresh token** (both rotate):
+
+   ```bash
+   curl -s -X POST http://localhost:8081/api/v1/auth/refresh \
+     -H 'Content-Type: application/json' \
+     -d "{\"refresh_token\":\"$REFRESH\"}"
+   ```
+
+Default lifetimes come from configuration: access token `24h`
+(`JWT_ACCESS_TOKEN_TTL`), refresh token `168h` (`JWT_REFRESH_TOKEN_TTL`). There is no
+server-side token revocation endpoint; discard tokens client-side.
+
+## Authorization (RBAC)
+
+Every protected route also requires one or more permission strings, checked by middleware
+against the permissions embedded in the JWT. Permissions are seeded by migrations and
+grouped by resource:
+
+| Resource | Permissions |
+| --- | --- |
+| CI | `ci:read`, `ci:create`, `ci:update`, `ci:delete` |
+| CI types | `ci_type:read`, `ci_type:create`, `ci_type:update`, `ci_type:delete` |
+| Relationships | `relationship:read`, `relationship:create`, `relationship:update`, `relationship:delete` |
+| Relationship types | `relationship_type:read`, `relationship_type:create`, `relationship_type:update`, `relationship_type:delete` |
+| Lifecycle statuses | `lifecycle_status:read`, `lifecycle_status:create`, `lifecycle_status:update`, `lifecycle_status:delete` |
+| Users | `user:read`, `user:create`, `user:update`, `user:delete` |
+| Audit | `audit:read` (deletes also need `audit:delete`) |
+| Amortization | `amortization:read`, `amortization:configure`, `amortization:run` (migrations also seed `amortization:adjust`/`amortization:admin`, but no route checks them) |
+| Enterprise architecture | `ea:read`, `ea:create`, `ea:update`, `ea:delete` |
+| System | `system:admin` |
+
+The seeded roles are `admin` (all permissions), `editor` (read on CI, CI types,
+relationships, relationship types, lifecycle statuses, EA and audit; CI and relationship
+create/update/delete; `ea:create`/`ea:update`; `amortization:read/configure`) and
+`viewer` (read-only). Read routes also require their read permission, so a mutation needs
+both the read and the write permission - for example `POST /ci` requires `ci:read`
+**and** `ci:create`. A missing permission produces `403` with a plain-text body.
+
+## Pagination, filtering and sorting
+
+Most list endpoints accept `page` (default 1) and `limit` (default 20, maximum 100);
+out-of-range values are clamped by the handler. Pagination response keys vary by group:
+
+- CMDB lists (`/ci`, `/ci-types`, `/relationships`, `/relationship-types`,
+  `/lifecycle-status`): `page`, `limit`, `total`, `total_pages`
+- EA entities: `page`, `page_size`, `total`, `total_pages`
+- Amortization: `page`, `page_size`, `total_count`, `total_pages`
+
+Common filters: `search` on list endpoints, `ci_type` and repeatable `tags` on `/ci`,
+`source_id`/`target_id`/`relationship_type` on `/relationships`, `category`/`is_active`/
+`is_system` on `/relationship-types`, `domain` on EA queries. `/ci` supports
+`sort=name|type|created_at|updated_at` plus `order=asc|desc`; other list endpoints sort by
+`sort`/`order` with group-specific fields. When in doubt, the operation parameters in
+`openapi.yaml` are authoritative.
+
+## Errors
+
+Check the HTTP status first; error bodies are not uniform:
+
+- Most handlers return `{"error": "<message>"}`.
+- Authentication handlers and the JWT/RBAC middleware return `text/plain`.
+- Amortization returns a nested object:
+  `{"error": {"message": "...", "code": "...", "details": "..."}}`.
+
+Common statuses: `400` invalid input, `401` missing/invalid token, `403` missing
+permission, `404` unknown resource, `409` conflict (duplicate CI-type name, CI still
+referenced), `422` critical EA validation failure, `500` server-side failure. Some
+handlers map "not found" conditions to `500`; where that is the case the operation
+description in `openapi.yaml` says so.
+
+## Implementation status
+
+The contract marks each operation with `x-status`:
+
+- **Implemented** - route and handler match the documented behaviour.
+- **Partial** - route works but has a stated limitation (for example, a handler that
+  resolves path parameters with the wrong router library, or an import route blocked by
+  the global JSON content-type middleware).
+- **Planned** - the documented behaviour is not wired up yet (user update/delete, async
+  import status).
+
+Not implemented or not present: rate limiting, the Prometheus `/metrics` endpoint,
+Redis-backed sessions, `/ci/search`, and one-off audit resources such as `/audit/{id}`.
+Redis is used for caching only. The documented list of paths is a subset of the router;
+do not infer unwritten endpoints from it.
+
+## Related documentation
+
+- [`openapi.yaml`](./openapi.yaml) - partial OpenAPI 3.0.3 contract
+- [`api-examples.md`](./api-examples.md) - runnable curl recipes
+- [`docs/architecture/api.md`](../architecture/api.md) - server structure and middleware
+- [`docs/features/amortization.md`](../features/amortization.md) - amortization module overview, with the [design](../features/amortization/design.md) and [data validation](../features/amortization/data-validation.md) detail docs next to it
