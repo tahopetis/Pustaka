@@ -44,6 +44,10 @@ jobs:
     name: Go vulnerability check (report-only)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # setup-go v7 pins GOTOOLCHAIN=local; the mutable @latest tools need a newer
+    # Go than the module's 1.24, so allow the toolchain to be downloaded.
+    env:
+      GOTOOLCHAIN: auto
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -89,6 +93,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     continue-on-error: true
+    # See govulncheck above: the mutable @latest tool needs a downloaded toolchain.
+    env:
+      GOTOOLCHAIN: auto
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
