@@ -558,9 +558,8 @@ func validateFormat(fieldName, value, format string) []ValidationError {
 func isValidEmail(email string) bool {
 	// Basic email validation - in production, use proper regex or email package
 	return len(email) > 3 && len(email) < 254 &&
-		   len(email) > 0 && email[0] != '@' &&
-		   len(email) > 0 && email[len(email)-1] != '@' &&
-		   contains(email, "@")
+		email[0] != '@' && email[len(email)-1] != '@' &&
+		contains(email, "@")
 }
 
 func isValidURL(url string) bool {
