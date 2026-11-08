@@ -1,6 +1,7 @@
 import { defineConfig, configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
+import { chunkNameFor } from './build/chunks'
 
 export default defineConfig({
   plugins: [vue()],
@@ -25,13 +26,10 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // Vite 8 builds with Rolldown, which only accepts the function form
-        // (the object/array shorthand was removed).
+        // Vite 8 builds with Rolldown, which only accepts the function form.
+        // The classifier lives in build/chunks.ts and is unit-tested.
         manualChunks(id) {
-          if (!id.includes('node_modules')) return
-          if (/node_modules\/(vue|@vue\/|vue-router|pinia)\//.test(id)) return 'vendor'
-          if (/node_modules\/(@headlessui\/vue|@heroicons\/vue)\//.test(id)) return 'ui'
-          if (/node_modules\/(d3|d3-[^/]+|vis-network|vis-data|vis-util)\//.test(id)) return 'charts'
+          return chunkNameFor(id)
         },
       },
     },
