@@ -1,7 +1,7 @@
 import { defineConfig, configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
-import { chunkNameFor } from './build/chunks'
+import { chunkNameFor } from './config/chunks'
 
 export default defineConfig({
   plugins: [vue()],
@@ -27,7 +27,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Vite 8 builds with Rolldown, which only accepts the function form.
-        // The classifier lives in build/chunks.ts and is unit-tested.
+        // The classifier lives in config/chunks.ts and is unit-tested.
         manualChunks(id) {
           return chunkNameFor(id)
         },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chunkNameFor } from '../build/chunks'
+import { chunkNameFor } from '../config/chunks'
 
 describe('chunkNameFor', () => {
   it.each([
