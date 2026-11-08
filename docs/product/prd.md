@@ -1,7 +1,14 @@
+> **Document status: historical.** This PRD predates the Enterprise Architecture and amortization modules and
+> describes an earlier intended scope. It is kept for provenance. Several requirements in it were not implemented:
+> multi-tenancy, SSO/MFA, webhooks/GraphQL, change rollback, generic bulk import/export, configurable
+> tables/dashboards, and an infinite taxonomy hierarchy (the implemented model is flat). It also lists Cost
+> Analysis as out of scope, although the amortization module now ships that capability. For the current state see
+> [project status](../status.md) and [amortization](../features/amortization.md); do not use this document as a
+> statement of what exists.
+
 # Porta CMDB Product Requirements Document (PRD)
 
 **Author:** tahopetis
-**Date:** 2025-10-14
 **Project Level:** 3
 **Project Type:** Web Application (CMDB)
 **Target Scale:** Enterprise (100,000+ CIs, 10,000+ concurrent users)

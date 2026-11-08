@@ -1,7 +1,11 @@
+> **Document status: historical.** This is a pre-build backlog written before the current feature set. The
+> checkboxes were never maintained, and the document predates the Enterprise Architecture, amortization,
+> lifecycle-status administration, and import modules. It is kept for provenance and is not a status report. See
+> [project status](../status.md) and the [CMDB feature documentation](../features/cmdb.md) for what exists today.
+
 # Porta CMDB - Epics and User Stories
 
 **Version**: 1.0
-**Date**: October 14, 2025
 **Status**: Final
 **Project Level**: Level 3 - Complex System
 
