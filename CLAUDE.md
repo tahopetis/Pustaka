@@ -51,6 +51,17 @@ make deps                     # Install/update Go modules
 go mod tidy                   # Clean up modules
 ```
 
+Dependency bumps run in CI, not locally (the dev host is a low-power arm64
+machine; no local Go toolchain is needed):
+
+1. Actions → **go-deps** → *Run workflow* with `module@version` specs
+   (space-separated; `@latest` works).
+2. `gh run download <run-id> -n go-deps-patch`
+3. `git checkout -b chore/go-deps && git apply go-deps.patch`, commit and push.
+
+The push then triggers the normal required-check gate (build/test, CodeQL,
+dependency review, image builds).
+
 ### Frontend (Vue.js)
 ```bash
 cd web/

@@ -1,0 +1,119 @@
+name: go-deps
+
+# Dependency bumps run here, on a GitHub-hosted runner, so no local Go
+# toolchain is required (this repository is developed on a low-power arm64
+# machine; CI is the build environment).
+#
+# WHY A PATCH INSTEAD OF A PULL REQUEST:
+#   Commits pushed with the repository's GITHUB_TOKEN do not trigger workflows,
+#   so a PR opened that way could never satisfy the required status checks
+#   (`Dependency review`, CodeQL, image builds) and would deadlock under branch
+#   protection. Instead the job resolves the modules, verifies sums, and uploads
+#   a ready-to-apply patch. Applying it is a git-only operation:
+#
+#     gh run download <run-id> -n go-deps-patch
+#     git checkout -b chore/go-deps-<something>
+#     git apply go-deps.patch
+#     git commit -am "build(deps): ..." && git push
+#
+#   The subsequent push triggers the full required-check gate as usual.
+
+on:
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: "Space-separated module@version specifiers, e.g. github.com/spf13/viper@latest golang.org/x/text@v0.41.0"
+        required: true
+        type: string
+      tidy:
+        description: "Run `go mod tidy` after `go get`"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-deps
+  cancel-in-progress: true
+
+jobs:
+  resolve:
+    name: Resolve dependency bump
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Follows the module's own `go` directive, so this stays correct when the
+      # minimum Go version moves.
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Resolve modules
+        env:
+          PACKAGES: ${{ inputs.packages }}
+        run: |
+          set -euo pipefail
+          echo "go get $PACKAGES"
+          go get $PACKAGES
+
+      - name: Tidy module file
+        if: inputs.tidy
+        run: go mod tidy
+
+      - name: Verify checksums
+        run: go mod verify
+
+      - name: Produce patch
+        id: patch
+        run: |
+          set -euo pipefail
+          git diff -- go.mod go.sum > go-deps.patch
+          if [ -s go-deps.patch ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No dependency changes were produced."
+          fi
+          echo "--- diff stat ---"
+          git diff --stat -- go.mod go.sum
+          echo "--- go.mod head ---"
+          head -5 go.mod
+
+      - name: Upload patch
+        if: steps.patch.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-deps-patch
+          path: go-deps.patch
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Summarize
+        run: |
+          {
+            echo "## go-deps run"
+            echo ""
+            echo "Requested: \`${{ inputs.packages }}\`"
+            echo ""
+            if [ "${{ steps.patch.outputs.changed }}" = "true" ]; then
+              echo "Apply with:"
+              echo '```sh'
+              echo "gh run download ${{ github.run_id }} -n go-deps-patch"
+              echo "git checkout -b chore/go-deps"
+              echo "git apply go-deps.patch"
+              echo '```'
+              echo ""
+              echo '```'
+              git diff --stat -- go.mod go.sum
+              echo '```'
+            else
+              echo "No changes: the requested modules are already at the resolved versions."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
