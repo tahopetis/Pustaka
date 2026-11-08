@@ -1,7 +1,7 @@
 import { defineConfig, configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
-import { chunkNameFor } from './config/chunks'
+import { chunkGroups } from './config/chunks'
 
 export default defineConfig({
   plugins: [vue()],
@@ -24,12 +24,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    rollupOptions: {
+    // Vite 8 bundles with Rolldown: output.codeSplitting replaces the
+    // deprecated output.manualChunks. Groups live in config/chunks.ts and are
+    // unit-tested.
+    rolldownOptions: {
       output: {
-        // Vite 8 builds with Rolldown, which only accepts the function form.
-        // The classifier lives in config/chunks.ts and is unit-tested.
-        manualChunks(id) {
-          return chunkNameFor(id)
+        codeSplitting: {
+          groups: [...chunkGroups],
         },
       },
     },

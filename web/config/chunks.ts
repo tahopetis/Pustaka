@@ -1,12 +1,20 @@
-// Chunk classifier for the Vite/Rolldown production build.
+// Chunk groups for the Vite/Rolldown production build.
 //
-// Kept as a pure function so the package grouping is unit-testable without
-// running a build (see tests/chunks.test.ts). Vite 8/Rolldown requires the
-// function form of `manualChunks`.
+// Vite 8 bundles with Rolldown: `build.rolldownOptions.output.codeSplitting`
+// replaces the deprecated `build.rollupOptions.output.manualChunks`. The groups
+// are kept as data so the mapping is unit-testable (see tests/chunks.test.ts).
 
-type PackageMatcher = (pkgName: string) => boolean
+export interface ChunkGroup {
+  name: string
+  test: RegExp
+}
 
-const CHART_PACKAGES = new Set([
+const VENDOR_PACKAGES = ['vue', 'vue-router', 'pinia'].join('|')
+
+// d3-* siblings and the graph libraries' direct runtime dependencies.
+const CHART_PACKAGES = [
+  'd3',
+  'd3-[^/]+',
   'vis-network',
   'vis-data',
   'vis-util',
@@ -18,33 +26,28 @@ const CHART_PACKAGES = new Set([
   'safer-buffer',
   '@egjs/hammerjs',
   'keycharm',
-])
+].join('|')
 
-const CHUNK_GROUPS: ReadonlyArray<readonly [string, PackageMatcher]> = [
-  [
-    'vendor',
-    pkg =>
-      pkg === 'vue' ||
-      pkg === 'vue-router' ||
-      pkg === 'pinia' ||
-      pkg.startsWith('@vue/'),
-  ],
-  ['ui', pkg => pkg === '@headlessui/vue' || pkg === '@heroicons/vue'],
-  ['charts', pkg => pkg === 'd3' || pkg.startsWith('d3-') || CHART_PACKAGES.has(pkg)],
+/** Groups are evaluated in order; the first match wins. */
+export const chunkGroups: readonly ChunkGroup[] = [
+  {
+    name: 'vendor',
+    test: new RegExp(`node_modules/(?:${VENDOR_PACKAGES}|@vue/[^/]+)/`),
+  },
+  {
+    name: 'ui',
+    test: /node_modules\/(?:@headlessui\/vue|@heroicons\/vue)\//,
+  },
+  {
+    name: 'charts',
+    test: new RegExp(`node_modules/(?:${CHART_PACKAGES})/`),
+  },
 ]
 
 /** Returns the chunk name for a module id, or undefined to let Vite decide. */
 export function chunkNameFor(id: string): string | undefined {
-  const match = id.match(/node_modules\/(.+)$/)
-  if (!match) return undefined
-
-  const rest = match[1]
-  const pkgName = rest.startsWith('@')
-    ? rest.split('/').slice(0, 2).join('/')
-    : rest.split('/')[0]
-
-  for (const [chunkName, matches] of CHUNK_GROUPS) {
-    if (matches(pkgName)) return chunkName
+  for (const group of chunkGroups) {
+    if (group.test.test(id)) return group.name
   }
   return undefined
 }
