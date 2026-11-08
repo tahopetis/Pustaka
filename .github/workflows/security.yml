@@ -5,9 +5,9 @@ name: security
 # Disposition in this first iteration:
 #   - dependency-review: BLOCKING. It only judges the PR's own dependency/action
 #     changes, so it catches new vulnerable dependencies without freezing work.
-#   - npm audit: BLOCKING (high/critical). 5 moderate advisories remain, all
-#     dev-only via @vue/test-utils -> js-beautify -> editorconfig/glob/minimatch;
-#     clearing them needs a semver-major test-utils downgrade, so they are accepted.
+#   - npm audit: BLOCKING (high/critical). 4 moderate advisories remain, all
+#     dev-only via @vue/test-utils -> js-beautify -> editorconfig/glob -> minimatch;
+#     they clear when @vue/test-utils updates js-beautify, so they are accepted.
 #   - govulncheck: report-only for 2 residual findings in github.com/docker/docker,
 #     which has no fixed release; tracked in #40 (drop dockertest).
 #   - gosec / Trivy: report-only (SARIF to the Security tab); flip later.
@@ -84,8 +84,8 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-      # Blocks on high/critical. Remaining: 5 moderate, dev-only through
-      # @vue/test-utils -> js-beautify -> editorconfig/glob/minimatch;
+      # Blocks on high/critical. Remaining: 4 moderate, dev-only through
+      # @vue/test-utils -> js-beautify -> editorconfig/glob -> minimatch;
       # --audit-level=high exits 0.
       - name: Audit (fails on high/critical)
         run: npm audit --audit-level=high
