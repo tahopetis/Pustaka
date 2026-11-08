@@ -5,7 +5,8 @@ name: security
 # Disposition in this first iteration:
 #   - dependency-review: BLOCKING. It only judges the PR's own dependency/action
 #     changes, so it catches new vulnerable dependencies without freezing work.
-#   - npm audit: report-only until the frontend major upgrades land (#12/#35).
+#   - npm audit: BLOCKING (high/critical). After the frontend major migration
+#     only moderate dev-only advisories remain; threshold is --audit-level=high (#12).
 #   - govulncheck: report-only for 2 residual findings in github.com/docker/docker,
 #     which has no fixed release; tracked in #40 (drop dockertest).
 #   - gosec / Trivy: report-only (SARIF to the Security tab); flip later.
@@ -65,7 +66,7 @@ jobs:
         run: govulncheck $(go list -e ./... | grep -vE '/internal/(api|ci|auth)$|amortization_tests')
 
   npm-audit:
-    name: npm audit (report-only)
+    name: npm audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -82,10 +83,9 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-      # Pre-existing backlog: 34 advisories in the lockfile (issue #12).
-      # Report-only until they are updated, then remove continue-on-error.
+      # Blocks on high/critical. Remaining advisories are dev-only moderate
+      # (editorconfig -> minimatch chain); --audit-level=high exits 0.
       - name: Audit (fails on high/critical)
-        continue-on-error: true
         run: npm audit --audit-level=high
 
   gosec:
