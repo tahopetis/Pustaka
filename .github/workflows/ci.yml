@@ -32,8 +32,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/porta_test?sslmode=disable
+      TEST_REDIS_URL: redis://localhost:6379
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -52,8 +62,10 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # -p 1: the database-backed suites in different packages share one
+      # Postgres/Redis instance and truncate it between tests.
       - name: Test
-        run: go test ./... -count=1
+        run: go test -p 1 ./... -count=1
 
   frontend:
     name: Frontend unit tests + production build
