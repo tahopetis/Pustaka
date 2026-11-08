@@ -5,9 +5,10 @@ name: security
 # Disposition in this first iteration:
 #   - dependency-review: BLOCKING. It only judges the PR's own dependency/action
 #     changes, so it catches new vulnerable dependencies without freezing work.
-#   - npm audit: BLOCKING (high/critical). 4 moderate advisories remain, all
-#     dev-only via @vue/test-utils -> js-beautify -> editorconfig/glob -> minimatch;
-#     they clear when @vue/test-utils updates js-beautify, so they are accepted.
+#   - npm audit: BLOCKING (high/critical). 0 advisories: web/package.json overrides
+#     pin minimatch ^11.0.1 and glob ^14.0.2 to neutralise the dev-only
+#     @vue/test-utils -> js-beautify chain. Remove the overrides when the
+#     dependency uplifts; they exist only while upstream lags the fixes.
 #   - govulncheck: BLOCKING on reachable findings. #55 removed dockertest and
 #     the last import path to the retired docker/docker module, so no vulnerability
 #     is reachable from our code. Module-graph residue remains: go.sum keeps the
