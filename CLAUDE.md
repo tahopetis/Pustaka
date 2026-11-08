@@ -22,6 +22,7 @@ go run cmd/api/main.go       # Alternative way to run API
 
 # Testing
 make test                     # Run all Go tests
+make test-integration         # DB-backed suites (needs TEST_DATABASE_URL, see below)
 go test ./...                 # Run tests directly
 go test ./internal/ci/        # Run specific package tests
 go test -v ./internal/ci/     # Run tests with verbose output
@@ -242,6 +243,10 @@ curl http://localhost:8081/health
 # Verify database connections
 docker exec -it porta-postgres psql -U porta -d porta -c "SELECT 1;"
 docker exec -it porta-neo4j cypher-shell -u neo4j -p password "RETURN 1;"
+
+# Database-backed suites (internal/auth, internal/ci) skip unless the target
+# database name contains "test"; the helper creates tables and deletes rows:
+#   TEST_DATABASE_URL=postgres://porta:password@localhost:5433/porta_test?sslmode=disable make test-integration
 
 # Run specific tests with coverage
 go test -cover ./internal/ci/
