@@ -53,7 +53,7 @@ It supports hierarchical taxonomies, relationship mapping, access control, and a
 ## 🔧 Prerequisites
 
 - Docker & Docker Compose  
-- Go 1.24+ (if running locally)  
+- Go 1.25+ (if running locally)  
 - Node.js 24+ (frontend development)  
 
 ---
