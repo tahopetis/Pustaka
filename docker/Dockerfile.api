@@ -2,7 +2,7 @@
 # Built on the builder's native platform and cross-compiled for $TARGETARCH:
 # Go is a native cross-compiler and the code is pure Go (CGO disabled), so
 # emulating the Go compiler under QEMU for arm64 is unnecessary and slow.
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
