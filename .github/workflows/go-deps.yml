@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Follows the module's own `go` directive, so this stays correct when the
       # minimum Go version moves.
